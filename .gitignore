@@ -1,0 +1,42 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data directories
+data/
+temp/
+*.mp4
+*.ts
+*.m4s
+*.m3u8
+
+# WireGuard keys (private)
+*.key
+infra/wireguard/private/
+
+# Extractor build artifacts
+extractors/**/*.js
+extractors/**/*.map
+node_modules/
+
+# Logs
+*.log
+logs/

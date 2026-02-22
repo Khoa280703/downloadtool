@@ -1,0 +1,69 @@
+# Dockerfile for VPS deployment
+# Builds the API server and related components without GPU support
+
+# Stage 1: Builder
+FROM rust:1.82-bookworm AS builder
+
+WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace configuration
+COPY Cargo.toml ./
+COPY Cargo.lock ./
+
+# Copy all crates
+COPY crates/ ./crates/
+
+# Copy proto files
+COPY proto/ ./proto/
+
+# Build the release binary
+RUN cargo build --release --bin api-server
+
+# Stage 2: Runtime
+FROM debian:bookworm-slim AS runtime
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash appuser
+
+# Copy binary from builder
+COPY --from=builder /app/target/release/api-server /usr/local/bin/
+
+# Copy extractor scripts
+COPY --from=builder /app/crates/extractor/scripts/ /app/extractors/ || true
+
+# Create directories
+RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Environment variables
+ENV PORT=3000
+ENV EXTRACTOR_DIR=/app/extractors
+ENV GPU_ENABLED=false
+ENV RUST_LOG=info
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Run the server
+CMD ["api-server"]

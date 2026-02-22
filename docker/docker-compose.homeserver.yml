@@ -1,0 +1,35 @@
+# Docker Compose for Home Server deployment
+version: "3.8"
+
+services:
+  gpu-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.homeserver
+    container_name: downloadtool-gpu-worker
+    ports:
+      - "50051:50051"
+    environment:
+      - GPU_WORKER_BIND=0.0.0.0:50051
+      - GPU_WORKER_MAX_JOBS=4
+      - CUDA_DEVICE_ID=0
+      - RUST_LOG=info
+    volumes:
+      - gpu-worker-data:/app/data
+    restart: unless-stopped
+    networks:
+      - downloadtool-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  gpu-worker-data:
+
+networks:
+  downloadtool-net:
+    driver: bridge

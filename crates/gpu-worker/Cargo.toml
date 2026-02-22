@@ -1,0 +1,40 @@
+[package]
+name = "gpu-worker"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+
+# gRPC
+tonic = { workspace = true }
+prost = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Internal crates
+gpu-pipeline = { path = "../gpu-pipeline", features = ["gpu-support"] }
+
+# Configuration
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+# Bytes handling
+bytes = "1"
+
+[build-dependencies]
+tonic-build = "0.12"
+
+[[bin]]
+name = "gpu-worker-server"
+path = "src/main.rs"

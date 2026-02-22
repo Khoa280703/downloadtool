@@ -1,0 +1,38 @@
+[package]
+name = "muxer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Bytes handling
+bytes = { workspace = true }
+
+# Streaming utilities
+futures = "0.3"
+
+# fMP4 muxing
+mp4-stream = "0.4"
+
+# Internal crates
+proxy = { path = "../proxy" }
+extractor = { path = "../extractor" }
+
+[dev-dependencies]
+tokio-test = "0.4"

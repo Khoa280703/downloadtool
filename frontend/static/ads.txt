@@ -1,0 +1,15 @@
+# Ads.txt file for VideoDL
+# This file lists authorized digital sellers for this website
+
+# Google AdSense (placeholder - update with actual IDs when approved)
+# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
+
+# AdsTerra (update with actual publisher IDs)
+# adsterra.com, XXXXXX, DIRECT
+# 152media.info, 152M1, RESELLER
+# adform.com, 1941, RESELLER
+
+# PropellerAds (update with actual publisher IDs)
+# propellerads.com, XXXXXX, DIRECT
+
+# Contact: ads@videodl.app for any questions regarding this ads.txt file

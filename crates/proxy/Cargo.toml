@@ -1,0 +1,44 @@
+[package]
+name = "proxy"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+
+# HTTP client
+reqwest = { workspace = true }
+
+# Web framework
+axum = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Streaming
+bytes = "1"
+futures = "0.3"
+
+# Tower middleware
+tower = "0.4"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Anti-bot layer
+dashmap = "6"
+chrono = "0.4"
+dirs = "5"
+
+[dev-dependencies]
+tokio-test = "0.4"

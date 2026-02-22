@@ -1,0 +1,85 @@
+# Dockerfile for Home Server deployment
+# Builds the GPU worker with CUDA support for hardware transcoding
+
+FROM nvidia/cuda:12.3.2-devel-ubuntu22.04 AS builder
+
+WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    ffmpeg \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswscale-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Copy workspace configuration
+COPY Cargo.toml ./
+COPY Cargo.lock ./
+
+# Copy all crates
+COPY crates/ ./crates/
+
+# Copy proto files
+COPY proto/ ./proto/
+
+# Build the GPU worker with CUDA support
+RUN cargo build --release --bin gpu-worker-server --features gpu-support
+
+# Stage 2: Runtime
+FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04 AS runtime
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    ffmpeg \
+    libavcodec58 \
+    libavformat58 \
+    libavutil56 \
+    libswscale5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash appuser
+
+# Copy binary from builder
+COPY --from=builder /app/target/release/gpu-worker-server /usr/local/bin/
+
+# Create directories
+RUN mkdir -p /app/data && chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Environment variables
+ENV GPU_WORKER_BIND=0.0.0.0:50051
+ENV GPU_WORKER_MAX_JOBS=4
+ENV CUDA_DEVICE_ID=0
+ENV RUST_LOG=info
+
+# NVIDIA runtime configuration
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+
+# Expose gRPC port
+EXPOSE 50051
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD echo "health check placeholder" || exit 0
+
+# Run the GPU worker
+CMD ["gpu-worker-server"]

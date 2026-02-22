@@ -1,0 +1,246 @@
+<script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { consent, hasDecided } from '$stores/consent';
+	import { trackConsent } from '$lib/analytics';
+
+	/**
+	 * Show/hide detailed info
+	 */
+	let showDetails = $state(false);
+
+	/**
+	 * Handle accept action
+	 */
+	function handleAccept(): void {
+		consent.accept();
+		trackConsent(true, 'banner');
+	}
+
+	/**
+	 * Handle reject action
+	 */
+	function handleReject(): void {
+		consent.reject();
+		trackConsent(false, 'banner');
+	}
+</script>
+
+{#if !$hasDecided}
+	<div
+		class="cookie-banner"
+		transition:slide={{ duration: 300 }}
+		role="region"
+		aria-label="Cookie consent"
+	>
+		<div class="cookie-content">
+			<div class="cookie-text">
+				<h4>We value your privacy</h4>
+				<p>
+					We use cookies to enhance your browsing experience, serve personalized ads,
+					and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.
+					<a href="/privacy">Learn more</a>
+				</p>
+			</div>
+
+			{#if showDetails}
+				<div class="cookie-details" transition:slide={{ duration: 200 }}>
+					<ul>
+						<li>
+							<strong>Essential:</strong> Required for the site to function properly.
+							Always enabled.
+						</li>
+						<li>
+							<strong>Analytics:</strong> Helps us understand how visitors interact
+							with our website.
+						</li>
+						<li>
+							<strong>Advertising:</strong> Used to deliver relevant advertisements
+							and track their performance.
+						</li>
+					</ul>
+				</div>
+			{/if}
+
+			<div class="cookie-actions">
+				<button class="btn-accept" onclick={handleAccept}>
+					Accept All
+				</button>
+				<button class="btn-reject" onclick={handleReject}>
+					Reject Non-Essential
+				</button>
+				<button
+					class="btn-details"
+					onclick={() => showDetails = !showDetails}
+					aria-expanded={showDetails}
+				>
+					{showDetails ? 'Hide Details' : 'Show Details'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<style>
+	.cookie-banner {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		background: var(--bg-color, #ffffff);
+		border-top: 1px solid var(--border-color, #e5e7eb);
+		box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+		z-index: 999;
+		padding: 1rem;
+	}
+
+	.cookie-content {
+		max-width: 1200px;
+		margin: 0 auto;
+	}
+
+	.cookie-text h4 {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text-color, #111827);
+		margin: 0 0 0.5rem;
+	}
+
+	.cookie-text p {
+		font-size: 0.875rem;
+		color: var(--text-secondary, #6b7280);
+		margin: 0 0 1rem;
+		line-height: 1.5;
+	}
+
+	.cookie-text a {
+		color: var(--primary-color, #3b82f6);
+		text-decoration: none;
+	}
+
+	.cookie-text a:hover {
+		text-decoration: underline;
+	}
+
+	.cookie-details {
+		background: var(--card-bg, #f9fafb);
+		border-radius: 0.5rem;
+		padding: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.cookie-details ul {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	.cookie-details li {
+		font-size: 0.875rem;
+		color: var(--text-secondary, #6b7280);
+		margin-bottom: 0.5rem;
+		padding-left: 1.25rem;
+		position: relative;
+	}
+
+	.cookie-details li:last-child {
+		margin-bottom: 0;
+	}
+
+	.cookie-details li::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0.5rem;
+		width: 6px;
+		height: 6px;
+		background: var(--primary-color, #3b82f6);
+		border-radius: 50%;
+	}
+
+	.cookie-actions {
+		display: flex;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.cookie-actions button {
+		padding: 0.625rem 1.25rem;
+		border-radius: 0.5rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		border: none;
+	}
+
+	.btn-accept {
+		background: var(--primary-color, #3b82f6);
+		color: white;
+	}
+
+	.btn-accept:hover {
+		background: var(--primary-hover, #2563eb);
+	}
+
+	.btn-reject {
+		background: transparent;
+		color: var(--text-secondary, #6b7280);
+		border: 1px solid var(--border-color, #e5e7eb) !important;
+	}
+
+	.btn-reject:hover {
+		background: var(--card-bg, #f9fafb);
+		color: var(--text-color, #111827);
+	}
+
+	.btn-details {
+		background: transparent;
+		color: var(--text-secondary, #6b7280);
+		text-decoration: underline;
+		padding-left: 0.5rem !important;
+		padding-right: 0.5rem !important;
+	}
+
+	.btn-details:hover {
+		color: var(--text-color, #111827);
+	}
+
+	@media (min-width: 640px) {
+		.cookie-banner {
+			padding: 1.5rem;
+		}
+
+		.cookie-content {
+			display: flex;
+			align-items: flex-start;
+			gap: 2rem;
+		}
+
+		.cookie-text {
+			flex: 1;
+		}
+
+		.cookie-text p {
+			margin-bottom: 0;
+		}
+
+		.cookie-actions {
+			flex-direction: column;
+			min-width: 160px;
+		}
+
+		.cookie-actions button {
+			width: 100%;
+		}
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.cookie-banner {
+			--bg-color: #111827;
+			--card-bg: #1f2937;
+			--border-color: #374151;
+			--text-color: #f9fafb;
+			--text-secondary: #9ca3af;
+		}
+	}
+</style>

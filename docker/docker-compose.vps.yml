@@ -1,0 +1,36 @@
+# Docker Compose for VPS deployment
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.vps
+    container_name: downloadtool-api
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - EXTRACTOR_DIR=/app/extractors
+      - GPU_WORKER_ADDR=10.0.0.2:50051
+      - GPU_ENABLED=false
+      - RUST_LOG=info
+    volumes:
+      - ./extractors:/app/extractors:ro
+      - api-data:/app/data
+    restart: unless-stopped
+    networks:
+      - downloadtool-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  api-data:
+
+networks:
+  downloadtool-net:
+    driver: bridge
