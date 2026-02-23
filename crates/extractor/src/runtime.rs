@@ -4,12 +4,10 @@
 //! and logging, then loads the bundled TypeScript extractor scripts.
 
 use crate::types::{ExtractionError, VideoFormat, VideoInfo};
-use deno_core::{op2, Extension, JsRuntime, OpState, RuntimeOptions};
+use deno_core::{op2, JsRuntime, PollEventLoopOptions, RuntimeOptions};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
@@ -25,12 +23,18 @@ struct FetchResponse {
 }
 
 /// Request options for fetch op
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 struct FetchOptions {
     method: Option<String>,
     headers: Option<HashMap<String, String>>,
     body: Option<String>,
 }
+
+// Register custom ops with deno_core 0.300 extension macro
+deno_core::extension!(
+    extractor_ops,
+    ops = [op_fetch, op_log],
+);
 
 /// JavaScript runtime wrapper for running extractors
 pub struct ExtractorRuntime {
@@ -40,22 +44,59 @@ pub struct ExtractorRuntime {
 impl ExtractorRuntime {
     /// Create a new extractor runtime with bundled scripts loaded
     pub fn new(js_bundle: &str) -> Result<Self, ExtractionError> {
-        let extensions = vec![
-            Extension::builder("extractor_ops")
-                .ops(vec![op_fetch::decl(), op_log::decl()])
-                .build(),
-        ];
-
         let options = RuntimeOptions {
-            extensions,
+            extensions: vec![extractor_ops::init_ops()],
             ..Default::default()
         };
 
         let mut runtime = JsRuntime::new(options);
 
+        // Inject fetch polyfill that wraps op_fetch to provide standard fetch API
+        // (op_fetch returns plain object; extractor code expects Response with .text()/.json())
+        let fetch_polyfill = r#"
+(function() {
+    var _rawOpFetch = Deno.core.ops.op_fetch;
+    function makeResponse(raw) {
+        return {
+            ok: raw.ok,
+            status: raw.status,
+            statusText: raw.status_text || '',
+            headers: {
+                get: function(h) { return (raw.headers && raw.headers[h.toLowerCase()]) || null; },
+                has: function(h) { return !!(raw.headers && raw.headers[h.toLowerCase()]); }
+            },
+            url: raw.url || '',
+            text: function() { return Promise.resolve(raw.body || ''); },
+            json: function() {
+                return new Promise(function(resolve, reject) {
+                    try { resolve(JSON.parse(raw.body || 'null')); }
+                    catch(e) { reject(e); }
+                });
+            }
+        };
+    }
+    var wrappedFetch = async function fetch(url, init) {
+        var opts = init ? { method: init.method, headers: init.headers, body: init.body } : null;
+        var raw = await _rawOpFetch(url, opts);
+        return makeResponse(raw);
+    };
+    // Override Deno.core.ops.op_fetch so extractor code gets Response-like object
+    if (typeof Deno !== 'undefined' && Deno.core && Deno.core.ops) {
+        Deno.core.ops.op_fetch = wrappedFetch;
+    }
+    // Also provide global fetch fallback
+    globalThis.fetch = wrappedFetch;
+})();
+"#;
+        runtime
+            .execute_script("fetch_polyfill.js", fetch_polyfill.to_string())
+            .map_err(|e| {
+                ExtractionError::JavaScriptError(format!("Failed to load fetch polyfill: {}", e))
+            })?;
+
         // Load the bundled extractor JavaScript
         runtime
-            .execute_script("extractors.js", js_bundle)
+            .execute_script("extractors.js", js_bundle.to_string())
             .map_err(|e| {
                 ExtractionError::JavaScriptError(format!(
                     "Failed to load extractor bundle: {}",
@@ -95,20 +136,25 @@ impl ExtractorRuntime {
 
         let result = self
             .runtime
-            .execute_script("extract_call.js", &code)
+            .execute_script("extract_call.js", code)
             .map_err(|e| {
                 ExtractionError::JavaScriptError(format!("Script execution failed: {}", e))
             })?;
 
-        // Resolve the promise
-        let resolved = self.runtime.resolve_value(&result).await.map_err(|e| {
-            ExtractionError::JavaScriptError(format!("Promise resolution failed: {}", e))
-        })?;
+        // Resolve the promise while driving the event loop (required for async ops like op_fetch)
+        let resolve_fut = self.runtime.resolve(result);
+        let resolved = self
+            .runtime
+            .with_event_loop_promise(resolve_fut, PollEventLoopOptions::default())
+            .await
+            .map_err(|e| {
+                ExtractionError::JavaScriptError(format!("Promise resolution failed: {}", e))
+            })?;
 
         // Convert to serde_json::Value
         let scope = &mut self.runtime.handle_scope();
-        let local = deno_core::v8::Local::new(scope, resolved);
-        let value = serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
+        let local = deno_core::v8::Local::new(scope, &resolved);
+        let value = deno_core::serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
             ExtractionError::JavaScriptError(format!("Failed to deserialize result: {}", e))
         })?;
 
@@ -180,11 +226,18 @@ fn parse_extraction_result(
         let bitrate = stream_obj.get("bitrate").and_then(|v| v.as_u64());
 
         let codec = stream_obj.get("codec").and_then(|v| v.as_str()).map(String::from);
+        let codec_label = stream_obj.get("codecLabel").and_then(|v| v.as_str()).map(String::from);
+        let has_audio = stream_obj.get("hasAudio").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_audio_only = stream_obj.get("isAudioOnly").and_then(|v| v.as_bool()).unwrap_or(false);
 
         formats.push(VideoFormat {
             format_id: format!("{}-{}", format, idx),
+            quality: quality.to_string(),
             vcodec: if mime.contains("video") { codec.clone() } else { None },
             acodec: if mime.contains("audio") { codec } else { None },
+            codec_label,
+            has_audio,
+            is_audio_only,
             width,
             height,
             fps: None,
@@ -218,9 +271,9 @@ const ALLOWED_DOMAINS: &[&str] = &[
 ];
 
 /// Validate URL against allowed domains
-fn validate_url(url: &str) -> Result<(), deno_core::error::AnyError> {
+fn validate_url(url: &str) -> Result<(), anyhow::Error> {
     let parsed = reqwest::Url::parse(url)
-        .map_err(|e| deno_core::error::anyhow!("Invalid URL: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Invalid URL: {}", e))?;
 
     let host = parsed.host_str().unwrap_or("");
 
@@ -229,7 +282,7 @@ fn validate_url(url: &str) -> Result<(), deno_core::error::AnyError> {
     });
 
     if !is_allowed {
-        return Err(deno_core::error::anyhow!(
+        return Err(anyhow::anyhow!(
             "Domain not allowed: {}. Allowed domains: {:?}",
             host,
             ALLOWED_DOMAINS
@@ -243,10 +296,9 @@ fn validate_url(url: &str) -> Result<(), deno_core::error::AnyError> {
 #[op2(async)]
 #[serde]
 async fn op_fetch(
-    state: Rc<RefCell<OpState>>,
     #[string] url: String,
     #[serde] options: Option<FetchOptions>,
-) -> Result<FetchResponse, deno_core::error::AnyError> {
+) -> Result<FetchResponse, anyhow::Error> {
     // Security: validate domain whitelist
     if let Err(e) = validate_url(&url) {
         warn!("Blocked fetch to non-allowed domain: {}", e);
@@ -307,8 +359,12 @@ async fn op_fetch(
                 }
             }
 
-            // Get body as text
+            // Get body as text (reqwest auto-decompresses gzip/brotli/deflate)
             let body = resp.text().await.unwrap_or_default();
+
+            debug!("op_fetch {} -> status={}, body_len={}, body_preview={:?}",
+                url, status.as_u16(), body.len(),
+                &body.chars().take(200).collect::<String>());
 
             Ok(FetchResponse {
                 ok: status.is_success(),

@@ -5,6 +5,12 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = []
+# Enable GPU hardware support (requires FFmpeg with NVENC/NVDEC and CUDA)
+# Only activate on Home Server: cargo build --bin gpu-node --features gpu
+gpu = ["gpu-pipeline/gpu-support"]
+
 [dependencies]
 # Async runtime
 tokio = { workspace = true }
@@ -22,9 +28,6 @@ tracing-subscriber = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 
-# Internal crates
-gpu-pipeline = { path = "../gpu-pipeline", features = ["gpu-support"] }
-
 # Configuration
 config = { workspace = true }
 dotenvy = { workspace = true }
@@ -32,9 +35,15 @@ dotenvy = { workspace = true }
 # Bytes handling
 bytes = "1"
 
+# Async streaming
+futures = "0.3"
+
+# Internal crates
+gpu-pipeline = { path = "../gpu-pipeline" }
+
 [build-dependencies]
 tonic-build = "0.12"
 
 [[bin]]
-name = "gpu-worker-server"
+name = "gpu-node"
 path = "src/main.rs"

@@ -4,6 +4,7 @@
 //! and request throttling to avoid bot detection.
 
 use crate::cookie_store::{CookieStore, Platform};
+use futures::StreamExt;
 use crate::header_builder::HeaderBuilder;
 use crate::proxy_pool::ProxyPool;
 use crate::throttle::DomainThrottle;
@@ -95,7 +96,7 @@ impl AntiBotClient {
         _cookie_store: &CookieStore,
     ) -> Result<Client, AntiBotError> {
         let mut builder = Client::builder()
-            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(10)
             .cookie_store(true)  // Use built-in cookie store
             .connection_verbose(false);

@@ -38,33 +38,62 @@ impl ExtractorPool {
 
     /// Extract video information from a URL
     ///
-    /// This method acquires a permit from the semaphore, creates a new
-    /// JsRuntime isolate, and runs the extraction.
+    /// JsRuntime is !Send, so work runs in spawn_blocking with its own runtime.
     pub async fn extract(
         &self,
         platform: &str,
         url: &str,
         cookies: Option<&str>,
     ) -> Result<VideoInfo, ExtractionError> {
-        let _permit = self
-            .semaphore
-            .acquire()
+        // OwnedSemaphorePermit is Send + 'static, safe to move into spawn_blocking
+        let permit = Arc::clone(&self.semaphore)
+            .acquire_owned()
             .await
             .map_err(|e| ExtractionError::ScriptExecutionFailed(e.to_string()))?;
 
         debug!("Acquired pool permit for {} extraction", platform);
 
-        // Create a new runtime for this extraction
-        // Each isolate is single-threaded and not Send, so we create it here
-        let mut runtime = ExtractorRuntime::new(&self.js_bundle)?;
+        let bundle = Arc::clone(&self.js_bundle);
+        let platform = platform.to_string();
+        let url = url.to_string();
+        let cookies = cookies.map(String::from);
 
-        // Run the extraction
-        let result = runtime.extract(platform, url, cookies).await;
+        // JsRuntime is !Send — must run on a dedicated std::thread (not spawn_blocking).
+        // Using spawn_blocking + rt.block_on() creates nested tokio contexts which
+        // prevents deno_core's async ops from polling correctly (they hang indefinitely).
+        // std::thread::spawn starts fresh with no existing runtime context, so
+        // LocalSet::block_on works properly and async ops (op_fetch) can resolve.
+        let (tx, rx) = tokio::sync::oneshot::channel();
 
-        // Permit is automatically released when _permit drops
-        debug!("Released pool permit for {} extraction", platform);
+        std::thread::spawn(move || {
+            let _permit = permit; // released when thread exits
 
-        result
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    let _ = tx.send(Err(ExtractionError::ScriptExecutionFailed(e.to_string())));
+                    return;
+                }
+            };
+
+            let local = tokio::task::LocalSet::new();
+            let result = local.block_on(&rt, async move {
+                let mut runtime = ExtractorRuntime::new(&bundle)?;
+                runtime.extract(&platform, &url, cookies.as_deref()).await
+            });
+
+            let _ = tx.send(result);
+        });
+
+        let result = rx
+            .await
+            .map_err(|e| ExtractionError::ScriptExecutionFailed(e.to_string()))??;
+
+        debug!("Completed extraction");
+        Ok(result)
     }
 
     /// Get the pool size

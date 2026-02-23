@@ -16,10 +16,10 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 
 # HTTP client
-reqwest = { version = "0.12", features = ["stream", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["stream", "rustls-tls", "cookies", "gzip", "brotli", "deflate"] }
 
 # JavaScript runtime for extractors
-deno_core = "0.295"
+deno_core = "0.300"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -41,12 +41,10 @@ anyhow = "1"
 config = "0.14"
 dotenvy = "0.15"
 
-# Video processing
-ffmpeg-next = { version = "7", optional = true }
+# Bytes handling
+bytes = "1"
+futures = "0.3"
 
-[features]
-default = []
-gpu = ["gpu-pipeline/gpu-support"]
 
 [profile.release]
 opt-level = 3

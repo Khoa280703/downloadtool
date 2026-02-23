@@ -143,10 +143,16 @@ mod tests {
     use super::*;
 
     fn create_video_format(id: &str, vcodec: Option<&str>, acodec: Option<&str>, height: Option<u32>, bitrate: Option<u64>) -> VideoFormat {
+        let is_audio_only = acodec.is_some() && vcodec.is_none();
+        let has_audio = acodec.is_some() || vcodec.map(|v| v.contains("mp4a")).unwrap_or(false);
         VideoFormat {
             format_id: id.to_string(),
+            quality: height.map(|h| format!("{}p", h)).unwrap_or_else(|| "Audio".to_string()),
             vcodec: vcodec.map(|s| s.to_string()),
             acodec: acodec.map(|s| s.to_string()),
+            codec_label: None,
+            has_audio,
+            is_audio_only,
             width: height.map(|h| (h as f32 * 16.0 / 9.0) as u32),
             height,
             fps: Some(30.0),

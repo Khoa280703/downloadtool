@@ -53,10 +53,18 @@ pub struct VideoInfo {
 pub struct VideoFormat {
     /// Format ID used by the extractor
     pub format_id: String,
+    /// Quality label from extractor (e.g., "1080p (video only)", "Audio 128kbps")
+    pub quality: String,
     /// Video codec
     pub vcodec: Option<String>,
     /// Audio codec
     pub acodec: Option<String>,
+    /// Human-readable codec label (e.g., "H.264", "VP9", "AV1", "AAC")
+    pub codec_label: Option<String>,
+    /// Whether this stream has an audio track
+    pub has_audio: bool,
+    /// Whether this stream is audio-only
+    pub is_audio_only: bool,
     /// Width in pixels
     pub width: Option<u32>,
     /// Height in pixels

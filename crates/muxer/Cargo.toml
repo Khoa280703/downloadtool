@@ -26,9 +26,11 @@ bytes = { workspace = true }
 
 # Streaming utilities
 futures = "0.3"
+async-stream = "0.3"
 
-# fMP4 muxing
-mp4-stream = "0.4"
+
+# HTTP (for URL parsing in chunked stream bypass)
+reqwest = { workspace = true }
 
 # Internal crates
 proxy = { path = "../proxy" }

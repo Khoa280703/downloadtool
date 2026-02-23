@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { buildStreamUrl } from '$lib/api';
+	import { buildStreamUrl, buildMuxedStreamUrl } from '$lib/api';
 	import { currentDownload, setDownloading, downloadProgress } from '$stores/download';
 	import { trackDownloadStarted } from '$lib/analytics';
 	import type { Stream } from '$lib/types';
 
 	interface Props {
 		stream: Stream | null;
+		/** Audio-only stream to mux with video-only stream. When provided, uses /api/stream/muxed. */
+		audioStream?: Stream | null;
 		title: string;
 		disabled?: boolean;
 	}
 
-	let { stream, title, disabled = false }: Props = $props();
+	let { stream, audioStream = null, title, disabled = false }: Props = $props();
 
 	let isLoading = $state(false);
-
-	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 	/** Trigger browser download */
 	async function handleDownload(): Promise<void> {
@@ -29,14 +29,16 @@
 		downloadProgress.set(0);
 
 		try {
-			// Build download URL
-			const downloadUrl = buildStreamUrl(stream.url, title, stream.format);
+			// Build download URL — use muxed endpoint for video-only streams
+			const useMux = audioStream && !stream.hasAudio;
+			const downloadUrl = useMux
+				? buildMuxedStreamUrl(stream.url, audioStream!.url, title)
+				: buildStreamUrl(stream.url, title, stream.format);
 
 			// Create anchor element for download
 			const anchor = document.createElement('a');
 			anchor.href = downloadUrl;
-			anchor.download = `${title.replace(/[^a-z0-9]/gi, '_')}.${stream.format}`;
-			anchor.target = '_blank';
+			anchor.download = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
 			anchor.style.display = 'none';
 
 			document.body.appendChild(anchor);

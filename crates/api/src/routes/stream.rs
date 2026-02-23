@@ -8,18 +8,25 @@ use axum::extract::Query;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use serde::Deserialize;
-use tracing::{debug, error, info, warn};
+use tokio::sync::mpsc;
+use tracing::{debug, error, info};
 
 use proxy::client::{parse_range_header, validate_stream_url, ProxyClient, Range};
 use proxy::cookie_store::Platform;
 use proxy::stream::forward_stream_headers;
 
-use muxer::codec::Codec;
 use muxer::mux_router::{MuxRouter, StreamSource};
 use muxer::stream_fetcher::StreamFetcher;
-use muxer::{mux_streams, MuxerError};
+use muxer::{remux_streams, MuxerError};
+
+/// Chunk size for YouTube CDN throttle bypass: 9.5 MB.
+///
+/// YouTube CDN throttles full-file requests to ~2 Mbps (governed by `initcwndbps`).
+/// Each sub-range request is served at full line speed. Fetching in ≤9.5 MB explicit
+/// range chunks bypasses the per-file throttle entirely — same technique as yt-dlp.
+const YOUTUBE_CHUNK_SIZE: u64 = 9_500_000;
 
 /// Query parameters for stream proxy.
 #[derive(Debug, Deserialize)]
@@ -78,64 +85,70 @@ impl From<MuxerError> for ApiError {
 ///
 /// GET /api/stream?url=<encoded>&title=<encoded>&format=mp4
 ///
-/// Validates URL against allowlist, fetches from source CDN,
-/// and pipes bytes to browser with zero-copy streaming.
+/// Three modes:
+/// 1. Browser sent `Range` header (seek/resume) → single proxied range request.
+/// 2. YouTube CDN URL with `clen` param → chunked download to bypass throttle.
+/// 3. Fallback → single proxied request.
 pub async fn stream_handler(
     Query(params): Query<StreamParams>,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
     info!("Stream request for URL: {}", params.url);
 
-    // Validate URL against allowlist
     let parsed_url = validate_stream_url(&params.url).map_err(|e| ApiError {
         message: format!("URL validation failed: {}", e),
         status: StatusCode::BAD_REQUEST,
     })?;
 
-    info!(
-        "Validated stream URL: {}",
-        parsed_url.host_str().unwrap_or("unknown")
-    );
+    let platform = detect_platform(&params.url);
+    let browser_range = extract_range_from_headers(&headers);
 
-    // Parse Range header from request (if present) for resume support
-    let range = extract_range_from_headers(&headers);
+    // Mode 1: browser Range header present (seek / resume) → single range request
+    if let Some(range) = browser_range {
+        return proxy_single_request(&params, Some(range), platform).await;
+    }
 
-    // Create proxy client and fetch stream
-    let client = ProxyClient::new().map_err(|e| ApiError {
+    // Mode 2: YouTube CDN with clen → chunked download (throttle bypass)
+    if let Some(total_size) = extract_clen(&parsed_url) {
+        info!(
+            "Chunked download: {} bytes in ~{}MB chunks",
+            total_size,
+            YOUTUBE_CHUNK_SIZE / 1_000_000
+        );
+        return proxy_chunked(&params, &parsed_url, total_size, platform).await;
+    }
+
+    // Mode 3: fallback single request
+    proxy_single_request(&params, None, platform).await
+}
+
+/// Proxy a single (possibly ranged) request — used for seek/resume or non-CDN URLs.
+async fn proxy_single_request(
+    params: &StreamParams,
+    range: Option<Range>,
+    platform: Platform,
+) -> Result<Response, ApiError> {
+    let client = ProxyClient::new(platform).map_err(|e| ApiError {
         message: format!("Failed to create proxy client: {}", e),
         status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
 
     match client.fetch_stream_with_headers(&params.url, range).await {
         Ok((source_headers, byte_stream)) => {
-            info!("Successfully connected to source stream");
-
-            // Build response headers
             let mut response_headers = forward_stream_headers(&source_headers);
-
-            // Add Content-Disposition for download
             let filename = build_filename(&params.title, &params.format);
             add_content_disposition(&mut response_headers, &filename);
-
-            // Add CORS headers
             add_cors_headers(&mut response_headers);
 
-            // Create response body from stream
             let body = Body::from_stream(byte_stream);
-
-            let mut response_builder = Response::builder();
-
-            // Copy headers to response
-            for (key, value) in response_headers.iter() {
-                response_builder = response_builder.header(key.as_str(), value.as_bytes());
+            let mut rb = Response::builder();
+            for (k, v) in response_headers.iter() {
+                rb = rb.header(k.as_str(), v.as_bytes());
             }
-
-            let response = response_builder.body(body).map_err(|e| ApiError {
+            rb.body(body).map_err(|e| ApiError {
                 message: format!("Failed to build response: {}", e),
                 status: StatusCode::INTERNAL_SERVER_ERROR,
-            })?;
-
-            Ok(response)
+            })
         }
         Err(e) => {
             error!("Failed to fetch stream: {}", e);
@@ -147,12 +160,120 @@ pub async fn stream_handler(
     }
 }
 
+/// Proxy via sequential chunked download — bypasses YouTube CDN full-file throttle.
+///
+/// Sets `Content-Length` from `clen` so Chrome shows a real progress bar.
+async fn proxy_chunked(
+    params: &StreamParams,
+    parsed_url: &reqwest::Url,
+    total_size: u64,
+    platform: Platform,
+) -> Result<Response, ApiError> {
+    let content_type = extract_mime_type(parsed_url)
+        .unwrap_or_else(|| "application/octet-stream".to_string());
+
+    let mut response_headers = HeaderMap::new();
+    response_headers.insert(
+        "Content-Type",
+        HeaderValue::from_str(&content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+    );
+    // Explicit Content-Length lets Chrome show download progress
+    response_headers.insert(
+        "Content-Length",
+        HeaderValue::from_str(&total_size.to_string()).expect("u64 fits header"),
+    );
+    response_headers.insert("Accept-Ranges", HeaderValue::from_static("bytes"));
+
+    let filename = build_filename(&params.title, &params.format);
+    add_content_disposition(&mut response_headers, &filename);
+    add_cors_headers(&mut response_headers);
+
+    let stream = chunked_stream(params.url.clone(), total_size, 0, platform);
+    let body = Body::from_stream(stream);
+
+    let mut rb = Response::builder();
+    for (k, v) in response_headers.iter() {
+        rb = rb.header(k.as_str(), v.as_bytes());
+    }
+    rb.body(body).map_err(|e| ApiError {
+        message: format!("Failed to build response: {}", e),
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+    })
+}
+
+/// Build a byte stream that downloads `url` in YOUTUBE_CHUNK_SIZE chunks.
+///
+/// Each chunk is requested with an explicit `Range: bytes=start-end` header.
+/// YouTube CDN delivers these at full line speed regardless of file size.
+/// A background task drives the downloads; bytes are forwarded through a channel.
+fn chunked_stream(
+    url: String,
+    total_size: u64,
+    start_offset: u64,
+    platform: Platform,
+) -> impl Stream<Item = Result<Bytes, std::io::Error>> + Send + 'static {
+    let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(8);
+
+    tokio::spawn(async move {
+        let client = match ProxyClient::new(platform) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = tx
+                    .send(Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to create proxy client: {}", e),
+                    )))
+                    .await;
+                return;
+            }
+        };
+
+        let mut offset = start_offset;
+        while offset < total_size {
+            let end = (offset + YOUTUBE_CHUNK_SIZE - 1).min(total_size - 1);
+            let range = Range {
+                start: offset,
+                end: Some(end),
+            };
+            debug!("Chunk: bytes={}-{} / {}", offset, end, total_size);
+
+            match client.fetch_stream_with_headers(&url, Some(range)).await {
+                Ok((_, mut chunk_stream)) => {
+                    while let Some(item) = chunk_stream.next().await {
+                        let result = item.map_err(|e| {
+                            std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                        });
+                        if tx.send(result).await.is_err() {
+                            return; // Client disconnected — abort silently
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Chunk fetch failed bytes={}-{}: {}", offset, end, e);
+                    let _ = tx
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("Chunk fetch failed: {}", e),
+                        )))
+                        .await;
+                    return;
+                }
+            }
+
+            offset = end + 1;
+        }
+    });
+
+    // Convert mpsc::Receiver to Stream
+    futures::stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|item| (item, rx))
+    })
+}
+
 /// Muxed stream endpoint.
 ///
 /// GET /api/stream/muxed?video_url=<encoded>&audio_url=<encoded>&title=<encoded>
-///
-/// Fetches separate video and audio streams, muxes them into fMP4,
-/// and returns as a single stream.
 pub async fn muxed_stream_handler(
     Query(params): Query<MuxedStreamParams>,
 ) -> Result<Response, ApiError> {
@@ -160,7 +281,6 @@ pub async fn muxed_stream_handler(
     debug!("Video URL: {}", params.video_url);
     debug!("Audio URL: {}", params.audio_url);
 
-    // Validate URLs
     let _ = validate_stream_url(&params.video_url).map_err(|e| ApiError {
         message: format!("Video URL validation failed: {}", e),
         status: StatusCode::BAD_REQUEST,
@@ -171,84 +291,43 @@ pub async fn muxed_stream_handler(
         status: StatusCode::BAD_REQUEST,
     })?;
 
-    // Detect platform from URLs
     let platform = detect_platform(&params.video_url);
 
-    // Fetch both streams concurrently
-    let (video_stream, audio_stream) = StreamFetcher::fetch_both(
-        &params.video_url,
-        &params.audio_url,
-        platform,
-    )
-    .await
-    .map_err(|e| ApiError {
-        message: format!("Failed to fetch streams: {}", e),
-        status: StatusCode::BAD_GATEWAY,
-    })?;
+    let (video_stream, audio_stream) =
+        StreamFetcher::fetch_both(&params.video_url, &params.audio_url, platform)
+            .await
+            .map_err(|e| ApiError {
+                message: format!("Failed to fetch streams: {}", e),
+                status: StatusCode::BAD_GATEWAY,
+            })?;
 
-    // Parse codecs
-    let video_codec = params
-        .video_codec
-        .as_deref()
-        .and_then(Codec::from_string)
-        .unwrap_or(Codec::H264);
+    info!("Starting remux (copy-based fMP4 box remuxer)");
 
-    let audio_codec = params
-        .audio_codec
-        .as_deref()
-        .and_then(Codec::from_string)
-        .unwrap_or(Codec::AAC);
+    let muxed_stream = remux_streams(video_stream, audio_stream);
 
-    info!(
-        "Starting mux with video: {:?}, audio: {:?}",
-        video_codec, audio_codec
-    );
-
-    // Create muxed stream
-    let muxed_stream = mux_streams(video_stream, audio_stream, video_codec, audio_codec);
-
-    // Build response headers
     let mut response_headers = HeaderMap::new();
+    response_headers.insert("Content-Type", HeaderValue::from_static("video/mp4"));
 
-    // Set Content-Type for MP4
-    response_headers.insert(
-        "Content-Type",
-        HeaderValue::from_static("video/mp4"),
-    );
-
-    // Add Content-Disposition for download
     let filename = build_filename(&params.title, &Some("mp4".to_string()));
     add_content_disposition(&mut response_headers, &filename);
-
-    // Add CORS headers
     add_cors_headers(&mut response_headers);
 
-    // Note: No Content-Length as we don't know the final size
-    // This triggers chunked transfer encoding
-
-    // Create response body from muxed stream
-    // Convert MuxerError to std::io::Error for axum compatibility
     let compat_stream = stream_with_muxer_error(muxed_stream);
     let body = Body::from_stream(compat_stream);
 
-    let mut response_builder = Response::builder();
-
-    // Copy headers to response
-    for (key, value) in response_headers.iter() {
-        response_builder = response_builder.header(key.as_str(), value.as_bytes());
+    let mut rb = Response::builder();
+    for (k, v) in response_headers.iter() {
+        rb = rb.header(k.as_str(), v.as_bytes());
     }
-
-    let response = response_builder.body(body).map_err(|e| ApiError {
+    rb.body(body).map_err(|e| ApiError {
         message: format!("Failed to build response: {}", e),
         status: StatusCode::INTERNAL_SERVER_ERROR,
-    })?;
-
-    Ok(response)
+    })
 }
 
 /// Convert a muxer error stream to std::io::Error for axum compatibility.
 fn stream_with_muxer_error(
-    stream: impl Stream<Item = Result<Bytes, MuxerError>> + Send + 'static,
+    stream: impl Stream<Item = Result<Bytes, MuxerError>> + Send + Unpin + 'static,
 ) -> impl Stream<Item = Result<Bytes, std::io::Error>> + Send {
     futures::stream::unfold(stream, |mut stream| async move {
         match stream.next().await {
@@ -265,7 +344,6 @@ fn stream_with_muxer_error(
 /// Detect platform from URL.
 fn detect_platform(url: &str) -> Platform {
     let url_lower = url.to_lowercase();
-
     if url_lower.contains("googlevideo.com")
         || url_lower.contains("youtube.com")
         || url_lower.contains("youtu.be")
@@ -274,18 +352,52 @@ fn detect_platform(url: &str) -> Platform {
     } else if url_lower.contains("tiktok") {
         Platform::TikTok
     } else {
-        Platform::YouTube // Default
+        Platform::YouTube
     }
 }
 
+/// Extract `clen` (content length) from CDN URL query params.
+fn extract_clen(url: &reqwest::Url) -> Option<u64> {
+    url.query_pairs()
+        .find(|(k, _)| k == "clen")
+        .and_then(|(_, v)| v.parse().ok())
+}
+
+/// Extract MIME type from CDN URL `mime` query param (already percent-decoded by reqwest).
+fn extract_mime_type(url: &reqwest::Url) -> Option<String> {
+    url.query_pairs()
+        .find(|(k, _)| k == "mime")
+        .map(|(_, v)| v.into_owned())
+}
+
 /// Add Content-Disposition header for file download.
+/// Uses RFC 5987 encoding for non-ASCII filenames (e.g. Vietnamese titles).
 fn add_content_disposition(headers: &mut HeaderMap, filename: &str) {
-    let disposition = format!(r#"attachment; filename="{}""#, filename);
+    let ascii_name: String = filename
+        .chars()
+        .map(|c| if c.is_ascii() { c } else { '_' })
+        .collect();
+
+    let encoded: String = filename
+        .bytes()
+        .flat_map(|b| {
+            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                vec![b as char]
+            } else {
+                format!("%{:02X}", b).chars().collect::<Vec<_>>()
+            }
+        })
+        .collect();
+
+    let disposition = format!(
+        r#"attachment; filename="{}"; filename*=UTF-8''{}"#,
+        ascii_name, encoded
+    );
+
     headers.insert(
         "Content-Disposition",
-        HeaderValue::from_str(&disposition).unwrap_or_else(|_| {
-            HeaderValue::from_static("attachment")
-        }),
+        HeaderValue::from_str(&disposition)
+            .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
     );
 }
 
@@ -313,7 +425,7 @@ fn build_filename(title: &Option<String>, format: &Option<String>) -> String {
         .map(|f| f.trim_start_matches('.').to_string())
         .unwrap_or_else(|| "mp4".to_string());
 
-    format!("{}.{}" , base, ext)
+    format!("{}.{}", base, ext)
 }
 
 /// Sanitize filename by removing/replacing invalid characters.
@@ -323,7 +435,7 @@ fn sanitize_filename(name: &str) -> String {
             '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
             c => c,
         })
-        .take(100) // Limit length
+        .take(100)
         .collect::<String>()
         .trim()
         .to_string()
@@ -351,22 +463,13 @@ mod tests {
             build_filename(&None, &Some("webm".to_string())),
             "video.webm"
         );
-        assert_eq!(
-            build_filename(&Some("Test".to_string()), &None),
-            "Test.mp4"
-        );
+        assert_eq!(build_filename(&Some("Test".to_string()), &None), "Test.mp4");
     }
 
     #[test]
     fn test_sanitize_filename() {
-        assert_eq!(
-            sanitize_filename("My:Video|Name?"),
-            "My_Video_Name_"
-        );
-        assert_eq!(
-            sanitize_filename("normal_name"),
-            "normal_name"
-        );
+        assert_eq!(sanitize_filename("My:Video|Name?"), "My_Video_Name_");
+        assert_eq!(sanitize_filename("normal_name"), "normal_name");
     }
 
     #[test]
@@ -403,7 +506,6 @@ mod tests {
     fn test_add_content_disposition() {
         let mut headers = HeaderMap::new();
         add_content_disposition(&mut headers, "My Video.mp4");
-
         let value = headers.get("Content-Disposition").unwrap();
         assert!(value.to_str().unwrap().contains("My Video.mp4"));
     }
@@ -412,14 +514,28 @@ mod tests {
     fn test_add_cors_headers() {
         let mut headers = HeaderMap::new();
         add_cors_headers(&mut headers);
-
-        assert_eq!(
-            headers.get("Access-Control-Allow-Origin").unwrap(),
-            "*"
-        );
+        assert_eq!(headers.get("Access-Control-Allow-Origin").unwrap(), "*");
         assert_eq!(
             headers.get("Access-Control-Allow-Methods").unwrap(),
             "GET, HEAD, OPTIONS"
         );
+    }
+
+    #[test]
+    fn test_extract_clen() {
+        let url = reqwest::Url::parse(
+            "https://rr1.googlevideo.com/videoplayback?clen=20971520&mime=video%2Fmp4",
+        )
+        .unwrap();
+        assert_eq!(extract_clen(&url), Some(20_971_520));
+    }
+
+    #[test]
+    fn test_extract_mime_type() {
+        let url = reqwest::Url::parse(
+            "https://rr1.googlevideo.com/videoplayback?clen=1234&mime=video%2Fmp4",
+        )
+        .unwrap();
+        assert_eq!(extract_mime_type(&url).as_deref(), Some("video/mp4"));
     }
 }

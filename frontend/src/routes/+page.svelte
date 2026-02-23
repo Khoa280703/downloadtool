@@ -8,7 +8,7 @@
 	import InterstitialAd from '$components/InterstitialAd.svelte';
 	import { currentDownload } from '$stores/download';
 	import { hasConsent } from '$stores/consent';
-	import type { ExtractResult } from '$lib/types';
+	import type { ExtractResult, Stream } from '$lib/types';
 	import {
 		trackExtractSuccess,
 		trackFormatSelected
@@ -18,6 +18,8 @@
 	let isExtracting = $state(false);
 	let showInterstitial = $state(false);
 	let pendingExtractResult = $state<ExtractResult | null>(null);
+	/** Audio stream to pair with video-only stream for transparent muxing */
+	let selectedAudioStream = $state<Stream | null>(null);
 
 	/** Enable interstitial flag */
 	const enableInterstitial = import.meta.env.PUBLIC_ENABLE_INTERSTITIAL !== 'false';
@@ -54,19 +56,19 @@
 	}
 
 	/**
-	 * Handle format selection
+	 * Handle format selection from FormatPicker (video stream + optional audio for muxing)
 	 */
-	function handleFormatSelect(stream: ExtractResult['streams'][0]): void {
+	function handleFormatSelect(videoStream: Stream, audioStream: Stream | null): void {
 		if (extractResult) {
-			extractResult = { ...extractResult, streams: extractResult.streams };
-			currentDownload.update(s => ({ ...s, selectedStream: stream }));
+			currentDownload.update(s => ({ ...s, selectedStream: videoStream }));
+			selectedAudioStream = audioStream;
 
 			// Track format selection
 			trackFormatSelected(
 				extractResult.platform,
-				stream.quality,
-				stream.format,
-				stream.hasAudio
+				videoStream.quality,
+				videoStream.format,
+				videoStream.hasAudio
 			);
 		}
 	}
@@ -153,12 +155,12 @@
 			<FormatPicker
 				streams={extractResult.streams}
 				platform={extractResult.platform}
-				selectedStream={$currentDownload.selectedStream}
 				onSelect={handleFormatSelect}
 			/>
 
 			<DownloadBtn
 				stream={$currentDownload.selectedStream}
+				audioStream={selectedAudioStream}
 				title={extractResult.title}
 			/>
 		</div>

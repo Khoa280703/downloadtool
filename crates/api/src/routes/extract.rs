@@ -58,22 +58,25 @@ pub struct VideoMetadata {
 pub struct StreamFormat {
     /// Format ID
     pub format_id: String,
-    /// Resolution (e.g., "1080p")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resolution: Option<String>,
+    /// Quality label (e.g., "1080p (video only)", "Audio 128kbps")
+    pub quality: String,
     /// File extension
     pub ext: String,
     /// Direct stream URL
     pub url: String,
+    /// Whether stream has an audio track
+    pub has_audio: bool,
+    /// Whether stream is audio-only
+    pub is_audio_only: bool,
+    /// Human-readable codec label (e.g., "H.264", "VP9", "AV1", "AAC")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codec_label: Option<String>,
+    /// Bitrate in bits per second
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitrate: Option<u64>,
     /// File size in bytes (if known)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filesize: Option<u64>,
-    /// Video codec
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vcodec: Option<String>,
-    /// Audio codec
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub acodec: Option<String>,
 }
 
 /// API error response.
@@ -160,18 +163,16 @@ fn is_valid_video_url(url: &str) -> bool {
 
 /// Convert VideoFormat to StreamFormat for response.
 fn convert_format(format: &VideoFormat) -> StreamFormat {
-    let resolution = format
-        .height
-        .map(|h| format!("{}p", h));
-
     StreamFormat {
         format_id: format.format_id.clone(),
-        resolution,
+        quality: format.quality.clone(),
         ext: format.ext.clone(),
         url: format.url.clone(),
+        has_audio: format.has_audio,
+        is_audio_only: format.is_audio_only,
+        codec_label: format.codec_label.clone(),
+        bitrate: format.bitrate,
         filesize: format.filesize,
-        vcodec: format.vcodec.clone(),
-        acodec: format.acodec.clone(),
     }
 }
 
@@ -235,8 +236,12 @@ mod tests {
         let formats = vec![
             VideoFormat {
                 format_id: "1".to_string(),
-                vcodec: None,
+                quality: "1080p (video only)".to_string(),
+                vcodec: Some("avc1".to_string()),
                 acodec: None,
+                codec_label: Some("H.264".to_string()),
+                has_audio: false,
+                is_audio_only: false,
                 width: Some(1920),
                 height: Some(1080),
                 fps: None,
@@ -247,8 +252,12 @@ mod tests {
             },
             VideoFormat {
                 format_id: "2".to_string(),
-                vcodec: None,
+                quality: "720p (video only)".to_string(),
+                vcodec: Some("avc1".to_string()),
                 acodec: None,
+                codec_label: Some("H.264".to_string()),
+                has_audio: false,
+                is_audio_only: false,
                 width: Some(1280),
                 height: Some(720),
                 fps: None,

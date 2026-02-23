@@ -122,7 +122,7 @@ docker-build:
 
 .PHONY: docker-run
 docker-run:
-	docker run -p 3000:3000 video-downloader:latest
+	docker run -p 3068:3068 video-downloader:latest
 
 # Help
 .PHONY: help

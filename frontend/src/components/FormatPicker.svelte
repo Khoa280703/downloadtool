@@ -4,85 +4,217 @@
 	interface Props {
 		streams: Stream[];
 		platform: Platform;
-		selectedStream: Stream | null;
-		onSelect: (stream: Stream) => void;
+		onSelect: (videoStream: Stream, audioStream: Stream | null) => void;
 	}
 
-	let { streams, platform, selectedStream, onSelect }: Props = $props();
+	let { streams, platform, onSelect }: Props = $props();
 
-	let removeWatermark = $state(false);
-	let addBranding = $state(false);
+	// --- Data preparation ---
 
-	/** Get quality badge color based on quality */
-	function getQualityColor(quality: string): string {
-		if (quality.includes('4K') || quality.includes('2160')) return '#ef4444';
-		if (quality.includes('1080')) return '#f97316';
-		if (quality.includes('720')) return '#eab308';
-		if (quality.includes('MP3') || quality.includes('audio')) return '#8b5cf6';
+	/** Unique resolutions from video streams (exclude audio-only), sorted low→high */
+	const resolutions = $derived.by(() => {
+		const seen = new Set<string>();
+		const list: string[] = [];
+
+		for (const s of streams) {
+			if (s.isAudioOnly) continue;
+			const res = s.quality.replace(' (video only)', '');
+			if (!seen.has(res)) {
+				seen.add(res);
+				list.push(res);
+			}
+		}
+
+		return list.sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
+	});
+
+	/** Codec/format variants for the currently selected resolution */
+	const codecOptions = $derived.by(() => {
+		if (!selectedResolution) return [];
+		return streams.filter(
+			(s) => !s.isAudioOnly && s.quality.replace(' (video only)', '') === selectedResolution
+		);
+	});
+
+	/** Audio-only streams sorted by bitrate desc */
+	const audioOnlyStreams = $derived.by(() =>
+		streams.filter((s) => s.isAudioOnly).sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))
+	);
+
+	/** Best audio-only stream for muxing with MP4 video.
+	 * Prefer M4A/MP4 (fMP4/AAC) over WebM (Opus) — WebM uses EBML container,
+	 * not ISO BMFF, so it cannot be remuxed into fMP4. */
+	const bestAudioStream = $derived.by(() => {
+		// Prefer non-WebM (M4A/AAC) for fMP4 compatibility
+		const fmp4Audio = audioOnlyStreams.filter((s) => s.format !== 'webm');
+		return (fmp4Audio.length > 0 ? fmp4Audio : audioOnlyStreams)[0] ?? null;
+	});
+
+	// --- Default selection logic ---
+
+	/** Pick default resolution: prefer 1080p, fallback to highest available */
+	function getDefaultResolution(resList: string[]): string | null {
+		if (!resList.length) return null;
+		if (resList.includes('1080p')) return '1080p';
+		return [...resList].sort((a, b) => (parseInt(b) || 0) - (parseInt(a) || 0))[0];
+	}
+
+	/** Pick default codec: H.264 MP4 → VP9 WebM → AV1 MP4 → first available */
+	function getDefaultCodec(options: Stream[]): Stream | null {
+		if (!options.length) return null;
+		const priority: ((s: Stream) => boolean)[] = [
+			(s) => s.codecLabel === 'H.264' && s.format === 'mp4',
+			(s) => s.codecLabel === 'VP9' && s.format === 'webm',
+			(s) => s.codecLabel === 'AV1' && s.format === 'mp4',
+			(s) => s.format === 'mp4',
+			() => true
+		];
+		for (const pred of priority) {
+			const match = options.find(pred);
+			if (match) return match;
+		}
+		return options[0];
+	}
+
+	/** Format audio stream label: "AAC 128kbps" */
+	function formatAudioLabel(audio: Stream): string {
+		const codec = audio.codecLabel || 'Audio';
+		const br = audio.bitrate ? `${Math.round(audio.bitrate / 1000)}kbps` : '';
+		return [codec, br].filter(Boolean).join(' ');
+	}
+
+	// --- State ---
+
+	let selectedResolution = $state<string | null>(null);
+	let selectedStream = $state<Stream | null>(null);
+	/** Whether user selected an audio-only stream */
+	let audioMode = $state(false);
+
+	// Initialize default resolution once streams load
+	$effect(() => {
+		if (!selectedResolution && resolutions.length) {
+			selectedResolution = getDefaultResolution(resolutions);
+		}
+	});
+
+	// Auto-select default codec only when current selection is no longer valid
+	// (e.g., resolution changed). Do NOT override user's manual codec selection.
+	$effect(() => {
+		if (!audioMode && codecOptions.length) {
+			const currentIsValid =
+				selectedStream !== null && codecOptions.some((o) => o.url === selectedStream!.url);
+			if (!currentIsValid) {
+				const newDefault = getDefaultCodec(codecOptions);
+				if (newDefault) {
+					selectedStream = newDefault;
+					onSelect(newDefault, newDefault.hasAudio ? null : (bestAudioStream ?? null));
+				}
+			}
+		}
+	});
+
+	function selectResolution(res: string) {
+		selectedResolution = res;
+		audioMode = false;
+	}
+
+	function selectCodec(stream: Stream) {
+		selectedStream = stream;
+		audioMode = false;
+		onSelect(stream, stream.hasAudio ? null : (bestAudioStream ?? null));
+	}
+
+	function selectAudio(audio: Stream) {
+		selectedStream = audio;
+		audioMode = true;
+		onSelect(audio, null);
+	}
+
+	/** Quality badge color */
+	function getQualityColor(res: string): string {
+		const n = parseInt(res) || 0;
+		if (n >= 2160) return '#ef4444';
+		if (n >= 1080) return '#f97316';
+		if (n >= 720) return '#eab308';
 		return '#6b7280';
 	}
-
-	/** Sort streams by quality (highest first) */
-	function sortStreams(list: Stream[]): Stream[] {
-		const qualityOrder = ['4K', '2160', '1440', '1080', '720', '480', '360', '240', '144'];
-		return [...list].sort((a, b) => {
-			const aIndex = qualityOrder.findIndex((q) => a.quality.includes(q));
-			const bIndex = qualityOrder.findIndex((q) => b.quality.includes(q));
-			if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-			if (a.quality.includes('MP3')) return 1;
-			if (b.quality.includes('MP3')) return -1;
-			return 0;
-		});
-	}
-
-	const sortedStreams = $derived(sortStreams(streams));
 </script>
 
 <div class="format-picker">
 	<h4>Select Quality</h4>
 
-	<div class="stream-list" role="radiogroup" aria-label="Video quality options">
-		{#each sortedStreams as stream}
+	<!-- Row 1: Resolution buttons -->
+	<div class="row-label">Resolution</div>
+	<div class="stream-list" role="radiogroup" aria-label="Video resolution">
+		{#each resolutions as res}
 			<button
-				class="stream-option"
-				class:selected={selectedStream?.url === stream.url}
-				onclick={() => onSelect(stream)}
+				class="res-option"
+				class:selected={!audioMode && selectedResolution === res}
+				onclick={() => selectResolution(res)}
 				role="radio"
-				aria-checked={selectedStream?.url === stream.url}
+				aria-checked={!audioMode && selectedResolution === res}
 			>
-				<span
-					class="quality-badge"
-					style:background-color={getQualityColor(stream.quality)}
-				>
-					{stream.quality}
+				<span class="quality-badge" style:background-color={getQualityColor(res)}>
+					{res}
 				</span>
-				<span class="format">{stream.format.toUpperCase()}</span>
-				{#if stream.hasAudio}
-					<span class="audio-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-						<path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-					</svg></span>
-				{/if}
 			</button>
 		{/each}
 	</div>
 
+	<!-- Row 2: Codec/format options for selected resolution -->
+	{#if codecOptions.length > 0}
+		<div class="row-label">Format</div>
+		<div class="stream-list" role="radiogroup" aria-label="Video format">
+			{#each codecOptions as stream}
+				<button
+					class="codec-option"
+					class:selected={!audioMode && selectedStream?.url === stream.url}
+					onclick={() => selectCodec(stream)}
+					role="radio"
+					aria-checked={!audioMode && selectedStream?.url === stream.url}
+				>
+					{#if stream.codecLabel}
+						<span class="codec-label">{stream.codecLabel}</span>
+					{/if}
+					<span class="format-ext">{stream.format.toUpperCase()}</span>
+					{#if !stream.hasAudio}
+						<span class="mux-badge" title="Audio will be added automatically">+🔊</span>
+					{/if}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- Audio-only section -->
+	{#if audioOnlyStreams.length > 0}
+		<div class="row-label">Audio Only</div>
+		<div class="stream-list" role="radiogroup" aria-label="Audio only">
+			{#each audioOnlyStreams as audio}
+				<button
+					class="codec-option"
+					class:selected={audioMode && selectedStream?.url === audio.url}
+					onclick={() => selectAudio(audio)}
+					role="radio"
+					aria-checked={audioMode && selectedStream?.url === audio.url}
+				>
+					<span class="codec-label">{formatAudioLabel(audio)}</span>
+					<span class="format-ext">{audio.format.toUpperCase()}</span>
+				</button>
+			{/each}
+		</div>
+	{/if}
+
 	{#if platform === 'tiktok'}
 		<label class="toggle-option">
-			<input
-				type="checkbox"
-				bind:checked={removeWatermark}
-			/>
+			<input type="checkbox" disabled />
 			<span class="toggle-slider"></span>
 			<span class="toggle-label">Remove watermark</span>
+			<span class="coming-soon">Soon</span>
 		</label>
 	{/if}
 
 	<label class="toggle-option">
-		<input
-			type="checkbox"
-			bind:checked={addBranding}
-			disabled
-		/>
+		<input type="checkbox" disabled />
 		<span class="toggle-slider"></span>
 		<span class="toggle-label">Add branding (GPU)</span>
 		<span class="coming-soon">Soon</span>
@@ -93,7 +225,7 @@
 	.format-picker {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 
 	h4 {
@@ -105,50 +237,67 @@
 		letter-spacing: 0.05em;
 	}
 
+	.row-label {
+		font-size: 0.7rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--text-secondary, #6b7280);
+		margin-bottom: -0.25rem;
+	}
+
 	.stream-list {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
 	}
 
-	.stream-option {
+	.res-option,
+	.codec-option {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
+		gap: 0.375rem;
+		padding: 0.4rem 0.65rem;
 		background: var(--input-bg, #ffffff);
 		border: 2px solid var(--border-color, #e5e7eb);
 		border-radius: 0.5rem;
 		cursor: pointer;
-		transition: all 0.2s;
+		transition: all 0.15s;
+		font-size: 0.8rem;
 	}
 
-	.stream-option:hover {
+	.res-option:hover,
+	.codec-option:hover {
 		border-color: var(--primary-color, #3b82f6);
 	}
 
-	.stream-option.selected {
+	.res-option.selected,
+	.codec-option.selected {
 		border-color: var(--primary-color, #3b82f6);
 		background: var(--primary-alpha, rgba(59, 130, 246, 0.1));
 	}
 
 	.quality-badge {
-		padding: 0.125rem 0.375rem;
+		padding: 0.1rem 0.35rem;
 		font-size: 0.75rem;
-		font-weight: 600;
+		font-weight: 700;
 		color: white;
 		border-radius: 0.25rem;
 	}
 
-	.format {
-		font-size: 0.75rem;
+	.codec-label {
+		font-weight: 600;
+		color: var(--text-color, #111827);
+	}
+
+	.format-ext {
+		font-size: 0.7rem;
 		color: var(--text-secondary, #6b7280);
 	}
 
-	.audio-badge {
-		display: flex;
-		align-items: center;
-		color: var(--success-color, #22c55e);
+	.mux-badge {
+		font-size: 0.65rem;
+		opacity: 0.7;
 	}
 
 	.toggle-option {
@@ -169,8 +318,8 @@
 		background: var(--border-color, #e5e7eb);
 		border-radius: 12px;
 		position: relative;
-		transition: background 0.2s;
 		flex-shrink: 0;
+		opacity: 0.5;
 	}
 
 	.toggle-slider::after {
@@ -182,21 +331,16 @@
 		border-radius: 50%;
 		top: 2px;
 		left: 2px;
-		transition: transform 0.2s;
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 	}
 
 	.toggle-option input:checked + .toggle-slider {
 		background: var(--primary-color, #3b82f6);
+		opacity: 1;
 	}
 
 	.toggle-option input:checked + .toggle-slider::after {
 		transform: translateX(20px);
-	}
-
-	.toggle-option input:disabled + .toggle-slider {
-		opacity: 0.5;
-		cursor: not-allowed;
 	}
 
 	.toggle-label {
@@ -214,13 +358,10 @@
 	}
 
 	@media (prefers-color-scheme: dark) {
-		.stream-option {
+		.res-option,
+		.codec-option {
 			--input-bg: #1f2937;
 			--border-color: #374151;
-		}
-
-		.toggle-slider {
-			--border-color: #4b5563;
 		}
 	}
 </style>

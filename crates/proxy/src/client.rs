@@ -6,7 +6,7 @@
 use crate::anti_bot::{AntiBotClient, AntiBotError};
 use crate::cookie_store::Platform;
 use bytes::Bytes;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use reqwest::header::HeaderMap;
 use std::time::Duration;
 use tracing::{debug, error, info};
@@ -103,6 +103,7 @@ impl ProxyClient {
 
         let range_header = range.map(|r| r.to_header_value());
         let stream = self.anti_bot.fetch_stream(url, range_header).await?;
+        let stream = stream.map(|r| r.map_err(ProxyError::from));
 
         debug!("Stream initiated for: {}", url);
 
@@ -125,7 +126,7 @@ impl ProxyClient {
         let status = response.status();
         let headers = response.headers().clone();
 
-        if !status.is_success() && !status.is_partial_content() {
+        if !status.is_success() && status.as_u16() != 206 {
             error!("Failed to fetch stream: HTTP {}", status);
             return Err(ProxyError::RequestFailed(
                 response.error_for_status().unwrap_err(),

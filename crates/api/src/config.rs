@@ -7,7 +7,7 @@ use std::env;
 /// Application configuration loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Port to listen on (default: 3000)
+    /// Port to listen on (default: 3068)
     pub port: u16,
     /// Directory containing TypeScript extractor scripts
     pub extractor_dir: String,
@@ -21,7 +21,7 @@ impl Config {
     /// Load configuration from environment variables.
     ///
     /// # Environment Variables
-    /// - `PORT` - Server port (default: 3000)
+    /// - `PORT` - Server port (default: 3068)
     /// - `EXTRACTOR_DIR` - Path to extractor scripts (default: "./extractors")
     /// - `GPU_WORKER_ADDR` - GPU worker address (default: "10.0.0.2:50051")
     /// - `GPU_ENABLED` - Enable GPU transcoding (default: "false")
@@ -32,7 +32,7 @@ impl Config {
         let port = env::var("PORT")
             .ok()
             .and_then(|p| p.parse().ok())
-            .unwrap_or(3000);
+            .unwrap_or(3068);
 
         let extractor_dir = env::var("EXTRACTOR_DIR")
             .unwrap_or_else(|_| "./extractors".to_string());
@@ -60,13 +60,13 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config {
-            port: 3000,
+            port: 3068,
             extractor_dir: "./extractors".to_string(),
             gpu_worker_addr: "10.0.0.2:50051".to_string(),
             gpu_enabled: false,
         };
 
-        assert_eq!(config.port, 3000);
+        assert_eq!(config.port, 3068);
         assert_eq!(config.extractor_dir, "./extractors");
         assert_eq!(config.gpu_worker_addr, "10.0.0.2:50051");
         assert!(!config.gpu_enabled);

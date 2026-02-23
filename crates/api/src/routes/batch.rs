@@ -3,8 +3,8 @@
 //! GET /api/batch - Server-Sent Events endpoint for batch video extraction
 
 use axum::extract::Query;
-use axum::response::{sse::Event, Sse};
-use futures::stream::{self, Stream};
+use axum::response::{sse::Event, IntoResponse, Sse};
+use futures::stream::{self, BoxStream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::time::Duration;
@@ -67,28 +67,21 @@ pub enum BatchEvent {
 /// - data: {"type":"progress","current":10,"total":50}
 pub async fn batch_handler(
     Query(params): Query<BatchParams>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+) -> impl IntoResponse {
     info!("Batch extraction request for URL: {}", params.url);
 
-    // Validate URL
-    if !is_valid_batch_url(&params.url) {
-        warn!("Invalid batch URL: {}", params.url);
-        let error_event = BatchEvent::Error {
-            message: "Invalid URL. Only YouTube channels/playlists and TikTok users are supported.".to_string(),
+    let stream: BoxStream<'static, Result<Event, Infallible>> =
+        if !is_valid_batch_url(&params.url) {
+            warn!("Invalid batch URL: {}", params.url);
+            let error_event = BatchEvent::Error {
+                message: "Invalid URL. Only YouTube channels/playlists and TikTok users are supported.".to_string(),
+            };
+            Box::pin(stream::once(async move {
+                Ok(Event::default().data(serde_json::to_string(&error_event).unwrap()))
+            }))
+        } else {
+            Box::pin(create_batch_stream(&params.url))
         };
-        let stream = stream::once(async move {
-            Ok(Event::default().data(serde_json::to_string(&error_event).unwrap()))
-        });
-        return Sse::new(stream).keep_alive(
-            axum::response::sse::KeepAlive::new()
-                .interval(Duration::from_secs(15)),
-        );
-    }
-
-    // Create SSE event stream
-    // In a real implementation, this would call extractor::extract_channel()
-    // and stream the results as they're extracted
-    let stream = create_batch_stream(&params.url);
 
     Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
@@ -167,12 +160,13 @@ fn create_batch_stream(
 /// Check if URL is a valid batch extraction URL.
 fn is_valid_batch_url(url: &str) -> bool {
     let url_lower = url.to_lowercase();
-    // YouTube channels, playlists
+    // YouTube channels, playlists, mixes (watch?v=...&list=...)
     url_lower.contains("youtube.com/channel/")
         || url_lower.contains("youtube.com/c/")
         || url_lower.contains("youtube.com/user/")
         || url_lower.contains("youtube.com/playlist")
         || url_lower.contains("youtube.com/@")
+        || (url_lower.contains("youtube.com") && url_lower.contains("list="))
         // TikTok users
         || (url_lower.contains("tiktok.com/@") && !url_lower.contains("/video/"))
 }

@@ -53,5 +53,5 @@ default = []
 gpu = ["dep:gpu-pipeline", "dep:tonic"]
 
 [[bin]]
-name = "api-server"
+name = "vps-gateway"
 path = "src/main.rs"

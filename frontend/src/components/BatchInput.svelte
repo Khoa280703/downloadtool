@@ -24,8 +24,6 @@
 	let url = $state('');
 	let error = $state('');
 
-	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
 	/** Check if URL is a channel/playlist */
 	function isChannelOrPlaylist(input: string): boolean {
 		// YouTube playlist/channel patterns
@@ -63,31 +61,34 @@
 		onStart?.();
 
 		const encodedUrl = encodeURIComponent(url);
-		const es = new EventSource(`${API_BASE}/api/batch?url=${encodedUrl}`);
+		const es = new EventSource(`/api/batch?url=${encodedUrl}`);
 		setEventSource(es);
 
 		es.onmessage = (event) => {
 			try {
 				const data: BatchMessage = JSON.parse(event.data);
 
-				if (data.type === 'progress') {
+				if (data.type === 'link') {
 					addBatchItem({
 						url: data.url,
 						title: data.title,
 						status: 'pending'
 					});
-					setBatchProgress(data.index + 1, data.total);
+					setBatchProgress(data.index, data.total);
 
 					// Add to download pool
 					const filename = `${data.title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
-					const streamUrl = `${API_BASE}/api/stream?url=${encodeURIComponent(data.url)}&title=${encodeURIComponent(data.title)}`;
+					const streamUrl = `/api/stream?url=${encodeURIComponent(data.url)}&title=${encodeURIComponent(data.title)}`;
 					downloadPool.add(streamUrl, filename);
-				} else if (data.type === 'complete') {
+				} else if (data.type === 'done') {
 					completeBatch();
 					es.close();
 					onComplete?.();
 				} else if (data.type === 'error') {
-					console.error('Batch item error:', data.error);
+					console.error('Batch item error:', data.message);
+					error = data.message || 'Batch extraction failed';
+					completeBatch();
+					es.close();
 				}
 			} catch (err) {
 				console.error('Failed to parse SSE message:', err);

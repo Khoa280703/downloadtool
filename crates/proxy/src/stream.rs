@@ -4,7 +4,7 @@
 //! support for range requests and header forwarding.
 
 use bytes::Bytes;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use reqwest::Client;
 use std::pin::Pin;
 use tracing::{debug, error, info};
@@ -102,7 +102,7 @@ impl StreamProxy {
         let response = request.send().await?;
         let status = response.status();
 
-        if !status.is_success() && !status.is_partial_content() {
+        if !status.is_success() && status.as_u16() != 206 {
             error!("Failed to fetch stream: HTTP {}", status);
             return Err(ProxyError::RequestFailed(
                 response.error_for_status().unwrap_err(),
