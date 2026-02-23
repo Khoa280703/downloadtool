@@ -68,12 +68,7 @@ where
         );
 
         // Phase D: emit init segment
-        // Replace YouTube's "dash" ftyp with "isom" ftyp for QuickTime compatibility.
-        // QuickTime treats major_brand=dash as a DASH streaming segment and may scan
-        // fragment timestamps to compute duration (summing tracks instead of taking max).
-        // Using isom makes QuickTime read mvhd.duration and mehd.fragment_duration correctly.
-        let _ = ftyp; // original ftyp from video stream discarded
-        yield Bytes::from(build_isom_ftyp());
+        yield Bytes::copy_from_slice(ftyp);
         yield Bytes::from(merged_moov);
 
         // Phase E: create fragment readers from the fragment portions of each stream
@@ -197,27 +192,6 @@ fn patch_mfhd_sequence(moof: &mut [u8], seq: u32) -> Result<(), MuxerError> {
         Some(_) => Err(MuxerError::InvalidInput("mfhd too short".into())),
         None => Err(MuxerError::InvalidInput("No mfhd in moof".into())),
     }
-}
-
-/// Build an `ftyp` box compatible with QuickTime/AVFoundation.
-///
-/// Uses `isom` as major brand instead of `dash` (YouTube's original brand).
-/// `dash` causes QuickTime to use DASH streaming duration heuristics which
-/// incorrectly sum track durations instead of computing the true movie duration.
-fn build_isom_ftyp() -> Vec<u8> {
-    // ftyp: 4B size + 4B "ftyp" + 4B major + 4B minor + N*4B compat
-    // compat: isom, iso5, iso6, avc1, mp41 = 5 brands
-    let compat = [b"isom", b"iso5", b"iso6", b"avc1", b"mp41"];
-    let size = 8 + 4 + 4 + compat.len() * 4; // = 36
-    let mut ftyp = Vec::with_capacity(size);
-    ftyp.extend_from_slice(&(size as u32).to_be_bytes());
-    ftyp.extend_from_slice(b"ftyp");
-    ftyp.extend_from_slice(b"isom"); // major brand
-    ftyp.extend_from_slice(&0u32.to_be_bytes()); // minor version
-    for brand in &compat {
-        ftyp.extend_from_slice(*brand);
-    }
-    ftyp
 }
 
 /// Patch `tfhd.track_id` inside a `moof` box (within the `traf` child).
