@@ -291,6 +291,18 @@ pub async fn muxed_stream_handler(
         status: StatusCode::BAD_REQUEST,
     })?;
 
+    // Detect WebM video streams early — before headers are sent.
+    // WebM uses EBML container, not ISO BMFF, so fMP4 remuxing is not supported.
+    // YouTube embeds mime=video%2Fwebm (URL-encoded) in the stream URL for VP9 streams.
+    if params.video_url.contains("mime=video%2Fwebm")
+        || params.video_url.contains("mime=video/webm")
+    {
+        return Err(ApiError {
+            message: "WebM video streams cannot be muxed into fMP4. Select an H.264/AV1 (MP4) video stream instead.".into(),
+            status: StatusCode::UNPROCESSABLE_ENTITY,
+        });
+    }
+
     let platform = detect_platform(&params.video_url);
 
     let (video_stream, audio_stream) =

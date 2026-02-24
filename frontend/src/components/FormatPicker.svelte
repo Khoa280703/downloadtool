@@ -11,13 +11,17 @@
 
 	// --- Data preparation ---
 
-	/** Unique resolutions from video streams (exclude audio-only), sorted low→high */
+	/** Unique resolutions from video streams (exclude audio-only and WebM-only), sorted low→high.
+	 * Resolutions where all video streams are WebM are excluded — WebM uses EBML container
+	 * and cannot be muxed into fMP4. */
 	const resolutions = $derived.by(() => {
 		const seen = new Set<string>();
 		const list: string[] = [];
 
 		for (const s of streams) {
 			if (s.isAudioOnly) continue;
+			// Exclude VP9/WebM video-only streams — not muxable into fMP4
+			if (!s.hasAudio && s.format === 'webm') continue;
 			const res = s.quality.replace(' (video only)', '');
 			if (!seen.has(res)) {
 				seen.add(res);
@@ -28,11 +32,16 @@
 		return list.sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
 	});
 
-	/** Codec/format variants for the currently selected resolution */
+	/** Codec/format variants for the currently selected resolution.
+	 * Excludes WebM video-only streams — EBML container, not ISO BMFF, cannot be muxed.
+	 * Streams with built-in audio (progressive) are allowed regardless of container. */
 	const codecOptions = $derived.by(() => {
 		if (!selectedResolution) return [];
 		return streams.filter(
-			(s) => !s.isAudioOnly && s.quality.replace(' (video only)', '') === selectedResolution
+			(s) =>
+				!s.isAudioOnly &&
+				s.quality.replace(' (video only)', '') === selectedResolution &&
+				(s.hasAudio || s.format !== 'webm')
 		);
 	});
 
@@ -59,12 +68,12 @@
 		return [...resList].sort((a, b) => (parseInt(b) || 0) - (parseInt(a) || 0))[0];
 	}
 
-	/** Pick default codec: H.264 MP4 → VP9 WebM → AV1 MP4 → first available */
+	/** Pick default codec: H.264 MP4 → AV1 MP4 → any MP4 → first available.
+	 * VP9/WebM intentionally excluded — cannot be muxed into fMP4. */
 	function getDefaultCodec(options: Stream[]): Stream | null {
 		if (!options.length) return null;
 		const priority: ((s: Stream) => boolean)[] = [
 			(s) => s.codecLabel === 'H.264' && s.format === 'mp4',
-			(s) => s.codecLabel === 'VP9' && s.format === 'webm',
 			(s) => s.codecLabel === 'AV1' && s.format === 'mp4',
 			(s) => s.format === 'mp4',
 			() => true
