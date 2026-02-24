@@ -1,6 +1,6 @@
 # Codebase Summary
 
-**Generated:** 2026-02-23
+**Generated:** 2026-02-24
 **Total Files:** 106 | **Total Tokens:** 146,804
 
 ## Project Overview
@@ -99,12 +99,16 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `ffi.rs` - GPU driver FFI bindings
 
 ### 6. **Muxer** (`crates/muxer`)
-- **Purpose:** Container-level multiplexing (fMP4 format)
+- **Purpose:** Container-level multiplexing (fMP4 format) with dual-track support
 - **Components:**
-  - `fmp4_muxer.rs` - fMP4 format writer (largest: 12,395 tokens)
-  - `stream_fetcher.rs` - Fetch & buffer streams
-  - `codec.rs` - Codec configuration & validation
-  - `mux_router.rs` - Route streams to appropriate muxer
+  - `fmp4_remuxer.rs` - Core dual-traf remuxer (407 LOC, video-led fragment merging)
+  - `moov_merger.rs` - Merge video/audio moov boxes, zero mdhd.duration (305 LOC)
+  - `traf_merger.rs` - Merge track fragments, patch trun.data_offset (416 LOC)
+  - `box_parser.rs` - BMFF box parsing, timescale reading (301 LOC)
+  - `fragment_stream.rs` - Fragment streaming/collection (273 LOC)
+  - `stream_fetcher.rs` - Fetch & buffer streams (264 LOC)
+  - `mux_router.rs` - Route streams to appropriate muxer (255 LOC)
+  - `codec.rs` - Codec identification/classification (189 LOC)
 
 ### 7. **GPU Worker** (`crates/gpu-worker`)
 - **Purpose:** Standalone process for GPU transcoding
@@ -125,35 +129,49 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - N-parameter transform bypasses YouTube's 100 KB/s CDN throttle
   - Fallback: HTML scraping for restricted videos
 
-## Recent Changes (2026-02-23)
+## Recent Changes (2026-02-24)
 
-### 1. **Timeout Bug Fix** ✅
-- **File:** `crates/proxy/src/anti_bot.rs` (line 99)
-- **Change:** `.timeout(30s)` → `.connect_timeout(30s)`
-- **Impact:** Downloads no longer timeout mid-transfer; only connection establishment is limited to 30s
-- **Status:** Deployed
+### 1. **WebM Video-Only Stream Exclusion** ✅
+- **File:** `crates/api/src/routes/stream.rs`
+- **Change:** Early 422 UNPROCESSABLE_ENTITY error for WebM video streams
+- **Why:** WebM uses EBML container (not ISO BMFF), incompatible with fMP4 remuxing
+- **Detection:** `mime=video/webm` or `mime=video%2Fwebm` in URL (YouTube encodes VP9 as WebM)
+- **Impact:** Prevents malformed muxing, directs users to H.264/AV1 MP4 streams
 
-### 2. **YouTube N-Parameter Transform** ✅
-- **New File:** `extractors/youtube-n-transform.ts`
-- **Purpose:** Extract & apply YouTube player.js n-parameter transform for full-speed downloads
-- **How it works:**
-  1. Fetches current player.js from YouTube homepage
-  2. Extracts n-parameter transform function via regex pattern matching
-  3. Caches transform by player version
-  4. Applies transform to stream URLs before download
-- **Impact:** Achieves ~2-3 Mbps instead of 100 KB/s on YouTube CDN
-- **Based on:** yt-dlp technique
-- **Files Modified:**
-  - `extractors/youtube-innertube.ts` - Added `transformStreamUrls()` call (line 218)
-  - `extractors/youtube.ts` - Added `transformStreamUrls()` call (line 103)
+### 2. **QuickTime Double-Duration Bug Fixed** ✅
+- **File:** `crates/muxer/src/moov_merger.rs`
+- **Problem:** YouTube DASH init has `mdhd.duration` per track. When 2 tracks merged, QuickTime summed them (213s+213s=426s=7:06 instead of 3:33)
+- **Fix:** Zero out `mdhd.duration` in both video/audio trak boxes (empty_moov style, matching ffmpeg)
+- **Affected:** All muxed fMP4 files with dual audio+video tracks
+- **Verified:** QuickTime & macOS player now show correct duration
+
+### 3. **Dual-Traf Muxer Implementation** ✅
+- **New File:** `crates/muxer/src/traf_merger.rs` (416 LOC)
+- **Purpose:** Merge video+audio fragments into single moof with dual traf boxes
+- **Compatibility:** QuickTime-compatible fragment structure
+- **Key:** Precise `trun.data_offset` patching for correct sample location
+
+### 4. **fMP4 Remuxer with Video-Led Grouping** ✅
+- **File:** `crates/muxer/src/fmp4_remuxer.rs` (407 LOC)
+- **Strategy:** Video-led fragment grouping (video sets pace, audio fills in)
+- **Scale:** 38 video + 22 audio fragments → 38 output fragments
+- **Format:** Patches `ftyp.major_brand` from `dash` to `isom`
+
+### 5. **Frontend WebM Filter** ✅
+- **File:** `frontend/src/components/FormatPicker.svelte`
+- **Change:** VP9/WebM video-only streams excluded from resolution + codec options
+- **Priority:** `getDefaultCodec` selects H.264 → AV1 → MP4 (never WebM)
+- **UX:** Prevents user confusion, avoids muxing failures
 
 ## Codebase Metrics
 
 | Metric | Value |
 |--------|-------|
 | Total Files | 106 |
-| Total Tokens | 146,804 |
-| Largest File | `crates/muxer/src/fmp4_muxer.rs` (12,395 tokens) |
+| Rust Files | 43 (10,188 LOC) |
+| Frontend Files | ~30 (TypeScript + Svelte) |
+| Muxer Crate | 9 files, 3,205 LOC (8 modules) |
+| Largest File | `crates/muxer/src/traf_merger.rs` (416 LOC) |
 | Language Distribution | Rust, TypeScript, Svelte, YAML |
 | Key Dependencies | Tokio, reqwest, deno_core, GPU libraries |
 
@@ -215,5 +233,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-02-23
-**Status:** Complete & Operational
+**Last Updated:** 2026-02-24
+**Status:** Complete & Operational (WebM Exclusion + QuickTime Fix Deployed)

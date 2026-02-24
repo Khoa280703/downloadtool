@@ -1,6 +1,6 @@
 # Code Standards & Codebase Structure
 
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-02-24
 
 ## Directory Structure
 
@@ -55,13 +55,17 @@ downloadtool/
 │   │   ├── Cargo.toml
 │   │   └── README.md
 │   │
-│   ├── muxer/                       # Container muxing (fMP4)
+│   ├── muxer/                       # Container muxing (fMP4) - dual-traf
 │   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── fmp4_muxer.rs        # Main muxer (12,395 tokens)
-│   │   │   ├── codec.rs             # Codec configuration
-│   │   │   ├── mux_router.rs        # Route streams
-│   │   │   └── stream_fetcher.rs    # Fetch & buffer streams
+│   │   │   ├── lib.rs               # (101 LOC)
+│   │   │   ├── fmp4_remuxer.rs      # Main remuxer (407 LOC)
+│   │   │   ├── moov_merger.rs       # Merge video/audio moov (305 LOC)
+│   │   │   ├── traf_merger.rs       # Merge track fragments (416 LOC)
+│   │   │   ├── box_parser.rs        # BMFF parsing (301 LOC)
+│   │   │   ├── fragment_stream.rs   # Fragment streaming (273 LOC)
+│   │   │   ├── stream_fetcher.rs    # Fetch & buffer (264 LOC)
+│   │   │   ├── mux_router.rs        # Route streams (255 LOC)
+│   │   │   └── codec.rs             # Codec config (189 LOC)
 │   │   ├── Cargo.toml
 │   │   └── README.md
 │   │
@@ -127,7 +131,7 @@ downloadtool/
 │   ├── Dockerfile.homeserver        # Home server image
 │   ├── Dockerfile.vps               # VPS image
 │   ├── docker-compose.homeserver.yml
-│   ├── docker-compose.vps.yml       # [UPDATED 2026-02-23]
+│   ├── docker-compose.vps.yml
 │   └── .dockerignore
 │
 ├── proto/                           # Protocol Buffer definitions
@@ -148,6 +152,8 @@ downloadtool/
 │   │   ├── phase-01-fix-timeout-bug.md
 │   │   ├── phase-02-implement-n-param-transform.md
 │   │   └── plan.md
+│   ├── 260224-1015-quicktime-webm-dual-traf-fixes/
+│   │   └── Implementation complete
 │   └── reports/                     # Research & implementation reports
 │
 ├── docs/                            # Documentation (THIS FOLDER)
@@ -157,9 +163,9 @@ downloadtool/
 │   └── project-overview-pdr.md
 │
 ├── target/                          # Rust build artifacts (git ignored)
-├── Cargo.toml                       # Workspace root config [UPDATED 2026-02-23]
+├── Cargo.toml                       # Workspace root config
 ├── Cargo.lock
-├── Makefile                         # Build commands [UPDATED 2026-02-23]
+├── Makefile                         # Build commands
 ├── .gitignore
 ├── .github/
 │   └── workflows/
@@ -246,7 +252,34 @@ pub enum CrateError {
 
 ## Critical Components Walkthrough
 
-### 1. Anti-Bot Client (`crates/proxy/src/anti_bot.rs`)
+### 1. Muxer Architecture (NEW 2026-02-24)
+
+**Core Strategy:** Video-led dual-track fMP4 muxing
+
+**File Sizes (9 modules, 3,205 LOC total):**
+- `traf_merger.rs` (416 LOC) - Merge video+audio fragments into single moof
+- `fmp4_remuxer.rs` (407 LOC) - Orchestrate dual-traf remuxing pipeline
+- `box_parser.rs` (301 LOC) - BMFF box parsing & timescale extraction
+- `moov_merger.rs` (305 LOC) - Merge moov boxes, zero mdhd.duration (QuickTime fix)
+- `fragment_stream.rs` (273 LOC) - Collect & stream fragments
+- `stream_fetcher.rs` (264 LOC) - Fetch video/audio streams via HTTP
+- `mux_router.rs` (255 LOC) - Route streams to muxer, detect format
+- `codec.rs` (189 LOC) - Codec classification & validation
+- `lib.rs` (101 LOC) - Module exports & error types
+
+**Key Fixes (Deployed 2026-02-24):**
+1. **QuickTime Double-Duration:** Moov merger now zeros `mdhd.duration` in both trak boxes
+2. **WebM Exclusion:** Stream.rs returns 422 for `mime=video/webm` URLs
+3. **Brand Patching:** Remuxer changes `ftyp.major_brand` from `dash` to `isom`
+4. **Offset Patching:** Traf merger precisely patches `trun.data_offset` for correct sample location
+
+**Data Flow:**
+```
+Video Stream → Fragment Collection → Moov Merge → Traf Merge → Remux to ftyp→isom
+Audio Stream ↘                       (duration=0) (dual traf)   (offset patched)
+```
+
+### 2. Anti-Bot Client (`crates/proxy/src/anti_bot.rs`)
 
 **File Size:** ~300 lines | **Complexity:** High (multi-layer protection)
 
@@ -270,9 +303,9 @@ pub enum CrateError {
 - For video downloads, we need unlimited time for body transfer
 - Only the connection establishment should timeout
 
-### 2. YouTube N-Transform Module (`extractors/youtube-n-transform.ts`)
+### 3. YouTube N-Transform Module (`extractors/youtube-n-transform.ts`)
 
-**File Size:** ~174 lines | **Purpose:** Bypass CDN throttling
+**File Size:** 173 lines | **Purpose:** Bypass CDN throttling
 
 **Key Functions:**
 ```typescript
@@ -297,9 +330,9 @@ function fetchAndParseTransformFn(playerUrl: string): Promise<((n: string) => st
 ```
 Matches: `.get("n"))&&(b=FUNCNAME(b)` or `.get("n"))&&(b=FUNCNAME[0](b)`
 
-### 3. YouTube Extractor (`extractors/youtube.ts`)
+### 4. YouTube Extractor (`extractors/youtube.ts`)
 
-**File Size:** ~220 lines | **Strategy:** InnerTube API → HTML fallback
+**File Size:** 220 lines | **Strategy:** InnerTube API → HTML fallback
 
 **Primary Strategy (InnerTube API):**
 ```typescript
@@ -326,9 +359,9 @@ async function extractViaHTML(videoId, originalUrl, cookies): Promise<Extraction
 - Both strategies call `transformStreamUrls()` for CDN optimization
 - Error handling: InnerTube fails → try HTML → throw error
 
-### 4. GPU Pipeline (`crates/gpu-pipeline/src/pipeline.rs`)
+### 5. GPU Pipeline (`crates/gpu-pipeline/src/pipeline.rs`)
 
-**File Size:** ~3,976 tokens (longest pipeline file)
+**File Size:** ~3,976 tokens
 
 **Data Flow:**
 ```
@@ -350,20 +383,14 @@ Output File
 - Frame rate management
 - Error propagation with `Result<T, PipelineError>`
 
-### 5. fMP4 Muxer (`crates/muxer/src/fmp4_muxer.rs`)
+### 6. Legacy Architecture (Removed 2026-02-24)
 
-**File Size:** 12,395 tokens (largest file in codebase)
+**Removed:** Old `fmp4_muxer.rs` module
 
-**Responsibility:**
-- Container format writing (fragmented MP4)
-- Interleaved audio/video samples
-- Seek optimization & metadata
-- Codec-specific handling
-
-**Design Pattern:**
-- `FMP4Muxer` struct with builder pattern
-- Stream-based writing (no full file buffering)
-- Error recovery for partial writes
+**Reason:** Replaced by modern dual-traf architecture
+- Previous approach: Sequential A/V interleaving
+- New approach: Video-led grouping with dual traf boxes
+- Benefit: QuickTime compatibility, correct duration, WebM filtering
 
 ## Testing & Quality Standards
 
@@ -521,11 +548,14 @@ cargo audit
 
 | Pitfall | Issue | Solution |
 |---------|-------|----------|
+| WebM video streams | EBML container (not BMFF) | Stream.rs returns 422, filter in FormatPicker |
+| QuickTime duration | YouTube sums mdhd.duration | Moov merger zeros both trak mdhd.duration |
 | `.timeout()` on streams | Kills mid-transfer | Use `.connect_timeout()` instead |
 | Blocking in async | Tokio panic | Use `tokio::spawn()` or `tokio::task::block_in_place()` |
 | Extractor errors silent | Hard to debug | Check logs with `RUST_LOG=debug` |
 | Cookie jar not shared | Per-request cookies | Use `Arc<CookieStore>` + Arc<Client> |
 | N-transform cache miss | Slow first request | Cache per player version automatically |
+| fMP4 brand mismatch | Dash vs isom | Remuxer patches brand to isom (QuickTime) |
 
 ## Deployment Checklist
 
@@ -540,5 +570,5 @@ cargo audit
 
 ---
 
-**Version:** 1.1
-**Last Updated:** 2026-02-23 (Added N-Param Transform, Timeout Fix documentation)
+**Version:** 1.2
+**Last Updated:** 2026-02-24 (Added QuickTime Duration Fix, WebM Exclusion, Dual-Traf Muxer documentation)

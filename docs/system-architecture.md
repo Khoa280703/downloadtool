@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-02-24
 
 ## High-Level Architecture
 
@@ -359,7 +359,30 @@ impl AntiBotClient {
 
 ## Critical Components Deep-Dive
 
-### 1. Anti-Bot Layer (`crates/proxy/src/anti_bot.rs`)
+### 1. Muxer Components (2026-02-24 Updates)
+
+**New Dual-Traf Architecture:**
+- `fmp4_remuxer.rs` (407 LOC) - Video-led grouping, 38+22 → 38 fragments
+- `moov_merger.rs` (305 LOC) - Merge video/audio moov, zero mdhd.duration
+- `traf_merger.rs` (416 LOC) - Merge track fragments, patch trun.data_offset
+
+**Key Fixes:**
+- **QuickTime Double-Duration Bug:** YouTube sets `mdhd.duration` per track. When merged, QuickTime summed them (213s+213s=426s). Now zeroed to empty_moov style like ffmpeg.
+- **ftyp Brand Patching:** Changes `dash` → `isom` for better compatibility
+- **WebM Exclusion (API):** Returns 422 UNPROCESSABLE_ENTITY for `mime=video/webm` streams
+
+**WebM Detection Strategy:**
+```rust
+// crates/api/src/routes/stream.rs
+if params.video_url.contains("mime=video%2Fwebm")
+    || params.video_url.contains("mime=video/webm") {
+    return Err(ApiError {
+        status: StatusCode::UNPROCESSABLE_ENTITY
+    });
+}
+```
+
+### 2. Anti-Bot Layer (`crates/proxy/src/anti_bot.rs`)
 
 **Key Fix (2026-02-23):** Timeout configuration
 
@@ -537,12 +560,14 @@ Output: Video files → CDN/S3 → Browser download
 
 | Error | Handling | Recovery |
 |-------|----------|----------|
+| **WebM video stream** | Return 422 UNPROCESSABLE_ENTITY | User selects H.264/AV1 MP4 stream |
 | **InnerTube fails** | Log & fallback | Try HTML scraping |
 | **Bot detection (403/429)** | Mark proxy failed | Rotate proxy, retry |
 | **Timeout (30s+ connect)** | Log & retry | Use different proxy |
 | **Extraction fails** | ExtractionError | Return error to frontend |
 | **GPU job fails** | Log error | Return error response |
+| **QuickTime playback (wrong duration)** | Now fixed in moov_merger | Both video & audio mdhd zeroed |
 
 ---
 
-**Version:** 2.0 (Updated with N-Param Transform & Timeout Fix)
+**Version:** 2.1 (Updated with QuickTime Duration Fix, WebM Exclusion, Dual-Traf Muxer)

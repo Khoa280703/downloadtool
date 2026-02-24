@@ -2,7 +2,7 @@
 
 Welcome to the downloadtool documentation. This folder contains comprehensive guides for users, developers, and operators.
 
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-02-24
 
 ## Quick Navigation
 
@@ -23,14 +23,14 @@ Deploy and maintain the system:
 
 ## Document Overview
 
-### 1. Codebase Summary (219 lines)
+### 1. Codebase Summary (255 lines)
 **Purpose:** High-level overview of project structure
 
 **Contains:**
 - Project overview and vision
 - Complete architecture with diagrams
 - 8 major components overview
-- Recent changes (2026-02-23)
+- Recent changes (2026-02-24): WebM exclusion, QuickTime fix, dual-traf muxer
 - Technology stack
 - File organization
 - Design patterns
@@ -40,7 +40,7 @@ Deploy and maintain the system:
 
 ---
 
-### 2. System Architecture (548 lines)
+### 2. System Architecture (580 lines)
 **Purpose:** Detailed architectural flows and technical specifications
 
 **Contains:**
@@ -50,45 +50,50 @@ Deploy and maintain the system:
   - YouTube n-parameter transform flow
   - GPU transcoding flow
 - Component interfaces (API routes, extractors, anti-bot)
-- Critical components deep-dive
+- Critical components deep-dive:
+  - Muxer architecture (NEW: dual-traf, QuickTime fix, WebM exclusion)
+  - Anti-bot layer (timeout fix explanation)
+  - N-parameter transform details
+  - Extraction engine strategy
 - Data structures & types
 - Request/response flows (with before/after timeout fix)
 - Security & anti-detection measures
 - Performance characteristics
 - Deployment architecture
-- Error handling strategy
+- Error handling strategy (WebM handling added)
 
 **Start here if:** You need to understand how data flows through the system
 
 ---
 
-### 3. Code Standards (544 lines)
+### 3. Code Standards (600 lines)
 **Purpose:** Development guidelines and best practices
 
 **Contains:**
 - Complete directory structure with annotations
-- Rust workspace organization
+- Rust workspace organization (8 muxer modules listed)
 - Naming conventions (Rust, TypeScript, Svelte)
 - Code organization principles
 - Error handling & logging patterns
-- 5 critical component walkthroughs:
+- 6 critical component walkthroughs:
+  - Muxer architecture (NEW: dual-traf, 3,205 LOC, QuickTime fix details)
   - Anti-bot client (with timeout fix explanation)
   - YouTube n-transform module (algorithm & regex)
   - YouTube extractor (dual strategy)
   - GPU pipeline (hardware acceleration)
-  - fMP4 muxer (container format)
+  - Legacy architecture (removed components)
 - Testing & quality standards
 - Performance optimizations
 - Security practices
 - Build & compilation
-- Common pitfalls & solutions
+- Common pitfalls & solutions (WebM, duration, timeout added)
 - Deployment checklist
 
 **Start here if:** You're implementing features or fixing bugs
 
 ---
 
-### 4. Project Overview & PDR (510 lines)
+### 4. Project Overview & PDR (580 lines)
 **Purpose:** Product requirements and roadmap
 
 **Contains:**
@@ -97,44 +102,68 @@ Deploy and maintain the system:
 - 8 functional requirements with acceptance criteria
 - 6 non-functional requirements (performance, reliability, etc.)
 - Architecture & technical constraints
-- 8 implementation phases with status
-- Recent changes (2026-02-23):
-  - YouTube n-parameter transform (new feature)
-  - Download timeout fix (critical bug)
-- Success metrics & KPIs
+- 8+ implementation phases with status (8.3 = QuickTime/WebM fixes)
+- Recent changes (2026-02-24):
+  - QuickTime double-duration bug fixed (moov_merger.rs)
+  - WebM video-only stream exclusion (API 422 + frontend filter)
+  - Dual-track fMP4 muxer architecture (traf_merger.rs)
+  - Download timeout fix (still active from 2026-02-23)
+- Success metrics & KPIs (updated: QuickTime ✅, WebM handling ✅)
 - Risk assessment & mitigation
 - Dependencies & external services
 - 4-quarter roadmap (Q1-Q4 2026)
 - Known limitations
 - Testing strategy
 - Compliance & legal considerations
-- Version history
+- Version history (v2.1 2026-02-24)
 
 **Start here if:** You need to understand requirements or plan features
 
 ---
 
-## Key Changes (2026-02-23)
+## Key Changes (2026-02-24)
 
-### 1. YouTube N-Parameter Transform
-**File:** `extractors/youtube-n-transform.ts` (NEW)
+### 1. QuickTime Double-Duration Bug Fixed
+**File:** `crates/muxer/src/moov_merger.rs`
 
-Downloads YouTube videos at full CDN speed instead of being throttled to 100 KB/s.
+YouTube DASH streams set `mdhd.duration` per track. When muxed, QuickTime summed them (213+213=426s instead of 213s). Now zeros both trak mdhd.duration.
 
 **Documented in:**
 - Codebase Summary → Recent Changes
-- System Architecture → N-Transform Flow Diagram
-- Code Standards → YouTube N-Transform Module
-- Project Overview → Phase 8.1
+- System Architecture → Critical Components Deep-Dive (Muxer section)
+- Code Standards → Muxer Architecture Walkthrough
+- Project Overview → Phase 8.3
 
-### 2. Download Timeout Bug Fix
+### 2. WebM Video-Only Stream Exclusion
+**Files:** `crates/api/src/routes/stream.rs` + `frontend/src/components/FormatPicker.svelte`
+
+WebM uses EBML (incompatible with ISO BMFF fMP4). Backend returns 422, frontend filters VP9/WebM from options.
+
+**Documented in:**
+- Codebase Summary → Recent Changes
+- System Architecture → Critical Components (Muxer) + Error Handling
+- Code Standards → Muxer Architecture + Common Pitfalls
+- Project Overview → Phase 8.3
+
+### 3. Dual-Track fMP4 Muxer Architecture
+**Files:** `crates/muxer/src/traf_merger.rs` (416 LOC) + `fmp4_remuxer.rs` (407 LOC)
+
+Video-led grouping with dual traf boxes, QuickTime-compatible, removes legacy fmp4_muxer.
+
+**Documented in:**
+- Codebase Summary → Muxer Components (8 modules listed)
+- System Architecture → Critical Components (Muxer section)
+- Code Standards → Muxer Architecture Walkthrough
+- Project Overview → Phase 8.3
+
+### 4. Download Timeout Bug Fix (2026-02-23, Still Active)
 **File:** `crates/proxy/src/anti_bot.rs` (Line 99)
 
 Changed `.timeout(30s)` to `.connect_timeout(30s)` so downloads don't timeout mid-transfer.
 
 **Documented in:**
 - Codebase Summary → Recent Changes
-- System Architecture → Request/Response Flow
+- System Architecture → Request/Response Flow + Critical Components
 - Code Standards → Anti-Bot Client Section
 - Project Overview → Phase 8.2
 
@@ -210,15 +239,15 @@ A: See System Architecture → Performance Characteristics table or Project Over
 ## Reporting & Updates
 
 ### Latest Report
-- **File:** `/plans/reports/docs-manager-260223-1357-post-implementation-documentation-update.md`
-- **Date:** 2026-02-23
-- **Status:** Complete ✅
+- **File:** `/plans/reports/docs-manager-260224-1016-post-implementation-documentation-update.md`
+- **Date:** 2026-02-24
+- **Status:** In progress (this update)
 
 ### Report Contents
-- All documentation created and verified
-- All code changes documented
-- Cross-referenced to source code
+- All recent changes (QuickTime fix, WebM exclusion, dual-traf muxer) documented
+- Cross-referenced to source code and architecture
 - Quality assurance checklist
+- Metrics updated (Rust 43 files, 10K LOC; Muxer 3,205 LOC across 8 modules)
 
 ## Maintenance & Updates
 
@@ -269,8 +298,8 @@ A: See System Architecture → Performance Characteristics table or Project Over
 
 ---
 
-**Documentation Version:** 2.0
-**Last Generated:** 2026-02-23 13:57 UTC
+**Documentation Version:** 2.1
+**Last Generated:** 2026-02-24
 **Status:** Complete ✅
 
 For the latest updates, check `/plans/reports/` for implementation reports.
