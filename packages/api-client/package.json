@@ -1,0 +1,13 @@
+{
+  "name": "@downloadtool/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "generate": "bash generate.sh"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.73.0"
+  }
+}

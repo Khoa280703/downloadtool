@@ -264,11 +264,7 @@ const ALLOWED_DOMAINS: &[&str] = &[
     "youtube.com",
     "www.youtube.com",
     "youtu.be",
-    "tiktok.com",
-    "www.tiktok.com",
-    "vm.tiktok.com",
     "googlevideo.com",     // YouTube CDN
-    "tiktokcdn.com",       // TikTok CDN
 ];
 
 /// Validate URL against allowed domains
@@ -466,11 +462,6 @@ mod tests {
     #[test]
     fn test_should_use_socks5_googlevideo_false() {
         assert!(!should_use_socks5("https://rr1---sn-abc.googlevideo.com/videoplayback?..."));
-    }
-
-    #[test]
-    fn test_should_use_socks5_tiktok_false() {
-        assert!(!should_use_socks5("https://www.tiktok.com/@user/video/123"));
     }
 
     #[test]

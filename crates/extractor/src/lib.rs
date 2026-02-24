@@ -108,7 +108,7 @@ pub async fn extract(url: &str, cookies: Option<&str>) -> Result<VideoInfo, Extr
 /// Use this when you already know the platform and want to skip auto-detection.
 ///
 /// # Arguments
-/// * `platform` - The platform identifier (e.g., "youtube", "tiktok")
+/// * `platform` - The platform identifier (e.g., "youtube")
 /// * `url` - The video URL to extract
 /// * `cookies` - Optional cookies string
 pub async fn extract_with_platform(
@@ -131,14 +131,8 @@ pub async fn extract_with_platform(
 fn detect_platform(url: &str) -> &str {
     let url_lower = url.to_lowercase();
 
-    if url_lower.contains("youtube.com")
-        || url_lower.contains("youtu.be")
-        || url_lower.contains("youtube.com/shorts")
-        || url_lower.contains("youtube.com/live")
-    {
+    if url_lower.contains("youtube.com") || url_lower.contains("youtu.be") {
         "youtube"
-    } else if url_lower.contains("tiktok.com") {
-        "tiktok"
     } else {
         "unknown"
     }
@@ -176,15 +170,6 @@ mod tests {
             detect_platform("https://www.youtube.com/shorts/abc123"),
             "youtube"
         );
-    }
-
-    #[test]
-    fn test_detect_platform_tiktok() {
-        assert_eq!(
-            detect_platform("https://tiktok.com/@user/video/123456"),
-            "tiktok"
-        );
-        assert_eq!(detect_platform("https://vm.tiktok.com/abc123"), "tiktok");
     }
 
     #[test]

@@ -74,7 +74,7 @@ pub async fn batch_handler(
         if !is_valid_batch_url(&params.url) {
             warn!("Invalid batch URL: {}", params.url);
             let error_event = BatchEvent::Error {
-                message: "Invalid URL. Only YouTube channels/playlists and TikTok users are supported.".to_string(),
+                message: "Invalid URL. Only YouTube channels/playlists are supported.".to_string(),
             };
             Box::pin(stream::once(async move {
                 Ok(Event::default().data(serde_json::to_string(&error_event).unwrap()))
@@ -157,18 +157,15 @@ fn create_batch_stream(
     }
 }
 
-/// Check if URL is a valid batch extraction URL.
+/// Check if URL is a valid YouTube batch extraction URL (channel/playlist).
 fn is_valid_batch_url(url: &str) -> bool {
     let url_lower = url.to_lowercase();
-    // YouTube channels, playlists, mixes (watch?v=...&list=...)
     url_lower.contains("youtube.com/channel/")
         || url_lower.contains("youtube.com/c/")
         || url_lower.contains("youtube.com/user/")
         || url_lower.contains("youtube.com/playlist")
         || url_lower.contains("youtube.com/@")
         || (url_lower.contains("youtube.com") && url_lower.contains("list="))
-        // TikTok users
-        || (url_lower.contains("tiktok.com/@") && !url_lower.contains("/video/"))
 }
 
 #[cfg(test)]
@@ -183,10 +180,6 @@ mod tests {
         assert!(is_valid_batch_url("https://youtube.com/user/Username"));
         assert!(is_valid_batch_url("https://youtube.com/playlist?list=xxx"));
         assert!(is_valid_batch_url("https://youtube.com/@ChannelName"));
-
-        // TikTok users (not videos)
-        assert!(is_valid_batch_url("https://tiktok.com/@username"));
-        assert!(!is_valid_batch_url("https://tiktok.com/@username/video/123"));
 
         // Invalid URLs
         assert!(!is_valid_batch_url("https://youtube.com/watch?v=xxx"));

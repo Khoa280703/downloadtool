@@ -11,10 +11,8 @@ use std::process::Command;
 fn main() {
     println!("cargo:rerun-if-changed=../../extractors/youtube.ts");
     println!("cargo:rerun-if-changed=../../extractors/youtube-innertube.ts");
-    println!("cargo:rerun-if-changed=../../extractors/tiktok.ts");
     println!("cargo:rerun-if-changed=../../extractors/types.ts");
     println!("cargo:rerun-if-changed=../../extractors/dist/youtube.js");
-    println!("cargo:rerun-if-changed=../../extractors/dist/tiktok.js");
     println!("cargo:rerun-if-changed=../../extractors/dist/types.js");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -72,11 +70,6 @@ fn bundle_with_esbuild_cmd(extractors_dir: &Path, dist_dir: &Path, npx: &str) ->
     bundle.push_str(&youtube_output);
     bundle.push('\n');
 
-    // Bundle TikTok extractor
-    let tiktok_output = run_esbuild(extractors_dir, "tiktok.ts", dist_dir, npx);
-    bundle.push_str(&tiktok_output);
-    bundle.push('\n');
-
     // If all individual bundles are empty (esbuild failed / no TS files), use full fallback
     if bundle.trim().is_empty() {
         return create_inline_fallback_bundle();
@@ -87,8 +80,7 @@ fn bundle_with_esbuild_cmd(extractors_dir: &Path, dist_dir: &Path, npx: &str) ->
         r#"
 // Extractor registry - access exports via IIFE global vars (typeof to avoid ReferenceError)
 var extractors = {
-    youtube: { extract: typeof youtube !== "undefined" && youtube && youtube.extract ? youtube.extract : async function(u,c){ throw new Error("YouTube extractor not bundled - run esbuild"); } },
-    tiktok:  { extract: typeof tiktok  !== "undefined" && tiktok  && tiktok.extract  ? tiktok.extract  : async function(u,c){ throw new Error("TikTok extractor not bundled - run esbuild"); } }
+    youtube: { extract: typeof youtube !== "undefined" && youtube && youtube.extract ? youtube.extract : async function(u,c){ throw new Error("YouTube extractor not bundled - run esbuild"); } }
 };
 "#,
     );
@@ -161,7 +153,7 @@ fn create_fallback_bundle(extractors_dir: &Path) -> String {
     let mut bundle = String::new();
 
     // Try to read pre-bundled files, stripping ESM export syntax
-    for file in ["types.js", "youtube.js", "tiktok.js"] {
+    for file in ["types.js", "youtube.js"] {
         let path = extractors_dir.join("dist").join(file);
         if let Ok(content) = fs::read_to_string(path) {
             bundle.push_str(&strip_esm_exports(&content));
@@ -172,7 +164,7 @@ fn create_fallback_bundle(extractors_dir: &Path) -> String {
     if bundle.is_empty() {
         create_inline_fallback_bundle()
     } else {
-        bundle.push_str("\nvar extractors = { youtube: { extract: typeof youtube !== \"undefined\" && youtube.extract ? youtube.extract : null }, tiktok: { extract: typeof tiktok !== \"undefined\" && tiktok.extract ? tiktok.extract : null } };\n");
+        bundle.push_str("\nvar extractors = { youtube: { extract: typeof youtube !== \"undefined\" && youtube.extract ? youtube.extract : null } };\n");
         bundle
     }
 }
@@ -203,11 +195,6 @@ var extractors = {
     youtube: {
         extract: async function(url, cookies) {
             throw new ExtractionError("YouTube extractor not bundled - build with esbuild", "youtube");
-        }
-    },
-    tiktok: {
-        extract: async function(url, cookies) {
-            throw new ExtractionError("TikTok extractor not bundled - build with esbuild", "tiktok");
         }
     }
 };

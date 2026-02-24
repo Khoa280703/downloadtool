@@ -48,6 +48,5 @@ mod tests {
     #[test]
     fn test_platform_enum_values() {
         assert_eq!(Platform::YouTube.to_string(), "youtube");
-        assert_eq!(Platform::TikTok.to_string(), "tiktok");
     }
 }

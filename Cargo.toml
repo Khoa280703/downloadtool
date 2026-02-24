@@ -45,6 +45,9 @@ dotenvy = "0.15"
 bytes = "1"
 futures = "0.3"
 
+# OpenAPI spec generation
+utoipa = { version = "4", features = ["axum_extras"] }
+
 
 [profile.release]
 opt-level = 3

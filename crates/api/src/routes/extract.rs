@@ -9,7 +9,7 @@ use tracing::{error, info, warn};
 use extractor::{VideoFormat, VideoInfo};
 
 /// Request body for video extraction.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct ExtractRequest {
     /// URL of the video to extract
     pub url: String,
@@ -20,7 +20,7 @@ pub struct ExtractRequest {
 }
 
 /// Response for video extraction.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ExtractResponse {
     /// Status of the extraction
     pub status: String,
@@ -34,7 +34,7 @@ pub struct ExtractResponse {
 }
 
 /// Video metadata structure.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct VideoMetadata {
     /// Video title
     pub title: String,
@@ -54,7 +54,7 @@ pub struct VideoMetadata {
 }
 
 /// Stream format information for response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct StreamFormat {
     /// Format ID
     pub format_id: String,
@@ -99,7 +99,7 @@ impl IntoResponse for ApiError {
 /// POST /api/extract
 /// Body: { url: string, quality?: string, format?: string }
 ///
-/// Validates URL (youtube.com / tiktok.com only), calls extractor,
+/// Validates URL (youtube.com only), calls extractor,
 /// and returns stream list + recommended stream URL.
 pub async fn extract_handler(
     ExtractJson(body): ExtractJson<ExtractRequest>,
@@ -110,7 +110,7 @@ pub async fn extract_handler(
     if !is_valid_video_url(&body.url) {
         warn!("Invalid or unsupported URL: {}", body.url);
         return Err(ApiError {
-            error: "Invalid or unsupported URL. Only YouTube and TikTok URLs are supported.".to_string(),
+            error: "Invalid or unsupported URL. Only YouTube URLs are supported.".to_string(),
             status: 400,
         });
     }
@@ -152,13 +152,10 @@ pub async fn extract_handler(
     }
 }
 
-/// Check if URL is a valid video URL from supported platforms.
+/// Check if URL is a valid YouTube URL.
 fn is_valid_video_url(url: &str) -> bool {
     let url_lower = url.to_lowercase();
-    url_lower.contains("youtube.com")
-        || url_lower.contains("youtu.be")
-        || url_lower.contains("tiktok.com")
-        || url_lower.contains("vm.tiktok.com")
+    url_lower.contains("youtube.com") || url_lower.contains("youtu.be")
 }
 
 /// Convert VideoFormat to StreamFormat for response.
@@ -226,8 +223,7 @@ mod tests {
     fn test_is_valid_video_url() {
         assert!(is_valid_video_url("https://youtube.com/watch?v=abc123"));
         assert!(is_valid_video_url("https://youtu.be/abc123"));
-        assert!(is_valid_video_url("https://tiktok.com/@user/video/123"));
-        assert!(is_valid_video_url("https://vm.tiktok.com/abc123"));
+        assert!(!is_valid_video_url("https://tiktok.com/@user/video/123"));
         assert!(!is_valid_video_url("https://example.com/video"));
     }
 

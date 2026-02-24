@@ -40,7 +40,7 @@ pub struct StreamParams {
 }
 
 /// Query parameters for muxed stream.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct MuxedStreamParams {
     /// Video stream URL (URL-encoded)
     pub video_url: String,
@@ -353,19 +353,9 @@ fn stream_with_muxer_error(
     })
 }
 
-/// Detect platform from URL.
-fn detect_platform(url: &str) -> Platform {
-    let url_lower = url.to_lowercase();
-    if url_lower.contains("googlevideo.com")
-        || url_lower.contains("youtube.com")
-        || url_lower.contains("youtu.be")
-    {
-        Platform::YouTube
-    } else if url_lower.contains("tiktok") {
-        Platform::TikTok
-    } else {
-        Platform::YouTube
-    }
+/// Detect platform from URL (always YouTube for now).
+fn detect_platform(_url: &str) -> Platform {
+    Platform::YouTube
 }
 
 /// Extract `clen` (content length) from CDN URL query params.
@@ -503,14 +493,6 @@ mod tests {
         assert_eq!(
             detect_platform("https://youtube.com/watch?v=abc"),
             Platform::YouTube
-        );
-    }
-
-    #[test]
-    fn test_detect_platform_tiktok() {
-        assert_eq!(
-            detect_platform("https://v16-webapp.tiktokcdn.com/video"),
-            Platform::TikTok
         );
     }
 

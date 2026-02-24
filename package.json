@@ -1,0 +1,16 @@
+{
+  "name": "downloadtool-monorepo",
+  "private": true,
+  "version": "0.0.1",
+  "engines": {
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter frontend dev",
+    "build:web": "pnpm --filter frontend build",
+    "build:injector": "pnpm --filter @downloadtool/injector build",
+    "build:extension": "pnpm --filter @downloadtool/extension build",
+    "build:all": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build && pnpm --filter frontend build",
+    "generate:api-client": "pnpm --filter @downloadtool/api-client generate"
+  }
+}

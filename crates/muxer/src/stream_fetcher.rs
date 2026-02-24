@@ -9,13 +9,17 @@ use proxy::anti_bot::{AntiBotClient, AntiBotError};
 use proxy::cookie_store::Platform;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Chunk size for YouTube CDN throttle bypass: 9.5 MB.
 ///
 /// YouTube CDN throttles full-file requests to ~2 Mbps.
 /// Sub-range requests are served at full line speed.
 const YOUTUBE_CHUNK_SIZE: u64 = 9_500_000;
+
+/// Maximum retries per chunk on request failure or mid-stream interruption.
+/// Uses exponential backoff: 1s, 2s, 4s.
+const CHUNK_MAX_RETRIES: u32 = 3;
 
 /// Type alias for a pinned byte stream with AntiBotError.
 pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, AntiBotError>> + Send>>;
@@ -120,25 +124,66 @@ async fn fetch_stream_chunked(
 
         let mut offset = 0u64;
         while offset < total_size {
-            let end = (offset + YOUTUBE_CHUNK_SIZE - 1).min(total_size - 1);
-            let range = format!("bytes={}-{}", offset, end);
-            debug!("Chunk fetch: bytes={}-{} / {}", offset, end, total_size);
+            let chunk_end = (offset + YOUTUBE_CHUNK_SIZE - 1).min(total_size - 1);
 
-            match task_client.fetch_stream(&url_owned, Some(range)).await {
-                Ok(mut chunk_stream) => {
-                    while let Some(item) = chunk_stream.next().await {
-                        if tx.send(item).await.is_err() {
-                            return; // Receiver dropped — abort
+            // Retry loop per chunk: tracks fetch_start to resume mid-stream
+            let mut retry_count = 0u32;
+            let mut fetch_start = offset;
+
+            'retry: loop {
+                let range = format!("bytes={}-{}", fetch_start, chunk_end);
+                debug!("Chunk fetch: bytes={}-{} / {} (attempt {})", fetch_start, chunk_end, total_size, retry_count + 1);
+
+                let stream_result = task_client.fetch_stream(&url_owned, Some(range)).await;
+                let mut chunk_stream = match stream_result {
+                    Ok(s) => s,
+                    Err(e) => {
+                        retry_count += 1;
+                        if retry_count > CHUNK_MAX_RETRIES {
+                            error!("Chunk fetch failed after {} retries bytes={}-{}: {}", CHUNK_MAX_RETRIES, fetch_start, chunk_end, e);
+                            let _ = tx.send(Err(e)).await;
+                            return;
+                        }
+                        let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                        warn!("Chunk request failed (retry {}/{}): {} — retrying in {}s", retry_count, CHUNK_MAX_RETRIES, e, delay.as_secs());
+                        tokio::time::sleep(delay).await;
+                        continue 'retry;
+                    }
+                };
+
+                // Stream bytes from this range, tracking position for mid-stream retry
+                let mut stream_ok = true;
+                while let Some(item) = chunk_stream.next().await {
+                    match item {
+                        Ok(bytes) => {
+                            fetch_start += bytes.len() as u64;
+                            if tx.send(Ok(bytes)).await.is_err() {
+                                return; // Receiver dropped — abort
+                            }
+                        }
+                        Err(e) => {
+                            retry_count += 1;
+                            if retry_count > CHUNK_MAX_RETRIES {
+                                error!("Stream interrupted after {} retries at byte {}: {}", CHUNK_MAX_RETRIES, fetch_start, e);
+                                let _ = tx.send(Err(e)).await;
+                                return;
+                            }
+                            let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                            warn!("Stream interrupted at byte {} (retry {}/{}): {} — retrying in {}s", fetch_start, retry_count, CHUNK_MAX_RETRIES, e, delay.as_secs());
+                            tokio::time::sleep(delay).await;
+                            stream_ok = false;
+                            break;
                         }
                     }
                 }
-                Err(e) => {
-                    error!("Chunk fetch failed bytes={}-{}: {}", offset, end, e);
-                    let _ = tx.send(Err(e)).await;
-                    return;
+
+                if stream_ok {
+                    break 'retry; // chunk complete, advance to next chunk
                 }
+                // else: mid-stream failure, retry from fetch_start
             }
-            offset = end + 1;
+
+            offset = chunk_end + 1;
         }
     });
 

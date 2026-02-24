@@ -12,7 +12,6 @@ use tracing::{debug, info, warn};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Platform {
     YouTube,
-    TikTok,
 }
 
 impl Platform {
@@ -20,7 +19,6 @@ impl Platform {
     pub fn domain(self) -> &'static str {
         match self {
             Platform::YouTube => "youtube.com",
-            Platform::TikTok => "tiktok.com",
         }
     }
 
@@ -28,7 +26,6 @@ impl Platform {
     pub fn homepage_url(self) -> &'static str {
         match self {
             Platform::YouTube => "https://www.youtube.com",
-            Platform::TikTok => "https://www.tiktok.com",
         }
     }
 
@@ -36,7 +33,6 @@ impl Platform {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "youtube" | "yt" => Some(Platform::YouTube),
-            "tiktok" | "tt" => Some(Platform::TikTok),
             _ => None,
         }
     }
@@ -46,7 +42,6 @@ impl std::fmt::Display for Platform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Platform::YouTube => write!(f, "youtube"),
-            Platform::TikTok => write!(f, "tiktok"),
         }
     }
 }
@@ -176,14 +171,12 @@ mod tests {
     #[test]
     fn test_platform_domain() {
         assert_eq!(Platform::YouTube.domain(), "youtube.com");
-        assert_eq!(Platform::TikTok.domain(), "tiktok.com");
     }
 
     #[test]
     fn test_platform_from_str() {
         assert_eq!(Platform::from_str("youtube"), Some(Platform::YouTube));
         assert_eq!(Platform::from_str("YT"), Some(Platform::YouTube));
-        assert_eq!(Platform::from_str("tiktok"), Some(Platform::TikTok));
         assert_eq!(Platform::from_str("unknown"), None);
     }
 

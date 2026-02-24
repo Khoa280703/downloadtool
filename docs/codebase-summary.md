@@ -129,6 +129,66 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - N-parameter transform bypasses YouTube's 100 KB/s CDN throttle
   - Fallback: HTML scraping for restricted videos
 
+## Omnichannel Distribution (2026-02-24)
+
+### 4 Distribution Channels Implemented
+
+The platform now reaches users via 4 independent channels:
+
+1. **Web PWA** (`apps/web/`)
+   - SvelteKit-based progressive web app
+   - Web Share Target API: Android "Share from YouTube app" integration
+   - Background Fetch API: Downloads continue even if PWA is closed
+   - Installable on Android Chrome, Desktop Chrome, Edge
+   - Clipboard auto-read on focus for quick video URL pasting
+
+2. **Bookmarklet** (`apps/injector/` → `GET /bm.js`)
+   - Tiny IIFE script (6KB minified)
+   - Copy-paste bookmarklet into browser bookmarks
+   - Works on any browser: Chrome, Firefox, Safari, Edge
+   - Injects Download button via Shadow DOM for CSS isolation
+   - No installation required
+
+3. **Browser Extension** (`apps/extension/` → 2 zips)
+   - MV3 (Manifest V3) compatible
+   - Firefox: 7.5KB zip via AMO (Add-ons for Mozilla)
+   - Edge: 7.5KB zip via Edge Add-ons Partner Dashboard
+   - Content script with Shadow DOM injection
+   - Background service worker uses `chrome.downloads` API for native download dialog
+   - Popup auto-detects YouTube tabs, shows quality picker
+
+4. **UserScript** (`apps/injector/` → `GET /userscript`)
+   - Tampermonkey/Greasemonkey compatible
+   - 10KB IIFE with `==UserScript==` header block
+   - Auto-update via `@updateURL` + `@downloadURL`
+   - Reuses shared modules from bookmarklet for DRY code
+   - `GM_xmlhttpRequest` bypasses CORS restrictions
+
+### Monorepo Architecture
+
+- **pnpm workspaces** (no Turborepo yet): zero-config workspace linking
+- **Root workspace tooling** in `package.json`: build, dev, generate scripts
+- **API client package** (`packages/api-client/`):
+  - Generated from Rust backend via utoipa + openapi-ts
+  - Provides type-safe TypeScript types + fetch functions
+  - Imported by web, extension, bookmarklet, userscript
+  - Zero runtime dependencies (generated types only)
+
+### Code Reuse (DRY)
+
+- `apps/injector/src/shared/`:
+  - `inject-button.ts`: Reused by bookmarklet + userscript
+  - `quality-picker.ts`: Reused by bookmarklet + userscript + extension
+  - `stream-utils.ts`: Filters WebM-only streams, builds muxed URLs for all 4 channels
+- Extension and injector share identical logic, different delivery mechanisms
+
+### Backend Integration
+
+- `GET /openapi.json`: Serves OpenAPI spec (utoipa auto-generated)
+- `GET /bm.js`: Serves bookmarklet (compile-time embed via `include_str!`)
+- `GET /userscript`: Serves userscript (compile-time embed via `include_str!`)
+- No new API endpoints required; uses existing `POST /api/extract` + `GET /api/stream/muxed`
+
 ## Recent Changes (2026-02-24)
 
 ### 1. **WebM Video-Only Stream Exclusion** ✅
@@ -192,20 +252,46 @@ A high-performance video downloader platform supporting YouTube and other platfo
 
 ```
 downloadtool/
-├── crates/              # Rust crates (6 modules)
-│   ├── api/             # HTTP server & routes
-│   ├── extractor/       # Extraction engine
-│   ├── gpu-pipeline/    # GPU transcoding
-│   ├── gpu-worker/      # GPU worker process
-│   ├── muxer/           # Container muxing
-│   └── proxy/           # Anti-bot & proxy layer
+├── backend/
+│   └── crates/              # Rust crates (6 modules)
+│       ├── api/             # HTTP server & routes + static file serving
+│       ├── extractor/       # Extraction engine
+│       ├── gpu-pipeline/    # GPU transcoding
+│       ├── gpu-worker/      # GPU worker process
+│       ├── muxer/           # Container muxing
+│       └── proxy/           # Anti-bot & proxy layer
+├── packages/
+│   └── api-client/          # Generated TypeScript API client (@downloadtool/api-client)
+│       ├── src/
+│       │   ├── types.gen.ts     # Auto-generated types from utoipa
+│       │   └── sdk.gen.ts       # Auto-generated fetch functions
+│       └── generate.sh          # Regenerate client from OpenAPI spec
+├── apps/
+│   ├── web/                 # SvelteKit PWA (Web UI + Share Target + Background Fetch)
+│   ├── injector/            # Vite IIFE builder for bookmarklet & userscript
+│   │   ├── src/
+│   │   │   ├── bookmarklet.ts
+│   │   │   ├── userscript.ts
+│   │   │   └── shared/          # DRY modules (inject-button, quality-picker, stream-utils)
+│   │   └── dist/
+│   │       ├── bm.js            # Bookmarklet output
+│   │       └── youtube-downloader.user.js  # UserScript output
+│   └── extension/           # MV3 Extension (Firefox + Edge)
+│       ├── src/
+│       │   ├── content-script.ts
+│       │   ├── background.ts
+│       │   └── popup/
+│       ├── manifest-firefox.json
+│       ├── manifest-edge.json
+│       └── build-extension.sh
 ├── extractors/          # Dynamic extractor scripts (TS)
-├── frontend/            # SvelteKit web UI
 ├── infra/               # Infrastructure configs (WireGuard)
 ├── proto/               # Protocol Buffer definitions
 ├── docker/              # Docker images & compose files
 ├── plans/               # Development plans & research
-└── docs/                # Documentation (this folder)
+├── docs/                # Documentation (this folder)
+├── pnpm-workspace.yaml  # Monorepo workspace config
+└── package.json         # Root workspace tooling
 ```
 
 ## Key Design Patterns

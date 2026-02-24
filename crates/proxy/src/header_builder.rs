@@ -100,29 +100,8 @@ impl HeaderBuilder {
                 headers.insert("sec-fetch-user", HeaderValue::from_static("?1"));
                 headers.insert("upgrade-insecure-requests", HeaderValue::from_static("1"));
 
-                // YouTube-specific referer
                 if referer.is_none() {
                     headers.insert(REFERER, HeaderValue::from_static("https://www.youtube.com/"));
-                }
-            }
-            Platform::TikTok => {
-                headers.insert(
-                    "sec-ch-ua",
-                    HeaderValue::from_static("\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\""),
-                );
-                headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
-                headers.insert("sec-ch-ua-platform", HeaderValue::from_static("\"Windows\""));
-                headers.insert("sec-fetch-dest", HeaderValue::from_static("document"));
-                headers.insert("sec-fetch-mode", HeaderValue::from_static("navigate"));
-                headers.insert("sec-fetch-site", HeaderValue::from_static("none"));
-                headers.insert("sec-fetch-user", HeaderValue::from_static("?1"));
-                headers.insert("upgrade-insecure-requests", HeaderValue::from_static("1"));
-
-                // TikTok-specific headers
-                headers.insert("cache-control", HeaderValue::from_static("max-age=0"));
-
-                if referer.is_none() {
-                    headers.insert(REFERER, HeaderValue::from_static("https://www.tiktok.com/"));
                 }
             }
         }
@@ -201,16 +180,6 @@ mod tests {
         assert!(headers.contains_key(USER_AGENT));
         assert!(headers.contains_key(REFERER));
         assert!(headers.contains_key("sec-ch-ua"));
-    }
-
-    #[test]
-    fn test_build_tiktok_headers() {
-        let builder = HeaderBuilder::new();
-        let headers = builder.build_headers(Platform::TikTok, None);
-
-        assert!(headers.contains_key(USER_AGENT));
-        assert!(headers.contains_key(REFERER));
-        assert!(headers.contains_key("cache-control"));
     }
 
     #[test]

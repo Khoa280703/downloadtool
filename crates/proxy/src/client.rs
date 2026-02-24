@@ -198,9 +198,6 @@ pub fn validate_stream_url(url: &str) -> Result<reqwest::Url, ProxyError> {
         "googlevideo.com",
         "youtube.com",
         "youtu.be",
-        "tiktokcdn.com",
-        "tiktok.com",
-        "vm.tiktok.com",
     ];
 
     let parsed = reqwest::Url::parse(url)
@@ -254,8 +251,7 @@ mod tests {
         assert!(validate_stream_url("https://rr1---sn-abc.googlevideo.com/videoplayback").is_ok());
         assert!(validate_stream_url("https://youtube.com/watch?v=abc").is_ok());
         assert!(validate_stream_url("https://youtu.be/abc123").is_ok());
-        assert!(validate_stream_url("https://v16-webapp.tiktokcdn.com/video").is_ok());
-        assert!(validate_stream_url("https://tiktok.com/@user/video/123").is_ok());
+
 
         // Invalid URLs
         assert!(validate_stream_url("https://example.com/video").is_err());

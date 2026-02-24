@@ -37,6 +37,9 @@ async fn main() -> anyhow::Result<()> {
     // Build router with all routes
     let app = Router::new()
         .route("/health", get(routes::health_check))
+        .route("/openapi.json", get(routes::openapi_handler))
+        .route("/bm.js", get(routes::bm_js_handler))
+        .route("/userscript", get(routes::userscript_handler))
         .route("/api/extract", post(routes::extract_handler))
         .route("/api/stream", get(routes::stream_handler))
         .route("/api/stream/muxed", get(routes::muxed_stream_handler))
