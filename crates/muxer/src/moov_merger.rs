@@ -17,11 +17,11 @@ pub fn merge_moov(
     video_moov: &[u8],
     audio_moov: &[u8],
 ) -> Result<(Vec<u8>, u32, u32), MuxerError> {
-    // Read timescales before borrowing slices
+    // Read timescales and durations before borrowing slices.
+    // NOTE: YouTube DASH init segments set mvhd.duration = 0 per DASH spec.
+    // The actual media duration lives in mdhd boxes (track-level media headers).
     let video_timescale = crate::box_parser::read_timescale(video_moov).unwrap_or(90000);
     let audio_timescale = crate::box_parser::read_timescale(audio_moov).unwrap_or(44100);
-    // Read audio mdhd.duration (in audio timescale) to convert tkhd.duration to movie timescale
-    let audio_mdhd_duration = crate::box_parser::read_mdhd_duration(audio_moov).unwrap_or(0);
 
     // Extract components from video moov content
     let v_hdr = read_box_header(video_moov)
@@ -41,22 +41,26 @@ pub fn merge_moov(
     let audio_trak_src = find_box(a_content, b"trak")
         .ok_or_else(|| MuxerError::InvalidInput("No trak in audio moov".into()))?;
 
-    // Clone mvhd and patch next_track_id → 3
+    // Clone mvhd and only patch next_track_id → 3.
+    // Leave mvhd.duration = 0 (empty_moov style, like ffmpeg -movflags empty_moov).
+    // QuickTime has a bug where non-zero mvhd.duration + fragment-computed duration = double.
+    // Keeping duration=0 forces QT to compute duration purely from moof/traf decode times.
     let mut mvhd_patched = mvhd.to_vec();
     patch_mvhd_next_track_id(&mut mvhd_patched, 3)?;
 
-    // Clone audio trak, patch track_id 1 → 2, and fix tkhd.duration timescale.
-    // audio.tkhd.duration is in audio timescale; merged moov uses video timescale,
-    // so convert: new_dur = audio_mdhd_duration * video_timescale / audio_timescale
+    // Clone video trak and zero out mdhd.duration (empty_moov style).
+    // YouTube DASH init sets mdhd.duration to actual media duration. If left non-zero,
+    // QuickTime sums mdhd durations across tracks (video 213s + audio 213s = 426s = 7:06).
+    let mut video_trak = video_trak.to_vec();
+    patch_trak_mdhd_duration(&mut video_trak, 0).ok();
+
+    // Clone audio trak, patch track_id 1 → 2, and zero mdhd.duration.
     let mut audio_trak = audio_trak_src.to_vec();
     patch_trak_track_id(&mut audio_trak, 2)?;
-    if audio_timescale > 0 && audio_mdhd_duration > 0 {
-        let new_dur = ((audio_mdhd_duration as u128 * video_timescale as u128)
-            / audio_timescale as u128) as u32;
-        patch_trak_tkhd_duration(&mut audio_trak, new_dur)?;
-    }
+    patch_trak_mdhd_duration(&mut audio_trak, 0).ok();
 
-    // Build mvex with trex for both tracks
+    // Build mvex: trex for both tracks. No mehd — let QT compute duration from fragments.
+    // Adding mehd with the computed duration causes QT to add it to fragment durations (double).
     let mvex = build_mvex(1, 2);
 
     // Assemble moov = 8-byte header + content
@@ -67,7 +71,7 @@ pub fn merge_moov(
     result.extend_from_slice(&(moov_size as u32).to_be_bytes());
     result.extend_from_slice(b"moov");
     result.extend_from_slice(&mvhd_patched);
-    result.extend_from_slice(video_trak);
+    result.extend_from_slice(&video_trak);
     result.extend_from_slice(&audio_trak);
     result.extend_from_slice(&mvex);
 
@@ -138,51 +142,66 @@ fn patch_trak_track_id(trak: &mut [u8], new_track_id: u32) -> Result<(), MuxerEr
     Ok(())
 }
 
-/// Patch `tkhd.duration` inside a `trak` box to `new_duration` (in movie timescale).
+/// Zero out `mdhd.duration` inside a `trak` box (empty_moov style).
 ///
-/// tkhd v0: `duration` at content offset 20.
-/// tkhd v1: `duration` at content offset 28 (u64 — patched as u32 high=0).
-fn patch_trak_tkhd_duration(trak: &mut [u8], new_duration: u32) -> Result<(), MuxerError> {
+/// Path: trak → mdia → mdhd
+/// mdhd v0: duration is u32 at content offset 16.
+/// mdhd v1: duration is u64 at content offset 24.
+fn patch_trak_mdhd_duration(trak: &mut [u8], duration: u32) -> Result<(), MuxerError> {
     let trak_hdr = read_box_header(trak)
-        .ok_or_else(|| MuxerError::InvalidInput("Invalid trak".into()))?;
+        .ok_or_else(|| MuxerError::InvalidInput("Invalid trak for mdhd patch".into()))?;
     let trak_content_start = trak_hdr.header_size as usize;
 
-    let trak_content = &trak[trak_content_start..];
-    let tkhd_off_in_content = find_box_offset(trak_content, b"tkhd")
-        .ok_or_else(|| MuxerError::InvalidInput("No tkhd in trak".into()))?;
+    // Find mdia in trak
+    let mdia_off = find_box_offset(&trak[trak_content_start..], b"mdia")
+        .ok_or_else(|| MuxerError::InvalidInput("No mdia in trak".into()))?;
+    let mdia_abs = trak_content_start + mdia_off;
 
-    let tkhd_abs = trak_content_start + tkhd_off_in_content;
-    let tkhd_hdr = read_box_header(&trak[tkhd_abs..])
-        .ok_or_else(|| MuxerError::InvalidInput("Invalid tkhd".into()))?;
+    let mdia_hdr = read_box_header(&trak[mdia_abs..])
+        .ok_or_else(|| MuxerError::InvalidInput("Invalid mdia".into()))?;
+    let mdia_content_start = mdia_abs + mdia_hdr.header_size as usize;
 
-    let tkhd_content_start = tkhd_abs + tkhd_hdr.header_size as usize;
-    if trak.len() < tkhd_content_start + 1 {
-        return Err(MuxerError::InvalidInput("tkhd too short".into()));
+    // Find mdhd in mdia
+    let mdhd_off = find_box_offset(&trak[mdia_content_start..], b"mdhd")
+        .ok_or_else(|| MuxerError::InvalidInput("No mdhd in mdia".into()))?;
+    let mdhd_abs = mdia_content_start + mdhd_off;
+
+    let mdhd_hdr = read_box_header(&trak[mdhd_abs..])
+        .ok_or_else(|| MuxerError::InvalidInput("Invalid mdhd".into()))?;
+    let mdhd_cs = mdhd_abs + mdhd_hdr.header_size as usize; // content start (= version byte)
+
+    if trak.len() < mdhd_cs + 1 {
+        return Err(MuxerError::InvalidInput("mdhd too short".into()));
     }
 
-    let version = trak[tkhd_content_start];
-    // tkhd FullBox content:
-    // v0: [ver+flags(4)][creation(4)][mod(4)][track_id(4)][reserved(4)][duration(4)] → offset 20
-    // v1: [ver+flags(4)][creation(8)][mod(8)][track_id(4)][reserved(4)][duration(8)] → offset 28
-    let dur_off = tkhd_content_start + if version == 0 { 20 } else { 28 };
-
+    let version = trak[mdhd_cs];
+    // v0 layout after FullBox header: ver(1)+flags(3)+creation(4)+mod(4)+timescale(4)+duration(4)
+    //   → duration at content offset 16
+    // v1: creation(8)+mod(8)+timescale(4)+duration(8) → duration at content offset 24
     if version == 0 {
+        let dur_off = mdhd_cs + 16;
         if trak.len() < dur_off + 4 {
-            return Err(MuxerError::InvalidInput("tkhd v0 too short for duration".into()));
+            return Err(MuxerError::InvalidInput("mdhd v0 too short".into()));
         }
-        write_u32_be(trak, dur_off, new_duration);
+        write_u32_be(trak, dur_off, duration);
     } else {
-        // v1 has 8-byte duration: write as 0||new_duration
+        let dur_off = mdhd_cs + 24;
         if trak.len() < dur_off + 8 {
-            return Err(MuxerError::InvalidInput("tkhd v1 too short for duration".into()));
+            return Err(MuxerError::InvalidInput("mdhd v1 too short".into()));
         }
+        // Write u64 as two u32 big-endian halves; duration fits in u32 so high word = 0.
         write_u32_be(trak, dur_off, 0);
-        write_u32_be(trak, dur_off + 4, new_duration);
+        write_u32_be(trak, dur_off + 4, duration);
     }
+
     Ok(())
 }
 
-/// Build an `mvex` box containing two `trex` entries for the given track IDs.
+/// Build an `mvex` box with two `trex` entries for the given track IDs.
+///
+/// No `mehd` box — leaving duration=0 (empty_moov style) forces QuickTime to compute
+/// duration from fragment decode times rather than metadata, avoiding the QT bug where
+/// it adds mvhd.duration + fragment duration = doubled duration.
 fn build_mvex(video_track_id: u32, audio_track_id: u32) -> Vec<u8> {
     // trex: 8B header + 4B ver/flags + 5×4B fields = 32 bytes
     const TREX_SIZE: u32 = 32;

@@ -1,27 +1,33 @@
-//! True streaming fMP4 remuxer với timestamp-based fragment interleaving.
+//! True streaming fMP4 remuxer with dual-traf QuickTime-compatible output.
 //!
-//! Thay vì buffer toàn bộ streams (~80MB), chỉ buffer init segment (~5KB)
-//! và stream fragments từng cái một. Memory tại mọi thời điểm: ~2 fragments.
+//! Collects all video and audio fragments, then groups them using a video-led
+//! strategy: each video fragment is merged with all audio fragments that fall
+//! within its time window into a single moof+mdat pair.
 //!
-//! Output order: ftyp → merged moov → interleaved (video+audio) fragments
-//! theo tfdt timestamp (cross-multiply timescale để tránh float division).
+//! Output structure:
+//!   ftyp → merged moov → [moof{mfhd + traf_V + traf_A...}][mdat{V+A data}] ...
+//!
+//! This single-moof-dual-traf format is what QuickTime/AVFoundation requires to
+//! correctly identify simultaneous tracks and show the right total duration.
 
 use crate::box_parser::{find_box, iter_boxes, read_box_header, write_u32_be};
 use crate::fragment_stream::{Fragment, FragmentReader};
 use crate::moov_merger::merge_moov;
+use crate::traf_merger::merge_fragments;
 use crate::MuxerError;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use std::pin::Pin;
-use tracing::{error, info};
+use tracing::{info};
 
 /// Pinned stream of muxed fMP4 bytes.
 pub type MuxedStream = Pin<Box<dyn Stream<Item = Result<Bytes, MuxerError>> + Send>>;
 
 /// Remux separate video and audio fMP4 streams into a single muxed fMP4.
 ///
-/// True streaming implementation: only buffers init segments + 2 current fragments.
-/// Fragments are interleaved by decode timestamp for correct playback.
+/// Collects all fragments then emits single-moof-dual-traf output for QuickTime
+/// compatibility. QuickTime groups separate moofs by track_id and sums durations;
+/// dual-traf format tells it both tracks are simultaneous.
 pub fn remux_streams<V, A, VE, AE>(video: V, audio: A) -> MuxedStream
 where
     VE: std::error::Error + Send + Sync + 'static,
@@ -29,14 +35,11 @@ where
     V: Stream<Item = Result<Bytes, VE>> + Send + 'static,
     A: Stream<Item = Result<Bytes, AE>> + Send + 'static,
 {
-    // Wrap errors to MuxerError so both streams have the same error type
     let video_mapped = video.map(|r| r.map_err(|e| MuxerError::StreamFetchError(e.to_string())));
     let audio_mapped = audio.map(|r| r.map_err(|e| MuxerError::StreamFetchError(e.to_string())));
 
     Box::pin(async_stream::try_stream! {
-        // Phase A: buffer both complete streams to extract init segments
-        // We need ftyp + moov which are at the beginning (~5KB typically)
-        // Buffer the entire stream since we can't seek backwards on a stream
+        // Phase A: buffer both complete streams
         let (video_result, audio_result) = tokio::join!(
             collect_stream(video_mapped),
             collect_stream(audio_mapped)
@@ -55,96 +58,147 @@ where
         let video_moov = find_box(&video_data, b"moov")
             .ok_or_else(|| MuxerError::InvalidInput("No moov in video stream".into()))?;
         let audio_moov = find_box(&audio_data, b"moov").ok_or_else(|| {
-            error!("No moov in audio stream — audio may be WebM (not fMP4). Use M4A/AAC audio.");
             MuxerError::InvalidInput("No moov in audio stream (WebM not supported for fMP4 remux)".into())
         })?;
 
-        // Phase C: merge moov boxes, get timescales for interleave comparison
+        // Phase C: merge moov, get timescales
         let (merged_moov, video_timescale, audio_timescale) = merge_moov(video_moov, audio_moov)?;
 
-        info!(
-            "Timescales: video={}, audio={}",
-            video_timescale, audio_timescale
-        );
+        info!("Timescales: video={}, audio={}", video_timescale, audio_timescale);
 
-        // Phase D: emit init segment
-        yield Bytes::copy_from_slice(ftyp);
+        // Phase D: emit init segment.
+        // Patch ftyp.major_brand from 'dash' → 'isom' so QuickTime treats this as
+        // standard MP4 instead of entering DASH streaming heuristics.
+        let ftyp_bytes = {
+            let mut b = ftyp.to_vec();
+            if b.len() >= 12 {
+                b[8..12].copy_from_slice(b"isom");
+            }
+            b
+        };
+        yield Bytes::from(ftyp_bytes);
         yield Bytes::from(merged_moov);
 
-        // Phase E: create fragment readers from the fragment portions of each stream
-        let video_frags = skip_init_bytes(&video_data);
-        let audio_frags = skip_init_bytes(&audio_data);
+        // Phase E: collect ALL fragments from both streams
+        let video_frag_data = skip_init_bytes(&video_data);
+        let audio_frag_data = skip_init_bytes(&audio_data);
 
-        // Wrap slices in futures::stream::iter so FragmentReader can consume them
         let video_frag_stream = futures::stream::iter(
-            std::iter::once(Ok::<Bytes, MuxerError>(Bytes::copy_from_slice(video_frags)))
+            std::iter::once(Ok::<Bytes, MuxerError>(Bytes::copy_from_slice(video_frag_data)))
         );
         let audio_frag_stream = futures::stream::iter(
-            std::iter::once(Ok::<Bytes, MuxerError>(Bytes::copy_from_slice(audio_frags)))
+            std::iter::once(Ok::<Bytes, MuxerError>(Bytes::copy_from_slice(audio_frag_data)))
         );
 
         let mut video_reader = FragmentReader::new(video_frag_stream);
         let mut audio_reader = FragmentReader::new(audio_frag_stream);
 
-        // Phase F: timestamp-based interleave loop
-        let mut video_frag: Option<Fragment> = None;
-        let mut audio_frag: Option<Fragment> = None;
-        let mut video_done = false;
-        let mut audio_done = false;
-        let mut seq = 1u32;
-
+        // Collect all video fragments
+        let mut video_frags: Vec<Fragment> = Vec::new();
         loop {
-            // Fill video slot if empty
-            if video_frag.is_none() && !video_done {
-                match video_reader.next_fragment().await {
-                    Some(Ok(f)) => video_frag = Some(f),
-                    Some(Err(e)) => Err(e)?,
-                    None => video_done = true,
-                }
-            }
-            // Fill audio slot if empty
-            if audio_frag.is_none() && !audio_done {
-                match audio_reader.next_fragment().await {
-                    Some(Ok(f)) => audio_frag = Some(f),
-                    Some(Err(e)) => Err(e)?,
-                    None => audio_done = true,
-                }
-            }
-
-            // Determine which track to emit next
-            let emit_video = match (&video_frag, &audio_frag) {
-                (Some(_), None) => true,
-                (None, Some(_)) => false,
-                (None, None) => break, // both exhausted
-                (Some(v), Some(a)) => {
-                    // Cross-multiply to compare decode times without float division:
-                    // v.tfdt / video_timescale <= a.tfdt / audio_timescale
-                    // ⟺ v.tfdt * audio_timescale <= a.tfdt * video_timescale
-                    (v.tfdt as u128) * (audio_timescale as u128)
-                        <= (a.tfdt as u128) * (video_timescale as u128)
-                }
-            };
-
-            if emit_video {
-                let frag = video_frag.take().unwrap();
-                let mut moof = frag.moof.to_vec();
-                patch_mfhd_sequence(&mut moof, seq)?;
-                // track_id stays 1 for video
-                seq += 1;
-                yield Bytes::from(moof);
-                yield frag.mdat;
-            } else {
-                let frag = audio_frag.take().unwrap();
-                let mut moof = frag.moof.to_vec();
-                patch_mfhd_sequence(&mut moof, seq)?;
-                patch_tfhd_track_id(&mut moof, 2)?;
-                seq += 1;
-                yield Bytes::from(moof);
-                yield frag.mdat;
+            match video_reader.next_fragment().await {
+                Some(Ok(f)) => video_frags.push(f),
+                Some(Err(e)) => Err(e)?,
+                None => break,
             }
         }
 
-        info!("Remux complete: {} total fragments interleaved", seq - 1);
+        // Collect all audio fragments; patch track_id to 2 in moof
+        let mut audio_frags: Vec<Fragment> = Vec::new();
+        loop {
+            match audio_reader.next_fragment().await {
+                Some(Ok(f)) => {
+                    // Patch audio track_id to 2 in its moof
+                    let mut moof = f.moof.to_vec();
+                    patch_tfhd_track_id(&mut moof, 2)?;
+                    audio_frags.push(Fragment {
+                        moof: Bytes::from(moof),
+                        mdat: f.mdat,
+                        tfdt: f.tfdt,
+                    });
+                }
+                Some(Err(e)) => Err(e)?,
+                None => break,
+            }
+        }
+
+        info!(
+            "Collected {} video fragments and {} audio fragments",
+            video_frags.len(), audio_frags.len()
+        );
+
+        // Phase F: video-led grouping → emit merged dual-traf fragments
+        //
+        // For each video fragment Vi:
+        //   next_v_tfdt_norm = tfdt_norm of V(i+1), or u128::MAX if last
+        //   audio_group = all audio fragments Aj where tfdt_norm(Aj) < next_v_tfdt_norm
+        //   emit merge_fragments(Vi, audio_group, seq)
+        //
+        // Remaining audio fragments (after all video) → emit as-is patched with seq.
+        //
+        // Normalization to avoid float:
+        //   video tfdt_norm = tfdt * audio_timescale
+        //   audio tfdt_norm = tfdt * video_timescale
+
+        let vts = video_timescale as u128;
+        let ats = audio_timescale as u128;
+
+        // Build normalized video decode times
+        let v_tfdt_norms: Vec<u128> = video_frags.iter()
+            .map(|f| f.tfdt as u128 * ats)
+            .collect();
+
+        // Build normalized audio decode times
+        let a_tfdt_norms: Vec<u128> = audio_frags.iter()
+            .map(|f| f.tfdt as u128 * vts)
+            .collect();
+
+        let mut audio_cursor = 0usize; // index into audio_frags
+        let mut seq = 1u32;
+
+        for (vi, v_frag) in video_frags.iter().enumerate() {
+            // Determine the upper bound: normalized tfdt of the NEXT video fragment
+            let next_v_norm = v_tfdt_norms.get(vi + 1).copied().unwrap_or(u128::MAX);
+
+            // Collect audio fragments whose normalized tfdt < next_v_norm
+            let audio_group_start = audio_cursor;
+            while audio_cursor < audio_frags.len()
+                && a_tfdt_norms[audio_cursor] < next_v_norm
+            {
+                audio_cursor += 1;
+            }
+            let audio_group = &audio_frags[audio_group_start..audio_cursor];
+
+            // Build slice of (moof, mdat) references for traf_merger
+            let audio_pairs: Vec<(&[u8], &[u8])> = audio_group
+                .iter()
+                .map(|f| (f.moof.as_ref(), f.mdat.as_ref()))
+                .collect();
+
+            // merge_fragments handles mfhd sequence patching internally
+            let merged = merge_fragments(
+                v_frag.moof.as_ref(),
+                v_frag.mdat.as_ref(),
+                &audio_pairs,
+                seq,
+            );
+            seq += 1;
+
+            yield Bytes::from(merged);
+        }
+
+        // Emit any remaining audio fragments that follow all video
+        while audio_cursor < audio_frags.len() {
+            let a_frag = &audio_frags[audio_cursor];
+            let mut moof = a_frag.moof.to_vec();
+            patch_mfhd_sequence(&mut moof, seq)?;
+            seq += 1;
+            yield Bytes::from(moof);
+            yield a_frag.mdat.clone();
+            audio_cursor += 1;
+        }
+
+        info!("Remux complete: {} total output fragments", seq - 1);
     })
 }
 

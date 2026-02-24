@@ -330,7 +330,7 @@ async fn op_fetch(
 
     // Create client with timeout
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(90))
         .build()?;
 
     let mut request = client.request(

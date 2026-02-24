@@ -178,54 +178,6 @@ pub fn read_tfdt(moof: &[u8]) -> Option<u64> {
     }
 }
 
-/// Read the duration from a `moov` box (first trak's mdhd).
-///
-/// Box path: moov → trak → mdia → mdhd
-/// mdhd v0: duration at content offset 16 (after timescale at 12); v1: at content offset 24.
-/// Returns the value promoted to u64.
-pub fn read_mdhd_duration(moov: &[u8]) -> Option<u64> {
-    let moov_hdr = read_box_header(moov)?;
-    let moov_end = (moov_hdr.total_size as usize).min(moov.len());
-    let moov_content = &moov[moov_hdr.header_size as usize..moov_end];
-
-    let (trak_off, trak_hdr) = iter_boxes(moov_content)
-        .find(|(_, h)| &h.box_type == b"trak")?;
-    let trak_end = (trak_off + trak_hdr.total_size as usize).min(moov_content.len());
-    let trak_slice = &moov_content[trak_off..trak_end];
-    let trak_hdr2 = read_box_header(trak_slice)?;
-    let trak_content = &trak_slice[trak_hdr2.header_size as usize..];
-
-    let (mdia_off, mdia_hdr) = iter_boxes(trak_content)
-        .find(|(_, h)| &h.box_type == b"mdia")?;
-    let mdia_end = (mdia_off + mdia_hdr.total_size as usize).min(trak_content.len());
-    let mdia_slice = &trak_content[mdia_off..mdia_end];
-    let mdia_hdr2 = read_box_header(mdia_slice)?;
-    let mdia_content = &mdia_slice[mdia_hdr2.header_size as usize..];
-
-    let (mdhd_off, _) = iter_boxes(mdia_content)
-        .find(|(_, h)| &h.box_type == b"mdhd")?;
-    let mdhd = &mdia_content[mdhd_off..];
-
-    if mdhd.len() < 9 {
-        return None;
-    }
-    let version = mdhd[8];
-    // v0: timescale at offset 20, duration at offset 24 (u32)
-    // v1: timescale at offset 28, duration at offset 32 (u64)
-    if version == 1 {
-        let dur_abs = 8 + 4 + 8 + 8 + 4; // = 32
-        if mdhd.len() < dur_abs + 8 {
-            return None;
-        }
-        Some(read_u64_be(mdhd, dur_abs))
-    } else {
-        let dur_abs = 8 + 4 + 4 + 4 + 4; // = 24
-        if mdhd.len() < dur_abs + 4 {
-            return None;
-        }
-        Some(read_u32_be(mdhd, dur_abs) as u64)
-    }
-}
 
 /// Read the timescale from a `moov` box (first trak's mdhd).
 ///

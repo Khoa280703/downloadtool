@@ -6,6 +6,7 @@
 pub mod box_parser;
 pub mod fragment_stream;
 pub mod moov_merger;
+pub mod traf_merger;
 pub mod fmp4_remuxer;
 pub mod mux_router;
 pub mod stream_fetcher;
