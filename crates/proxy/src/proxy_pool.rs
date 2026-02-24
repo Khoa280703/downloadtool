@@ -200,8 +200,10 @@ mod tests {
             "http://proxy2:8080".to_string(),
         ]);
 
-        // Mark first proxy as failed
-        pool.mark_failed("http://proxy1:8080");
+        // Mark first proxy as failed MAX_FAILURES times to trigger unhealthy state
+        for _ in 0..MAX_FAILURES {
+            pool.mark_failed("http://proxy1:8080");
+        }
 
         // Should skip failed proxy and return second one
         let proxy = pool.next().unwrap();

@@ -8,6 +8,7 @@ use deno_core::{op2, JsRuntime, PollEventLoopOptions, RuntimeOptions};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
@@ -292,6 +293,50 @@ fn validate_url(url: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Cached direct client (no proxy).
+static DIRECT_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+/// Cached SOCKS5 client (built lazily from `SOCKS5_PROXY_URL` env var).
+static SOCKS5_CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
+
+/// Get the appropriate cached reqwest client for the given URL.
+/// Routes youtube.com through SOCKS5 if `SOCKS5_PROXY_URL` is set.
+/// All other domains use the direct client.
+fn get_fetch_client(url: &str) -> Result<&'static reqwest::Client, anyhow::Error> {
+    if should_use_socks5(url) {
+        let socks5 = SOCKS5_CLIENT.get_or_init(|| {
+            std::env::var("SOCKS5_PROXY_URL").ok().and_then(|socks5_url| {
+                let proxy = reqwest::Proxy::all(&socks5_url).ok()?;
+                reqwest::Client::builder()
+                    .timeout(Duration::from_secs(90))
+                    .proxy(proxy)
+                    .build()
+                    .ok()
+            })
+        });
+        if let Some(client) = socks5 {
+            debug!("Routing {} through SOCKS5 proxy", url);
+            return Ok(client);
+        }
+        // Fallback to direct if SOCKS5 not configured or build failed
+    }
+
+    Ok(DIRECT_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(90))
+            .build()
+            .expect("Failed to build direct HTTP client")
+    }))
+}
+
+/// Returns true if the URL's host matches youtube.com or subdomains.
+/// These domains are routed through SOCKS5 proxy to avoid rate-limiting
+/// on home server IPs.
+fn should_use_socks5(url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(url) else { return false };
+    let host = parsed.host_str().unwrap_or("");
+    host == "youtube.com" || host.ends_with(".youtube.com") || host == "youtu.be"
+}
+
 /// HTTP fetch operation exposed to JavaScript
 #[op2(async)]
 #[serde]
@@ -328,10 +373,8 @@ async fn op_fetch(
         }
     }
 
-    // Create client with timeout
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(90))
-        .build()?;
+    // Get cached client; routes youtube.com through SOCKS5 if configured
+    let client = get_fetch_client(&url)?;
 
     let mut request = client.request(
         reqwest::Method::from_bytes(method.as_bytes())?,
@@ -398,5 +441,45 @@ fn op_log(#[string] level: String, #[string] message: String) {
         "warn" => warn!("[JS] {}", message),
         "error" => error!("[JS] {}", message),
         _ => info!("[JS] {}", message),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_use_socks5_youtube() {
+        assert!(should_use_socks5("https://youtube.com/watch?v=abc123"));
+    }
+
+    #[test]
+    fn test_should_use_socks5_www_youtube() {
+        assert!(should_use_socks5("https://www.youtube.com/watch?v=abc123"));
+    }
+
+    #[test]
+    fn test_should_use_socks5_youtu_be() {
+        assert!(should_use_socks5("https://youtu.be/abc123"));
+    }
+
+    #[test]
+    fn test_should_use_socks5_googlevideo_false() {
+        assert!(!should_use_socks5("https://rr1---sn-abc.googlevideo.com/videoplayback?..."));
+    }
+
+    #[test]
+    fn test_should_use_socks5_tiktok_false() {
+        assert!(!should_use_socks5("https://www.tiktok.com/@user/video/123"));
+    }
+
+    #[test]
+    fn test_should_use_socks5_unknown_false() {
+        assert!(!should_use_socks5("https://example.com/page"));
+    }
+
+    #[test]
+    fn test_should_use_socks5_invalid_url_false() {
+        assert!(!should_use_socks5("not-a-valid-url"));
     }
 }

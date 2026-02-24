@@ -27,21 +27,25 @@ fn main() {
     let dist_dir = out_dir.join("extractors_dist");
     fs::create_dir_all(&dist_dir).expect("Failed to create dist directory");
 
-    // Priority: 1) pre-built dist/*.js (run `make extractors` to update), 2) esbuild live, 3) inline fallback
-    let dist_youtube = extractors_dir.join("dist").join("youtube.js");
-    let bundle_content = if dist_youtube.exists() {
-        create_fallback_bundle(&extractors_dir)
+    // Priority: 1) esbuild live (IIFE format, globals-compatible), 2) inline fallback
+    // Note: pre-built dist/*.js use ESM format (not suitable for V8 execute_script)
+    // Try common npx locations since cargo build may not have full PATH
+    let npx_candidates = ["/usr/bin/npx", "/usr/local/bin/npx", "npx"];
+    let npx_bin = npx_candidates.iter()
+        .find(|p| {
+            let result = Command::new(p).args(["esbuild", "--version"]).output();
+            match &result {
+                Ok(o) => eprintln!("build.rs: npx {} esbuild --version -> status={}", p, o.status),
+                Err(e) => eprintln!("build.rs: npx {} failed: {}", p, e),
+            }
+            result.map(|o| o.status.success()).unwrap_or(false)
+        })
+        .copied();
+    eprintln!("build.rs: npx_bin={:?}, extractors_dir={:?}", npx_bin, extractors_dir);
+    let bundle_content = if let Some(npx) = npx_bin {
+        bundle_with_esbuild_cmd(&extractors_dir, &dist_dir, npx)
     } else {
-        let esbuild_ok = Command::new("npx")
-            .args(["esbuild", "--version"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if esbuild_ok {
-            bundle_with_esbuild(&extractors_dir, &dist_dir)
-        } else {
-            create_inline_fallback_bundle()
-        }
+        create_inline_fallback_bundle()
     };
 
     // Write the combined bundle
@@ -54,22 +58,22 @@ fn main() {
     );
 }
 
-/// Bundle TypeScript files using esbuild
-fn bundle_with_esbuild(extractors_dir: &Path, dist_dir: &Path) -> String {
+/// Bundle TypeScript files using esbuild (with specified npx binary)
+fn bundle_with_esbuild_cmd(extractors_dir: &Path, dist_dir: &Path, npx: &str) -> String {
     let mut bundle = String::new();
 
     // Bundle types first
-    let types_output = run_esbuild(extractors_dir, "types.ts", dist_dir);
+    let types_output = run_esbuild(extractors_dir, "types.ts", dist_dir, npx);
     bundle.push_str(&types_output);
     bundle.push('\n');
 
     // Bundle YouTube extractor
-    let youtube_output = run_esbuild(extractors_dir, "youtube.ts", dist_dir);
+    let youtube_output = run_esbuild(extractors_dir, "youtube.ts", dist_dir, npx);
     bundle.push_str(&youtube_output);
     bundle.push('\n');
 
     // Bundle TikTok extractor
-    let tiktok_output = run_esbuild(extractors_dir, "tiktok.ts", dist_dir);
+    let tiktok_output = run_esbuild(extractors_dir, "tiktok.ts", dist_dir, npx);
     bundle.push_str(&tiktok_output);
     bundle.push('\n');
 
@@ -93,14 +97,14 @@ var extractors = {
 }
 
 /// Run esbuild on a TypeScript file
-fn run_esbuild(extractors_dir: &Path, file: &str, dist_dir: &Path) -> String {
+fn run_esbuild(extractors_dir: &Path, file: &str, dist_dir: &Path, npx: &str) -> String {
     let input = extractors_dir.join(file);
     let output = dist_dir.join(file.replace(".ts", ".js"));
     // Use iife format so output is plain JS compatible with execute_script
     // global-name exposes the module as a variable on globalThis
     let global_name = file.replace(".ts", "").replace(".", "_");
 
-    let result = Command::new("npx")
+    let result = Command::new(npx)
         .args([
             "esbuild",
             input.to_str().unwrap(),
@@ -109,8 +113,7 @@ fn run_esbuild(extractors_dir: &Path, file: &str, dist_dir: &Path) -> String {
             &format!("--global-name={}", global_name),
             "--platform=neutral",
             "--target=es2020",
-            "--outfile",
-            output.to_str().unwrap(),
+            &format!("--outfile={}", output.display()),
         ])
         .output();
 
@@ -132,15 +135,36 @@ fn run_esbuild(extractors_dir: &Path, file: &str, dist_dir: &Path) -> String {
     }
 }
 
+/// Strip ESM export blocks from pre-built dist files (built with --format=esm by Makefile)
+/// Deno V8 execute_script doesn't support ES module syntax
+fn strip_esm_exports(content: &str) -> String {
+    let mut result = String::new();
+    let mut in_export_block = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("export {") {
+            in_export_block = true;
+        }
+        if !in_export_block {
+            result.push_str(line);
+            result.push('\n');
+        }
+        if in_export_block && trimmed.ends_with("};") {
+            in_export_block = false;
+        }
+    }
+    result
+}
+
 /// Create a fallback bundle when esbuild is not available
 fn create_fallback_bundle(extractors_dir: &Path) -> String {
     let mut bundle = String::new();
 
-    // Try to read pre-bundled files
+    // Try to read pre-bundled files, stripping ESM export syntax
     for file in ["types.js", "youtube.js", "tiktok.js"] {
         let path = extractors_dir.join("dist").join(file);
         if let Ok(content) = fs::read_to_string(path) {
-            bundle.push_str(&content);
+            bundle.push_str(&strip_esm_exports(&content));
             bundle.push('\n');
         }
     }
