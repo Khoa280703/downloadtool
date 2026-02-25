@@ -1,1081 +1,890 @@
-2026-Feb-25 02:49:55.538063
+2026-Feb-25 05:08:30.026039
 Starting deployment of khoa280703/downloadtool:main-zoscg4oc04gkwkssg0kw8w8w to localhost.
-2026-Feb-25 02:49:55.713943
+2026-Feb-25 05:08:30.594644
 Preparing container with helper image: ghcr.io/coollabsio/coolify-helper:1.0.12
-2026-Feb-25 02:49:55.811321
-[CMD]: docker stop -t 30 wcwwgk4g8o0owkwogkgo40kk
-2026-Feb-25 02:49:55.811321
-Error response from daemon: No such container: wcwwgk4g8o0owkwogkgo40kk
-2026-Feb-25 02:49:55.935619
-[CMD]: docker run -d --network coolify --name wcwwgk4g8o0owkwogkgo40kk  --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper:1.0.12
-2026-Feb-25 02:49:55.935619
-5a19af4810f2032d679844e5b7fbc1be037620dab8fc86fd575180691474ff27
-2026-Feb-25 02:49:57.137578
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git ls-remote https://github.com/Khoa280703/downloadtool refs/heads/main'
-2026-Feb-25 02:49:57.137578
-b192ae1e024a4b21b7fa6522678ec167fd180c22	refs/heads/main
-2026-Feb-25 02:49:57.147953
+2026-Feb-25 05:08:30.910033
+[CMD]: docker stop -t 30 bwo0440og4kooocc8kccc4sg
+2026-Feb-25 05:08:30.910033
+Error response from daemon: No such container: bwo0440og4kooocc8kccc4sg
+2026-Feb-25 05:08:31.385728
+[CMD]: docker run -d --network coolify --name bwo0440og4kooocc8kccc4sg  --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper:1.0.12
+2026-Feb-25 05:08:31.385728
+ad11bc28c5fd711d2f8f286ee89102ae268d805e6f5d28e2cfc34844059c7aad
+2026-Feb-25 05:08:33.036895
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git ls-remote https://github.com/Khoa280703/downloadtool refs/heads/main'
+2026-Feb-25 05:08:33.036895
+4964f9a4405b338e6420a0e7d46a1e71ddfa1598	refs/heads/main
+2026-Feb-25 05:08:33.047043
 ----------------------------------------
-2026-Feb-25 02:49:57.151819
-Importing Khoa280703/downloadtool:main (commit sha b192ae1e024a4b21b7fa6522678ec167fd180c22) to /artifacts/wcwwgk4g8o0owkwogkgo40kk.
-2026-Feb-25 02:49:57.292010
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'git clone --depth=1 --recurse-submodules --shallow-submodules -b 'main' 'https://github.com/Khoa280703/downloadtool' '/artifacts/wcwwgk4g8o0owkwogkgo40kk' && cd '/artifacts/wcwwgk4g8o0owkwogkgo40kk' && if [ -f .gitmodules ]; then sed -i "s#git@\(.*\):#https://\1/#g" '/artifacts/wcwwgk4g8o0owkwogkgo40kk'/.gitmodules || true && git submodule sync && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive --depth=1; fi && cd '/artifacts/wcwwgk4g8o0owkwogkgo40kk' && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull'
-2026-Feb-25 02:49:57.292010
-Cloning into '/artifacts/wcwwgk4g8o0owkwogkgo40kk'...
-2026-Feb-25 02:49:59.131170
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'cd /artifacts/wcwwgk4g8o0owkwogkgo40kk && git log -1 b192ae1e024a4b21b7fa6522678ec167fd180c22 --pretty=%B'
-2026-Feb-25 02:49:59.131170
-fix: bypass vite config file loading with programmatic build script
-2026-Feb-25 02:49:59.131170
-2026-Feb-25 02:49:59.131170
-vite uses esbuild to bundle vite.config.ts before importing it. On Alpine
-2026-Feb-25 02:49:59.131170
-Docker (musl libc), esbuild may fail silently causing vite to use empty
-2026-Feb-25 02:49:59.131170
-config (no plugins) → SvelteKit plugin never runs → '0 modules transformed'.
-2026-Feb-25 02:49:59.131170
-2026-Feb-25 02:49:59.131170
-Solution: build-docker.mjs imports vite + sveltekit() directly from
-2026-Feb-25 02:49:59.131170
-node_modules at runtime — no esbuild config bundling, no temp file,
-2026-Feb-25 02:49:59.131170
-configFile: false. SvelteKit plugin still reads svelte.config.js normally.
-2026-Feb-25 02:50:02.204286
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'test -f /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/Dockerfile.homeserver && echo 'exists' || echo 'not found''
-2026-Feb-25 02:50:02.204286
+2026-Feb-25 05:08:33.051624
+Importing Khoa280703/downloadtool:main (commit sha 4964f9a4405b338e6420a0e7d46a1e71ddfa1598) to /artifacts/bwo0440og4kooocc8kccc4sg.
+2026-Feb-25 05:08:33.403803
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'git clone --depth=1 --recurse-submodules --shallow-submodules -b 'main' 'https://github.com/Khoa280703/downloadtool' '/artifacts/bwo0440og4kooocc8kccc4sg' && cd '/artifacts/bwo0440og4kooocc8kccc4sg' && if [ -f .gitmodules ]; then sed -i "s#git@\(.*\):#https://\1/#g" '/artifacts/bwo0440og4kooocc8kccc4sg'/.gitmodules || true && git submodule sync && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive --depth=1; fi && cd '/artifacts/bwo0440og4kooocc8kccc4sg' && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull'
+2026-Feb-25 05:08:33.403803
+Cloning into '/artifacts/bwo0440og4kooocc8kccc4sg'...
+2026-Feb-25 05:08:35.945484
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'cd /artifacts/bwo0440og4kooocc8kccc4sg && git log -1 4964f9a4405b338e6420a0e7d46a1e71ddfa1598 --pretty=%B'
+2026-Feb-25 05:08:35.945484
+fix: build gpu-node without --features gpu (FFmpeg 7.x not available on Ubuntu 22.04)
+2026-Feb-25 05:08:40.595880
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'test -f /artifacts/bwo0440og4kooocc8kccc4sg/docker/Dockerfile.homeserver && echo 'exists' || echo 'not found''
+2026-Feb-25 05:08:40.595880
 exists
-2026-Feb-25 02:50:02.355638
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'cat /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/Dockerfile.homeserver'
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'cat /artifacts/bwo0440og4kooocc8kccc4sg/docker/Dockerfile.homeserver'
+2026-Feb-25 05:08:40.964932
 # Dockerfile for Home Server deployment
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 # Builds the GPU worker with CUDA support for hardware transcoding
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 FROM nvidia/cuda:12.3.2-devel-ubuntu22.04 AS builder
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 WORKDIR /app
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Install dependencies
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 RUN apt-get update && apt-get install -y \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 curl \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 build-essential \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 pkg-config \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libssl-dev \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 protobuf-compiler \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ffmpeg \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libavcodec-dev \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libavformat-dev \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libavutil-dev \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libswscale-dev \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+libavfilter-dev \
+2026-Feb-25 05:08:40.964932
+libavdevice-dev \
+2026-Feb-25 05:08:40.964932
+clang \
+2026-Feb-25 05:08:40.964932
+libclang-dev \
+2026-Feb-25 05:08:40.964932
 && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Install Rust
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ENV PATH="/root/.cargo/bin:${PATH}"
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Copy workspace configuration
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 COPY Cargo.toml ./
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 COPY Cargo.lock ./
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Copy all crates
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 COPY crates/ ./crates/
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Copy proto files
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 COPY proto/ ./proto/
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Build the GPU worker with CUDA support
-2026-Feb-25 02:50:02.355638
-RUN cargo build --release --bin gpu-worker-server --features gpu-support
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+# NOTE: --features gpu disabled until FFmpeg 7.x is available in the build environment
+2026-Feb-25 05:08:40.964932
+# Ubuntu 22.04 apt provides FFmpeg 4.4.x but ffmpeg-next = "7" requires FFmpeg 7.x
+2026-Feb-25 05:08:40.964932
+RUN cargo build --release --bin gpu-node
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Stage 2: Runtime
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04 AS runtime
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 WORKDIR /app
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Install runtime dependencies
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 RUN apt-get update && apt-get install -y \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ca-certificates \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libssl3 \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ffmpeg \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libavcodec58 \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libavformat58 \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libavutil56 \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 libswscale5 \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+libavfilter7 \
+2026-Feb-25 05:08:40.964932
+libavdevice58 \
+2026-Feb-25 05:08:40.964932
 && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Create non-root user
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 RUN useradd -m -u 1000 -s /bin/bash appuser
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Copy binary from builder
-2026-Feb-25 02:50:02.355638
-COPY --from=builder /app/target/release/gpu-worker-server /usr/local/bin/
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+COPY --from=builder /app/target/release/gpu-node /usr/local/bin/
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Create directories
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Switch to non-root user
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 USER appuser
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Environment variables
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ENV GPU_WORKER_BIND=0.0.0.0:50051
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ENV GPU_WORKER_MAX_JOBS=4
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ENV CUDA_DEVICE_ID=0
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ENV RUST_LOG=info
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # NVIDIA runtime configuration
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ENV NVIDIA_VISIBLE_DEVICES=all
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Expose gRPC port
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 EXPOSE 50051
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Health check
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
 CMD echo "health check placeholder" || exit 0
-2026-Feb-25 02:50:02.355638
-2026-Feb-25 02:50:02.355638
+2026-Feb-25 05:08:40.964932
+2026-Feb-25 05:08:40.964932
 # Run the GPU worker
-2026-Feb-25 02:50:02.355638
-CMD ["gpu-worker-server"]
-2026-Feb-25 02:50:02.513693
+2026-Feb-25 05:08:40.964932
+CMD ["gpu-node"]
+2026-Feb-25 05:08:41.331256
 Added 4 ARG declarations to Dockerfile for service gpu-worker (multi-stage build, added to 2 stages).
-2026-Feb-25 02:50:02.662413
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'test -f /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/Dockerfile.vps && echo 'exists' || echo 'not found''
-2026-Feb-25 02:50:02.662413
+2026-Feb-25 05:08:41.678312
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'test -f /artifacts/bwo0440og4kooocc8kccc4sg/docker/Dockerfile.vps && echo 'exists' || echo 'not found''
+2026-Feb-25 05:08:41.678312
 exists
-2026-Feb-25 02:50:02.804304
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'cat /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/Dockerfile.vps'
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'cat /artifacts/bwo0440og4kooocc8kccc4sg/docker/Dockerfile.vps'
+2026-Feb-25 05:08:42.051161
 # Dockerfile for VPS deployment
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 # Builds the API server and related components without GPU support
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
-# Stage 1: Builder
-2026-Feb-25 02:50:02.804304
-FROM rust:1.85-bookworm AS builder
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+# Stage 0: Build injector JS (embedded into api crate via include_str! at compile time)
+2026-Feb-25 05:08:42.051161
+FROM node:22-alpine AS js-builder
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 WORKDIR /app
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+RUN npm install -g pnpm
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+# Copy workspace manifests for pnpm resolution
+2026-Feb-25 05:08:42.051161
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+2026-Feb-25 05:08:42.051161
+COPY packages/api-client/package.json ./packages/api-client/
+2026-Feb-25 05:08:42.051161
+COPY apps/injector/package.json ./apps/injector/
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+# Copy injector source and shared packages
+2026-Feb-25 05:08:42.051161
+COPY apps/injector/ ./apps/injector/
+2026-Feb-25 05:08:42.051161
+COPY packages/ ./packages/
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+# Install deps and build injector (produces dist/bm.js and dist/youtube-downloader.user.js)
+2026-Feb-25 05:08:42.051161
+RUN pnpm install --frozen-lockfile
+2026-Feb-25 05:08:42.051161
+RUN pnpm --filter @downloadtool/injector build
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+# Stage 1: Rust builder
+2026-Feb-25 05:08:42.051161
+FROM rust:1.88-bookworm AS builder
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+WORKDIR /app
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Install dependencies
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 RUN apt-get update && apt-get install -y \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 pkg-config \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 libssl-dev \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 protobuf-compiler \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Copy workspace configuration
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 COPY Cargo.toml ./
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 COPY Cargo.lock ./
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Copy all crates
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 COPY crates/ ./crates/
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Copy proto files
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 COPY proto/ ./proto/
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+# Copy injector dist (required by include_str! in crates/api/src/routes/static_files.rs)
+2026-Feb-25 05:08:42.051161
+COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Build the release binary
-2026-Feb-25 02:50:02.804304
-RUN cargo build --release --bin api-server
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+RUN cargo build --release --bin vps-gateway
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Stage 2: Runtime
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 FROM debian:bookworm-slim AS runtime
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 WORKDIR /app
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Install runtime dependencies
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 RUN apt-get update && apt-get install -y \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 ca-certificates \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 libssl3 \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Create non-root user
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 RUN useradd -m -u 1000 -s /bin/bash appuser
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Copy binary from builder
-2026-Feb-25 02:50:02.804304
-COPY --from=builder /app/target/release/api-server /usr/local/bin/
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
-# Copy extractor scripts
-2026-Feb-25 02:50:02.804304
-COPY --from=builder /app/crates/extractor/scripts/ /app/extractors/ || true
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+COPY --from=builder /app/target/release/vps-gateway /usr/local/bin/
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Create directories
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Switch to non-root user
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 USER appuser
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Environment variables
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 ENV PORT=3068
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 ENV EXTRACTOR_DIR=/app/extractors
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 ENV GPU_ENABLED=false
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 ENV RUST_LOG=info
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Expose port
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 EXPOSE 3068
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Health check
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
 CMD curl -f http://localhost:3068/health || exit 1
-2026-Feb-25 02:50:02.804304
-2026-Feb-25 02:50:02.804304
+2026-Feb-25 05:08:42.051161
+2026-Feb-25 05:08:42.051161
 # Run the server
-2026-Feb-25 02:50:02.804304
-CMD ["api-server"]
-2026-Feb-25 02:50:02.952075
-Added 4 ARG declarations to Dockerfile for service api (multi-stage build, added to 2 stages).
-2026-Feb-25 02:50:03.097800
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'test -f /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/Dockerfile.frontend && echo 'exists' || echo 'not found''
-2026-Feb-25 02:50:03.097800
+2026-Feb-25 05:08:42.051161
+CMD ["vps-gateway"]
+2026-Feb-25 05:08:42.410144
+Added 6 ARG declarations to Dockerfile for service api (multi-stage build, added to 3 stages).
+2026-Feb-25 05:08:42.773364
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'test -f /artifacts/bwo0440og4kooocc8kccc4sg/docker/Dockerfile.frontend && echo 'exists' || echo 'not found''
+2026-Feb-25 05:08:42.773364
 exists
-2026-Feb-25 02:50:03.248333
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'cat /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/Dockerfile.frontend'
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'cat /artifacts/bwo0440og4kooocc8kccc4sg/docker/Dockerfile.frontend'
+2026-Feb-25 05:08:43.124664
 # Dockerfile for frontend (SvelteKit Node server)
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 # Copy ALL source files BEFORE npm install so svelte-kit sync (prepare script)
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 # can find svelte.config.js and generate .svelte-kit/ correctly.
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 FROM node:22-alpine AS builder
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 WORKDIR /app
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 # Copy all frontend source files first (node_modules excluded via .dockerignore)
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 COPY frontend/ ./
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 # Install — prepare script runs svelte-kit sync with svelte.config.js available
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 RUN npm install
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 RUN node build-docker.mjs
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 # Runtime
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 FROM node:22-alpine AS runtime
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 WORKDIR /app
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 COPY --from=builder /app/build ./build
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 COPY --from=builder /app/package.json ./
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 ENV PORT=3000
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 ENV HOST=0.0.0.0
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 EXPOSE 3000
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
 CMD wget -qO- http://localhost:3000 || exit 1
-2026-Feb-25 02:50:03.248333
-2026-Feb-25 02:50:03.248333
+2026-Feb-25 05:08:43.124664
+2026-Feb-25 05:08:43.124664
 CMD ["node", "build"]
-2026-Feb-25 02:50:03.404271
+2026-Feb-25 05:08:43.496703
 Added 4 ARG declarations to Dockerfile for service frontend (multi-stage build, added to 2 stages).
-2026-Feb-25 02:50:03.407804
+2026-Feb-25 05:08:43.501574
 Pulling & building required images.
-2026-Feb-25 02:50:03.414229
+2026-Feb-25 05:08:43.506856
 Creating build-time .env file in /artifacts (outside Docker context).
-2026-Feb-25 02:50:03.561809
+2026-Feb-25 05:08:43.873615
 Adding build arguments to Docker Compose build command.
-2026-Feb-25 02:50:03.833973
-[CMD]: docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/build-time.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/wcwwgk4g8o0owkwogkgo40kk -f /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/docker-compose.homeserver.yml build --pull --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg COOLIFY_BUILD_SECRETS_HASH=1bf8dfcfdeb73162b126768f9e085efbcfdffa61f0529746b67826c254109afc'
-2026-Feb-25 02:50:03.833973
+2026-Feb-25 05:08:44.359324
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/build-time.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/bwo0440og4kooocc8kccc4sg -f /artifacts/bwo0440og4kooocc8kccc4sg/docker/docker-compose.homeserver.yml build --pull --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg COOLIFY_BUILD_SECRETS_HASH=1bf8dfcfdeb73162b126768f9e085efbcfdffa61f0529746b67826c254109afc'
+2026-Feb-25 05:08:44.359324
 #1 [internal] load local bake definitions
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
 #1 reading from stdin 1.79kB done
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
 #1 DONE 0.0s
-2026-Feb-25 02:50:04.042531
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
+2026-Feb-25 05:08:44.570721
 #2 [frontend internal] load build definition from Dockerfile.frontend
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
 #2 transferring dockerfile: 999B done
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
 #2 DONE 0.0s
-2026-Feb-25 02:50:04.042531
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
+2026-Feb-25 05:08:44.570721
 #3 [api internal] load build definition from Dockerfile.vps
-2026-Feb-25 02:50:04.042531
-#3 transferring dockerfile: 1.60kB done
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
+#3 transferring dockerfile: 2.35kB done
+2026-Feb-25 05:08:44.570721
 #3 DONE 0.0s
-2026-Feb-25 02:50:04.042531
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
+2026-Feb-25 05:08:44.570721
 #4 [gpu-worker internal] load build definition from Dockerfile.homeserver
-2026-Feb-25 02:50:04.042531
-#4 transferring dockerfile: 2.05kB done
-2026-Feb-25 02:50:04.042531
+2026-Feb-25 05:08:44.570721
+#4 transferring dockerfile: 2.28kB done
+2026-Feb-25 05:08:44.570721
 #4 DONE 0.0s
-2026-Feb-25 02:50:04.042531
-2026-Feb-25 02:50:04.042531
-#5 [gpu-worker internal] load metadata for docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04
-2026-Feb-25 02:50:04.994546
+2026-Feb-25 05:08:44.570721
+2026-Feb-25 05:08:44.570721
+#5 [api internal] load metadata for docker.io/library/node:22-alpine
+2026-Feb-25 05:08:45.751841
 #5 ...
-2026-Feb-25 02:50:04.994546
-2026-Feb-25 02:50:04.994546
-#6 [api internal] load metadata for docker.io/library/rust:1.85-bookworm
-2026-Feb-25 02:50:04.994546
-#6 DONE 1.1s
-2026-Feb-25 02:50:05.237504
-#7 [gpu-worker internal] load metadata for docker.io/nvidia/cuda:12.3.2-runtime-ubuntu22.04
-2026-Feb-25 02:50:05.237504
-#7 DONE 1.1s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#8 [frontend internal] load metadata for docker.io/library/node:22-alpine
-2026-Feb-25 02:50:05.237504
-#8 DONE 1.1s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#5 [gpu-worker internal] load metadata for docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04
-2026-Feb-25 02:50:05.237504
-#5 DONE 1.1s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#9 [api internal] load .dockerignore
-2026-Feb-25 02:50:05.237504
-#9 transferring context: 341B done
-2026-Feb-25 02:50:05.237504
-#9 DONE 0.0s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#10 [api internal] load metadata for docker.io/library/debian:bookworm-slim
-2026-Feb-25 02:50:05.237504
-#10 DONE 1.1s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.751841
+2026-Feb-25 05:08:45.751841
+#6 [api internal] load metadata for docker.io/library/debian:bookworm-slim
+2026-Feb-25 05:08:45.751841
+#6 DONE 1.3s
+2026-Feb-25 05:08:45.852279
+#7 [api internal] load metadata for docker.io/library/rust:1.88-bookworm
+2026-Feb-25 05:08:45.852279
+#7 DONE 1.3s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#5 [api internal] load metadata for docker.io/library/node:22-alpine
+2026-Feb-25 05:08:45.852279
+#5 DONE 1.3s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#8 [gpu-worker internal] load metadata for docker.io/nvidia/cuda:12.3.2-runtime-ubuntu22.04
+2026-Feb-25 05:08:45.852279
+#8 DONE 1.3s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#9 [gpu-worker internal] load metadata for docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04
+2026-Feb-25 05:08:45.852279
+#9 DONE 1.3s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#10 [frontend internal] load .dockerignore
+2026-Feb-25 05:08:45.852279
+#10 transferring context: 341B done
+2026-Feb-25 05:08:45.852279
+#10 DONE 0.0s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
 #11 [frontend builder 1/5] FROM docker.io/library/node:22-alpine@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
 #11 resolve docker.io/library/node:22-alpine@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34 0.0s done
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
 #11 DONE 0.0s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#12 [gpu-worker runtime 1/6] FROM docker.io/nvidia/cuda:12.3.2-runtime-ubuntu22.04@sha256:882b43fadd789693f08de95e6014ed5f0ea118c7b342150876e153b4340e1103
-2026-Feb-25 02:50:05.237504
-#12 resolve docker.io/nvidia/cuda:12.3.2-runtime-ubuntu22.04@sha256:882b43fadd789693f08de95e6014ed5f0ea118c7b342150876e153b4340e1103 0.0s done
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#12 [gpu-worker builder 1/9] FROM docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04@sha256:6655d5fc2fb48580255a5021a81c379c325a457b74b77ac823ed67e4faa32aeb
+2026-Feb-25 05:08:45.852279
+#12 resolve docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04@sha256:6655d5fc2fb48580255a5021a81c379c325a457b74b77ac823ed67e4faa32aeb 0.0s done
+2026-Feb-25 05:08:45.852279
 #12 DONE 0.0s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#13 [gpu-worker runtime 2/6] WORKDIR /app
-2026-Feb-25 02:50:05.237504
-#13 CACHED
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#14 [frontend internal] load build context
-2026-Feb-25 02:50:05.237504
-#14 transferring context: 169.68kB done
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#13 [gpu-worker runtime 1/6] FROM docker.io/nvidia/cuda:12.3.2-runtime-ubuntu22.04@sha256:882b43fadd789693f08de95e6014ed5f0ea118c7b342150876e153b4340e1103
+2026-Feb-25 05:08:45.852279
+#13 resolve docker.io/nvidia/cuda:12.3.2-runtime-ubuntu22.04@sha256:882b43fadd789693f08de95e6014ed5f0ea118c7b342150876e153b4340e1103 0.0s done
+2026-Feb-25 05:08:45.852279
+#13 DONE 0.0s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#14 [api runtime 1/6] FROM docker.io/library/debian:bookworm-slim@sha256:74d56e3931e0d5a1dd51f8c8a2466d21de84a271cd3b5a733b803aa91abf4421
+2026-Feb-25 05:08:45.852279
+#14 resolve docker.io/library/debian:bookworm-slim@sha256:74d56e3931e0d5a1dd51f8c8a2466d21de84a271cd3b5a733b803aa91abf4421 0.0s done
+2026-Feb-25 05:08:45.852279
 #14 DONE 0.0s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#15 [frontend builder 2/5] WORKDIR /app
-2026-Feb-25 02:50:05.237504
-#15 CACHED
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#16 [api runtime 1/7] FROM docker.io/library/debian:bookworm-slim@sha256:74d56e3931e0d5a1dd51f8c8a2466d21de84a271cd3b5a733b803aa91abf4421
-2026-Feb-25 02:50:05.237504
-#16 resolve docker.io/library/debian:bookworm-slim@sha256:74d56e3931e0d5a1dd51f8c8a2466d21de84a271cd3b5a733b803aa91abf4421 0.0s done
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#15 [api builder 1/9] FROM docker.io/library/rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0
+2026-Feb-25 05:08:45.852279
+#15 resolve docker.io/library/rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0 0.0s done
+2026-Feb-25 05:08:45.852279
+#15 DONE 0.0s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#16 [frontend internal] load build context
+2026-Feb-25 05:08:45.852279
+#16 transferring context: 197.18kB 0.0s done
+2026-Feb-25 05:08:45.852279
 #16 DONE 0.0s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#17 [api runtime 2/7] WORKDIR /app
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#17 [frontend builder 4/5] RUN npm install
+2026-Feb-25 05:08:45.852279
 #17 CACHED
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#18 [api runtime 3/7] RUN apt-get update && apt-get install -y     ca-certificates     libssl3     && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#18 [frontend runtime 3/4] COPY --from=builder /app/build ./build
+2026-Feb-25 05:08:45.852279
 #18 CACHED
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#19 [api runtime 4/7] RUN useradd -m -u 1000 -s /bin/bash appuser
-2026-Feb-25 02:50:05.237504
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#19 [frontend builder 3/5] COPY frontend/ ./
+2026-Feb-25 05:08:45.852279
 #19 CACHED
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#20 [api internal] load build context
-2026-Feb-25 02:50:05.237504
-#20 transferring context: 475.95kB 0.0s done
-2026-Feb-25 02:50:05.237504
-#20 DONE 0.0s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#21 [frontend builder 3/5] COPY frontend/ ./
-2026-Feb-25 02:50:05.237504
-#21 DONE 0.0s
-2026-Feb-25 02:50:05.237504
-2026-Feb-25 02:50:05.237504
-#22 [api builder 1/8] FROM docker.io/library/rust:1.85-bookworm@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4
-2026-Feb-25 02:50:05.237504
-#22 resolve docker.io/library/rust:1.85-bookworm@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 0.0s done
-2026-Feb-25 02:50:05.237504
-#22 extracting sha256:353e14e5cc47664fba714a7da288001d90427c705494847ac773f5cc08199451
-2026-Feb-25 02:50:09.116786
-#22 extracting sha256:353e14e5cc47664fba714a7da288001d90427c705494847ac773f5cc08199451 3.9s done
-2026-Feb-25 02:50:09.116786
-#22 extracting sha256:50edd9a93fcd3168d25021d6d0863290a0ce5692f406e0614ce3c8cef848babd
-2026-Feb-25 02:50:11.039928
-#22 extracting sha256:50edd9a93fcd3168d25021d6d0863290a0ce5692f406e0614ce3c8cef848babd 2.1s done
-2026-Feb-25 02:50:11.039928
-#22 DONE 6.0s
-2026-Feb-25 02:50:11.039928
-2026-Feb-25 02:50:11.039928
-#23 [gpu-worker runtime 3/6] RUN apt-get update && apt-get install -y     ca-certificates     libssl3     ffmpeg     libavcodec58     libavformat58     libavutil56     libswscale5     && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:11.039928
-#23 0.689 Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
-2026-Feb-25 02:50:11.039928
-#23 0.757 Get:2 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
-2026-Feb-25 02:50:11.039928
-#23 1.624 Get:3 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64  InRelease [1581 B]
-2026-Feb-25 02:50:11.039928
-#23 2.118 Get:4 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [6626 kB]
-2026-Feb-25 02:50:11.039928
-#23 2.139 Get:5 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
-2026-Feb-25 02:50:11.039928
-#23 2.488 Get:6 http://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
-2026-Feb-25 02:50:11.039928
-#23 2.836 Get:7 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1792 kB]
-2026-Feb-25 02:50:11.039928
-#23 2.991 Get:8 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64  Packages [2383 kB]
-2026-Feb-25 02:50:11.039928
-#23 3.869 Get:9 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [266 kB]
-2026-Feb-25 02:50:11.039928
-#23 3.913 Get:10 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [17.5 MB]
-2026-Feb-25 02:50:11.039928
-#23 5.384 Get:11 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [164 kB]
-2026-Feb-25 02:50:11.039928
-#23 5.385 Get:12 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [4100 kB]
-2026-Feb-25 02:50:11.039928
-#23 5.415 Get:13 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1301 kB]
-2026-Feb-25 02:50:11.039928
-#23 5.469 Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [70.9 kB]
-2026-Feb-25 02:50:11.039928
-#23 5.470 Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1613 kB]
-2026-Feb-25 02:50:11.039928
-#23 5.578 Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [6835 kB]
-2026-Feb-25 02:50:11.039928
-#23 5.798 Get:17 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [37.2 kB]
-2026-Feb-25 02:50:11.039928
-#23 5.798 Get:18 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [83.9 kB]
-2026-Feb-25 02:50:11.578859
-#23 ...
-2026-Feb-25 02:50:11.578859
-2026-Feb-25 02:50:11.578859
-#24 [api builder 2/8] WORKDIR /app
-2026-Feb-25 02:50:11.578859
-#24 DONE 0.5s
-2026-Feb-25 02:50:11.578859
-2026-Feb-25 02:50:11.578859
-#25 [gpu-worker builder 1/9] FROM docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04@sha256:6655d5fc2fb48580255a5021a81c379c325a457b74b77ac823ed67e4faa32aeb
-2026-Feb-25 02:50:11.578859
-#25 resolve docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04@sha256:6655d5fc2fb48580255a5021a81c379c325a457b74b77ac823ed67e4faa32aeb 0.0s done
-2026-Feb-25 02:50:11.578859
-#25 extracting sha256:8ebe7e080c37469e9f54a4a0506785a20a769e656bd6f745c02d2e034ae5a2f8
-2026-Feb-25 02:50:11.730227
-#25 ...
-2026-Feb-25 02:50:11.730227
-2026-Feb-25 02:50:11.730227
-#26 [api builder 3/8] RUN apt-get update && apt-get install -y     pkg-config     libssl-dev     protobuf-compiler     && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:12.171615
-#26 0.592 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
-2026-Feb-25 02:50:13.028864
-#26 1.449 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
-2026-Feb-25 02:50:13.436993
-#26 1.857 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
-2026-Feb-25 02:50:13.923830
-#26 ...
-2026-Feb-25 02:50:13.923830
-2026-Feb-25 02:50:13.923830
-#27 [frontend builder 4/5] RUN npm install
-2026-Feb-25 02:50:13.923830
-#27 7.776
-2026-Feb-25 02:50:13.923830
-#27 7.776 > frontend@0.0.1 prepare
-2026-Feb-25 02:50:13.923830
-#27 7.776 > svelte-kit sync || echo ''
-2026-Feb-25 02:50:13.923830
-#27 7.776
-2026-Feb-25 02:50:13.923830
-#27 8.618
-2026-Feb-25 02:50:13.923830
-#27 8.618 added 110 packages, and audited 111 packages in 8s
-2026-Feb-25 02:50:13.923830
-#27 8.618
-2026-Feb-25 02:50:13.923830
-#27 8.618 20 packages are looking for funding
-2026-Feb-25 02:50:13.923830
-#27 8.618   run `npm fund` for details
-2026-Feb-25 02:50:13.923830
-#27 8.628
-2026-Feb-25 02:50:13.923830
-#27 8.628 5 low severity vulnerabilities
-2026-Feb-25 02:50:13.923830
-#27 8.628
-2026-Feb-25 02:50:13.923830
-#27 8.628 To address all issues (including breaking changes), run:
-2026-Feb-25 02:50:13.923830
-#27 8.628   npm audit fix --force
-2026-Feb-25 02:50:13.923830
-#27 8.628
-2026-Feb-25 02:50:13.923830
-#27 8.628 Run `npm audit` for details.
-2026-Feb-25 02:50:13.923830
-#27 8.630 npm notice
-2026-Feb-25 02:50:13.923830
-#27 8.630 npm notice New major version of npm available! 10.9.4 -> 11.10.1
-2026-Feb-25 02:50:13.923830
-#27 8.630 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.10.1
-2026-Feb-25 02:50:13.923830
-#27 8.630 npm notice To update run: npm install -g npm@11.10.1
-2026-Feb-25 02:50:13.923830
-#27 8.630 npm notice
-2026-Feb-25 02:50:13.923830
-#27 DONE 8.8s
-2026-Feb-25 02:50:13.923830
-2026-Feb-25 02:50:13.923830
-#26 [api builder 3/8] RUN apt-get update && apt-get install -y     pkg-config     libssl-dev     protobuf-compiler     && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:13.923830
-#26 2.197 Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8792 kB]
-2026-Feb-25 02:50:15.735972
-#26 ...
-2026-Feb-25 02:50:15.735972
-2026-Feb-25 02:50:15.735972
-#28 [frontend builder 5/5] RUN node build-docker.mjs
-2026-Feb-25 02:50:15.735972
-#28 1.025 The following Vite config options will be overridden by SvelteKit:
-2026-Feb-25 02:50:15.735972
-#28 1.025   - build.outDir
-2026-Feb-25 02:50:15.735972
-#28 1.051 vite v6.4.1 building SSR bundle for production...
-2026-Feb-25 02:50:15.735972
-#28 1.071 transforming...
-2026-Feb-25 02:50:15.735972
-#28 1.489 2:50:15 AM [vite-plugin-svelte] src/components/InterstitialAd.svelte:28:20 This reference only captures the initial value of `countdownSeconds`. Did you mean to reference it inside a closure instead?
-2026-Feb-25 02:50:15.735972
-#28 1.489 https://svelte.dev/e/state_referenced_locally
-2026-Feb-25 02:50:15.735972
-#28 1.489 26:
-2026-Feb-25 02:50:15.735972
-#28 1.489 27:   /** Current countdown value */
-2026-Feb-25 02:50:15.735972
-#28 1.489 28:   let count = $state(countdownSeconds);
-2026-Feb-25 02:50:15.735972
-#28 1.489                                          ^
-2026-Feb-25 02:50:15.735972
-#28 1.489 29:
-2026-Feb-25 02:50:15.735972
-#28 1.489 30:   /** Whether countdown is complete */
-2026-Feb-25 02:50:15.735972
-#28 1.698 ✓ 123 modules transformed.
-2026-Feb-25 02:50:15.735972
-#28 1.701 ✗ Build failed in 650ms
-2026-Feb-25 02:50:15.735972
-#28 1.702 node:internal/modules/run_main:123
-2026-Feb-25 02:50:15.735972
-#28 1.702     triggerUncaughtException(
-2026-Feb-25 02:50:15.735972
-#28 1.702     ^
-2026-Feb-25 02:50:15.735972
-#28 1.702
-2026-Feb-25 02:50:15.735972
-#28 1.702 [vite:load-fallback] Could not load /app/src/lib/analytics (imported by src/routes/privacy/+page.svelte): ENOENT: no such file or directory, open '/app/src/lib/analytics'
-2026-Feb-25 02:50:15.735972
-#28 1.702     at async open (node:internal/fs/promises:636:25)
-2026-Feb-25 02:50:15.735972
-#28 1.702     at async Object.readFile (node:internal/fs/promises:1235:14)
-2026-Feb-25 02:50:15.735972
-#28 1.702     at async Object.handler (file:///app/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:45872:27)
-2026-Feb-25 02:50:15.735972
-#28 1.702     at async PluginDriver.hookFirstAndGetPlugin (file:///app/node_modules/rollup/dist/es/shared/node-entry.js:22453:28)
-2026-Feb-25 02:50:15.735972
-#28 1.702     at async file:///app/node_modules/rollup/dist/es/shared/node-entry.js:21445:33
-2026-Feb-25 02:50:15.735972
-#28 1.702     at async Queue.work (file:///app/node_modules/rollup/dist/es/shared/node-entry.js:22681:32) {
-2026-Feb-25 02:50:15.735972
-#28 1.702   errno: -2,
-2026-Feb-25 02:50:15.735972
-#28 1.702   code: 'PLUGIN_ERROR',
-2026-Feb-25 02:50:15.735972
-#28 1.702   syscall: 'open',
-2026-Feb-25 02:50:15.735972
-#28 1.702   path: '/app/src/lib/analytics',
-2026-Feb-25 02:50:15.735972
-#28 1.702   pluginCode: 'ENOENT',
-2026-Feb-25 02:50:15.735972
-#28 1.702   plugin: 'vite:load-fallback',
-2026-Feb-25 02:50:15.735972
-#28 1.702   hook: 'load',
-2026-Feb-25 02:50:15.735972
-#28 1.702   watchFiles: [
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/index.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/index.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/.svelte-kit/generated/server/internal.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/components/svelte-5/error.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/routes/+layout.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/routes/+page.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/routes/privacy/+page.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/package.json',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/shared-server.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/constants.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/respond.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/esm-env/index.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/promise.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/env.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/utils.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/app.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/command.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/prerender.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/form.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/query.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/paths/internal/server.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/.svelte-kit/generated/root.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/state/index.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/index.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/index-server.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/environment/index.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/CookieConsent.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/AdBanner.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/UrlInput.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/BatchInput.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/FormatPicker.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/DownloadBtn.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/BatchProgress.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/src/components/InterstitialAd.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/esm-env/false.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/esm-env/true.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/error.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/constants.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/escape.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/shared.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/http.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/shared.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/form-utils.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/legacy/legacy-server.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/.svelte-kit/generated/root.svelte',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/state/client.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/app/state/server.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/constants.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/shared/attributes.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/store/utils.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/shared/utils.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/escaping.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/hydration.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/shared/validate.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/utils.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/errors.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/context.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/renderer.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/blocks/html.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/dev.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/shared/clone.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/abort-signal.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/hydratable.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/svelte/src/internal/server/blocks/snippet.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/endpoint.js',
-2026-Feb-25 02:50:15.735972
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/index.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/render.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/respond_with_error.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/url.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/routing.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/data/index.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/cookie.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/fetch.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/page_nodes.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/exports.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/actions.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/env_module.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/server_routing.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/validate-headers.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/pathname.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/remote.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/telemetry/record_span.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/telemetry/otel.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/data_serializer.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/transition/index.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/utils.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/legacy/legacy-client.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/flags/index.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/client/state.svelte.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/runtime/client/client.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/index-client.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/shared/warnings.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/shared/errors.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/server/warnings.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/server/crypto.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/server/render-context.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/html-tree-validation.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/shared/dev.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/svelte/src/internal/client/constants.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     '/app/node_modules/@sveltejs/kit/src/utils/array.js',
-2026-Feb-25 02:50:15.738573
-#28 1.702     ... 10 more items
-2026-Feb-25 02:50:15.738573
-#28 1.702   ]
-2026-Feb-25 02:50:15.738573
-#28 1.702 }
-2026-Feb-25 02:50:15.738573
-#28 1.702
-2026-Feb-25 02:50:15.738573
-#28 1.702 Node.js v22.22.0
-2026-Feb-25 02:50:15.738573
-#28 ERROR: process "/bin/sh -c node build-docker.mjs" did not complete successfully: exit code: 1
-2026-Feb-25 02:50:15.805988
-#25 [gpu-worker builder 1/9] FROM docker.io/nvidia/cuda:12.3.2-devel-ubuntu22.04@sha256:6655d5fc2fb48580255a5021a81c379c325a457b74b77ac823ed67e4faa32aeb
-2026-Feb-25 02:50:15.805988
-#25 extracting sha256:8ebe7e080c37469e9f54a4a0506785a20a769e656bd6f745c02d2e034ae5a2f8 10.7s done
-2026-Feb-25 02:50:15.805988
-#25 DONE 10.7s
-2026-Feb-25 02:50:15.805988
-2026-Feb-25 02:50:15.805988
-#29 [gpu-worker builder 2/9] WORKDIR /app
-2026-Feb-25 02:50:15.805988
-#29 CANCELED
-2026-Feb-25 02:50:15.805988
-2026-Feb-25 02:50:15.805988
-#26 [api builder 3/8] RUN apt-get update && apt-get install -y     pkg-config     libssl-dev     protobuf-compiler     && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:15.805988
-#26 CANCELED
-2026-Feb-25 02:50:15.805988
-2026-Feb-25 02:50:15.805988
-#23 [gpu-worker runtime 3/6] RUN apt-get update && apt-get install -y     ca-certificates     libssl3     ffmpeg     libavcodec58     libavformat58     libavutil56     libswscale5     && rm -rf /var/lib/apt/lists/*
-2026-Feb-25 02:50:15.805988
-#23 8.927 Get:19 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [62.6 kB]
-2026-Feb-25 02:50:15.805988
-#23 9.869 Get:20 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3767 kB]
-2026-Feb-25 02:50:15.805988
-#23 CANCELED
-2026-Feb-25 02:50:15.805988
-------
-2026-Feb-25 02:50:15.805988
-> [frontend builder 5/5] RUN node build-docker.mjs:
-2026-Feb-25 02:50:15.805988
-1.702     '/app/node_modules/svelte/src/internal/server/render-context.js',
-2026-Feb-25 02:50:15.805988
-1.702     '/app/node_modules/svelte/src/html-tree-validation.js',
-2026-Feb-25 02:50:15.805988
-1.702     '/app/node_modules/svelte/src/internal/shared/dev.js',
-2026-Feb-25 02:50:15.805988
-1.702     '/app/node_modules/svelte/src/internal/client/constants.js',
-2026-Feb-25 02:50:15.805988
-1.702     '/app/node_modules/@sveltejs/kit/src/utils/array.js',
-2026-Feb-25 02:50:15.805988
-1.702     ... 10 more items
-2026-Feb-25 02:50:15.805988
-1.702   ]
-2026-Feb-25 02:50:15.805988
-1.702 }
-2026-Feb-25 02:50:15.805988
-1.702
-2026-Feb-25 02:50:15.805988
-1.702 Node.js v22.22.0
-2026-Feb-25 02:50:15.805988
-------
-2026-Feb-25 02:50:15.808688
-Dockerfile.frontend:18
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
---------------------
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
-16 |
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
-17 |     # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
-18 | >>> RUN node build-docker.mjs
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
-19 |
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
-20 |     # Runtime
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
---------------------
-2026-Feb-25 02:50:15.808688
-2026-Feb-25 02:50:15.808688
-target frontend: failed to solve: process "/bin/sh -c node build-docker.mjs" did not complete successfully: exit code: 1
-2026-Feb-25 02:50:15.811644
-exit status 1
-2026-Feb-25 02:50:15.843907
-========================================
-2026-Feb-25 02:50:15.849813
-Deployment failed: Command execution failed (exit code 1): docker exec wcwwgk4g8o0owkwogkgo40kk bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/build-time.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/wcwwgk4g8o0owkwogkgo40kk -f /artifacts/wcwwgk4g8o0owkwogkgo40kk/docker/docker-compose.homeserver.yml build --pull --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg COOLIFY_BUILD_SECRETS_HASH=1bf8dfcfdeb73162b126768f9e085efbcfdffa61f0529746b67826c254109afc'
-2026-Feb-25 02:50:15.849813
-Error: Dockerfile.frontend:18
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
---------------------
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
-16 |
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
-17 |     # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
-18 | >>> RUN node build-docker.mjs
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
-19 |
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
-20 |     # Runtime
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
---------------------
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
-target frontend: failed to solve: process "/bin/sh -c node build-docker.mjs" did not complete successfully: exit code: 1
-2026-Feb-25 02:50:15.849813
-2026-Feb-25 02:50:15.849813
-exit status 1
-2026-Feb-25 02:50:15.856742
-Error type: RuntimeException
-2026-Feb-25 02:50:15.861502
-Error code: 0
-2026-Feb-25 02:50:15.866123
-Location: /var/www/html/app/Traits/ExecuteRemoteCommand.php:243
-2026-Feb-25 02:50:15.870284
-Stack trace (first 5 lines):
-2026-Feb-25 02:50:15.874878
-#0 /var/www/html/app/Traits/ExecuteRemoteCommand.php(104): App\Jobs\ApplicationDeploymentJob->executeCommandWithProcess()
-2026-Feb-25 02:50:15.879379
-#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php(272): App\Jobs\ApplicationDeploymentJob->{closure:App\Traits\ExecuteRemoteCommand::execute_remote_command():71}()
-2026-Feb-25 02:50:15.884194
-#2 /var/www/html/app/Traits/ExecuteRemoteCommand.php(71): Illuminate\Support\Collection->each()
-2026-Feb-25 02:50:15.888402
-#3 /var/www/html/app/Jobs/ApplicationDeploymentJob.php(730): App\Jobs\ApplicationDeploymentJob->execute_remote_command()
-2026-Feb-25 02:50:15.892635
-#4 /var/www/html/app/Jobs/ApplicationDeploymentJob.php(467): App\Jobs\ApplicationDeploymentJob->deploy_docker_compose_buildpack()
-2026-Feb-25 02:50:15.899399
-========================================
-2026-Feb-25 02:50:16.151024
-Gracefully shutting down build container: wcwwgk4g8o0owkwogkgo40kk
-2026-Feb-25 02:50:16.425255
-[CMD]: docker stop -t 30 wcwwgk4g8o0owkwogkgo40kk
-2026-Feb-25 02:50:16.425255
-wcwwgk4g8o0owkwogkgo40kk
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#20 [frontend builder 5/5] RUN node build-docker.mjs
+2026-Feb-25 05:08:45.852279
+#20 CACHED
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#21 [frontend runtime 4/4] COPY --from=builder /app/package.json ./
+2026-Feb-25 05:08:45.852279
+#21 CACHED
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#22 [gpu-worker internal] load build context
+2026-Feb-25 05:08:45.852279
+#22 transferring context: 475.95kB 0.0s done
+2026-Feb-25 05:08:45.852279
+#22 DONE 0.0s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#23 [api internal] load build context
+2026-Feb-25 05:08:45.852279
+#23 transferring context: 600.49kB 0.0s done
+2026-Feb-25 05:08:45.852279
+#23 DONE 0.0s
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#24 [gpu-worker builder 9/9] RUN cargo build --release --bin gpu-node
+2026-Feb-25 05:08:45.852279
+#24 CACHED
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#25 [gpu-worker builder 2/9] WORKDIR /app
+2026-Feb-25 05:08:45.852279
+#25 CACHED
+2026-Feb-25 05:08:45.852279
+2026-Feb-25 05:08:45.852279
+#26 [gpu-worker runtime 2/6] WORKDIR /app
+2026-Feb-25 05:08:45.852279
+#26 CACHED
+2026-Feb-25 05:08:45.854421
+#27 [gpu-worker runtime 4/6] RUN useradd -m -u 1000 -s /bin/bash appuser
+2026-Feb-25 05:08:45.854421
+#27 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#28 [gpu-worker builder 8/9] COPY proto/ ./proto/
+2026-Feb-25 05:08:45.854421
+#28 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#29 [gpu-worker builder 5/9] COPY Cargo.toml ./
+2026-Feb-25 05:08:45.854421
+#29 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#30 [gpu-worker runtime 5/6] COPY --from=builder /app/target/release/gpu-node /usr/local/bin/
+2026-Feb-25 05:08:45.854421
+#30 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#31 [gpu-worker runtime 3/6] RUN apt-get update && apt-get install -y     ca-certificates     libssl3     ffmpeg     libavcodec58     libavformat58     libavutil56     libswscale5     libavfilter7     libavdevice58     && rm -rf /var/lib/apt/lists/*
+2026-Feb-25 05:08:45.854421
+#31 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#32 [gpu-worker builder 3/9] RUN apt-get update && apt-get install -y     curl     build-essential     pkg-config     libssl-dev     protobuf-compiler     ffmpeg     libavcodec-dev     libavformat-dev     libavutil-dev     libswscale-dev     libavfilter-dev     libavdevice-dev     clang     libclang-dev     && rm -rf /var/lib/apt/lists/*
+2026-Feb-25 05:08:45.854421
+#32 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#33 [gpu-worker builder 6/9] COPY Cargo.lock ./
+2026-Feb-25 05:08:45.854421
+#33 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#34 [gpu-worker builder 4/9] RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+2026-Feb-25 05:08:45.854421
+#34 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#35 [gpu-worker builder 7/9] COPY crates/ ./crates/
+2026-Feb-25 05:08:45.854421
+#35 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#36 [gpu-worker runtime 6/6] RUN mkdir -p /app/data && chown -R appuser:appuser /app
+2026-Feb-25 05:08:45.854421
+#36 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#37 [api js-builder 10/10] RUN pnpm --filter @downloadtool/injector build
+2026-Feb-25 05:08:45.854421
+#37 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#38 [api js-builder  8/10] COPY packages/ ./packages/
+2026-Feb-25 05:08:45.854421
+#38 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#39 [api builder 2/9] WORKDIR /app
+2026-Feb-25 05:08:45.854421
+#39 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#40 [api builder 4/9] COPY Cargo.toml ./
+2026-Feb-25 05:08:45.854421
+#40 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#41 [api js-builder  5/10] COPY packages/api-client/package.json ./packages/api-client/
+2026-Feb-25 05:08:45.854421
+#41 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#42 [api js-builder  3/10] RUN npm install -g pnpm
+2026-Feb-25 05:08:45.854421
+#42 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#43 [api builder 3/9] RUN apt-get update && apt-get install -y     pkg-config     libssl-dev     protobuf-compiler     && rm -rf /var/lib/apt/lists/*
+2026-Feb-25 05:08:45.854421
+#43 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#44 [api js-builder  7/10] COPY apps/injector/ ./apps/injector/
+2026-Feb-25 05:08:45.854421
+#44 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#45 [api runtime 4/6] RUN useradd -m -u 1000 -s /bin/bash appuser
+2026-Feb-25 05:08:45.854421
+#45 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#46 [api js-builder  4/10] COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+2026-Feb-25 05:08:45.854421
+#46 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#47 [api builder 7/9] COPY proto/ ./proto/
+2026-Feb-25 05:08:45.854421
+#47 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#48 [api builder 2/5] WORKDIR /app
+2026-Feb-25 05:08:45.854421
+#48 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#49 [api runtime 3/6] RUN apt-get update && apt-get install -y     ca-certificates     libssl3     && rm -rf /var/lib/apt/lists/*
+2026-Feb-25 05:08:45.854421
+#49 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#50 [api builder 9/9] RUN cargo build --release --bin vps-gateway
+2026-Feb-25 05:08:45.854421
+#50 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#51 [api builder 8/9] COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
+2026-Feb-25 05:08:45.854421
+#51 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#52 [api builder 5/9] COPY Cargo.lock ./
+2026-Feb-25 05:08:45.854421
+#52 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#53 [api builder 6/9] COPY crates/ ./crates/
+2026-Feb-25 05:08:45.854421
+#53 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#54 [api js-builder  9/10] RUN pnpm install --frozen-lockfile
+2026-Feb-25 05:08:45.854421
+#54 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#55 [api runtime 2/6] WORKDIR /app
+2026-Feb-25 05:08:45.854421
+#55 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#56 [api js-builder  6/10] COPY apps/injector/package.json ./apps/injector/
+2026-Feb-25 05:08:45.854421
+#56 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#57 [api runtime 5/6] COPY --from=builder /app/target/release/vps-gateway /usr/local/bin/
+2026-Feb-25 05:08:45.854421
+#57 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#58 [api runtime 6/6] RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
+2026-Feb-25 05:08:45.854421
+#58 CACHED
+2026-Feb-25 05:08:45.854421
+2026-Feb-25 05:08:45.854421
+#59 [api] exporting to image
+2026-Feb-25 05:08:45.955381
+#59 exporting layers done
+2026-Feb-25 05:08:45.955381
+#59 exporting manifest sha256:0a0ae5d2098e4b00abb0e812bc4748e961169f7abb55a66cd0b535fc1ce46427 done
+2026-Feb-25 05:08:45.955381
+#59 exporting config sha256:2c114f9941c9130d877fd31bfcadc5bfb6ec636a2eae79ab950e049ee4b868ee done
+2026-Feb-25 05:08:45.955381
+#59 exporting attestation manifest sha256:7a6843238dc015018f71227c26c37dc47571681a45ad62cd18f03adc769e5eb8 0.0s done
+2026-Feb-25 05:08:45.955381
+#59 exporting manifest list sha256:26181aeeaab563d5b46bde29bbf5e2748b1d1003d4774fdd9f6487eac655a933 done
+2026-Feb-25 05:08:45.955381
+#59 naming to docker.io/library/o8kccgkgwsockoocow8sg88s_api:4964f9a4405b338e6420a0e7d46a1e71ddfa1598 done
+2026-Feb-25 05:08:45.955381
+#59 unpacking to docker.io/library/o8kccgkgwsockoocow8sg88s_api:4964f9a4405b338e6420a0e7d46a1e71ddfa1598 done
+2026-Feb-25 05:08:45.955381
+#59 DONE 0.0s
+2026-Feb-25 05:08:45.955381
+2026-Feb-25 05:08:45.955381
+#60 [frontend] exporting to image
+2026-Feb-25 05:08:45.955381
+#60 exporting layers done
+2026-Feb-25 05:08:45.955381
+#60 exporting manifest sha256:2b7ac74b4236473bdbc9346f2b506de61f4d1f296befca629b0cf08b5862eebb done
+2026-Feb-25 05:08:45.955381
+#60 exporting config sha256:a96810395cbeedf365cde1af568c06aefbb063c22df12b82173f74e2eb9d64a7 done
+2026-Feb-25 05:08:45.955381
+#60 exporting attestation manifest sha256:ccc942d7130aaac41001081bdf29de47b5bdb5500a483c64e1de9d05216d5236 done
+2026-Feb-25 05:08:45.955381
+#60 exporting manifest list sha256:65737ec84d44c1a6d7f47468fab2f584222a1920faffb7119eee4d45e6203331 done
+2026-Feb-25 05:08:45.955381
+#60 naming to docker.io/library/o8kccgkgwsockoocow8sg88s_frontend:4964f9a4405b338e6420a0e7d46a1e71ddfa1598 done
+2026-Feb-25 05:08:45.955381
+#60 unpacking to docker.io/library/o8kccgkgwsockoocow8sg88s_frontend:4964f9a4405b338e6420a0e7d46a1e71ddfa1598 done
+2026-Feb-25 05:08:45.955381
+#60 DONE 0.1s
+2026-Feb-25 05:08:45.955381
+2026-Feb-25 05:08:45.955381
+#61 [gpu-worker] exporting to image
+2026-Feb-25 05:08:45.955381
+#61 exporting layers done
+2026-Feb-25 05:08:45.955381
+#61 exporting manifest sha256:073e01b76815a2f926d63cecc99892bb1d10b4325e87d13f4e1961e83c540d2c done
+2026-Feb-25 05:08:45.955381
+#61 exporting config sha256:512ecff06b1058051b92eb7bb364df2ef9135bd921d9c27c0f14c2ea35c1b896 done
+2026-Feb-25 05:08:45.955381
+#61 exporting attestation manifest sha256:487dc88506ba0b8492515326a09d4144c74d62b4897064eca58b330dd916fccb 0.0s done
+2026-Feb-25 05:08:45.955381
+#61 exporting manifest list sha256:59e8b040c468bdba3b5ec70a1418730b4981690fd3beb3543bd5ecb306604922 done
+2026-Feb-25 05:08:45.955381
+#61 naming to docker.io/library/o8kccgkgwsockoocow8sg88s_gpu-worker:4964f9a4405b338e6420a0e7d46a1e71ddfa1598 done
+2026-Feb-25 05:08:45.955381
+#61 unpacking to docker.io/library/o8kccgkgwsockoocow8sg88s_gpu-worker:4964f9a4405b338e6420a0e7d46a1e71ddfa1598 done
+2026-Feb-25 05:08:45.955381
+#61 DONE 0.1s
+2026-Feb-25 05:08:45.955381
+2026-Feb-25 05:08:45.955381
+#62 [frontend] resolving provenance for metadata file
+2026-Feb-25 05:08:45.986019
+#62 DONE 0.0s
+2026-Feb-25 05:08:45.986019
+2026-Feb-25 05:08:45.986019
+#63 [api] resolving provenance for metadata file
+2026-Feb-25 05:08:45.986019
+#63 DONE 0.0s
+2026-Feb-25 05:08:45.986019
+2026-Feb-25 05:08:45.986019
+#64 [gpu-worker] resolving provenance for metadata file
+2026-Feb-25 05:08:45.986019
+#64 DONE 0.0s
+2026-Feb-25 05:08:45.987937
+gpu-worker  Built
+2026-Feb-25 05:08:45.987937
+api  Built
+2026-Feb-25 05:08:45.987937
+frontend  Built
+2026-Feb-25 05:08:45.999155
+Creating .env file with runtime variables for container.
+2026-Feb-25 05:08:46.663522
+Removing old containers.
+2026-Feb-25 05:08:47.555356
+[CMD]: docker stop -t 30 frontend-o8kccgkgwsockoocow8sg88s-041008215319
+2026-Feb-25 05:08:47.555356
+frontend-o8kccgkgwsockoocow8sg88s-041008215319
+2026-Feb-25 05:08:47.873948
+[CMD]: docker rm -f frontend-o8kccgkgwsockoocow8sg88s-041008215319
+2026-Feb-25 05:08:47.873948
+frontend-o8kccgkgwsockoocow8sg88s-041008215319
+2026-Feb-25 05:09:18.437068
+[CMD]: docker stop -t 30 api-o8kccgkgwsockoocow8sg88s-041008213737
+2026-Feb-25 05:09:18.437068
+api-o8kccgkgwsockoocow8sg88s-041008213737
+2026-Feb-25 05:09:18.748919
+[CMD]: docker rm -f api-o8kccgkgwsockoocow8sg88s-041008213737
+2026-Feb-25 05:09:18.748919
+api-o8kccgkgwsockoocow8sg88s-041008213737
+2026-Feb-25 05:09:49.319489
+[CMD]: docker stop -t 30 gpu-worker-o8kccgkgwsockoocow8sg88s-041008211408
+2026-Feb-25 05:09:49.319489
+gpu-worker-o8kccgkgwsockoocow8sg88s-041008211408
+2026-Feb-25 05:09:49.639451
+[CMD]: docker rm -f gpu-worker-o8kccgkgwsockoocow8sg88s-041008211408
+2026-Feb-25 05:09:49.639451
+gpu-worker-o8kccgkgwsockoocow8sg88s-041008211408
+2026-Feb-25 05:09:49.641954
+Starting new application.
+2026-Feb-25 05:09:50.717465
+[CMD]: docker exec bwo0440og4kooocc8kccc4sg bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/bwo0440og4kooocc8kccc4sg/.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/bwo0440og4kooocc8kccc4sg -f /artifacts/bwo0440og4kooocc8kccc4sg/docker/docker-compose.homeserver.yml up -d'
+2026-Feb-25 05:09:50.717465
+Container gpu-worker-o8kccgkgwsockoocow8sg88s-050839852837  Creating
+2026-Feb-25 05:09:50.753636
+Container gpu-worker-o8kccgkgwsockoocow8sg88s-050839852837  Created
+2026-Feb-25 05:09:50.753636
+Container api-o8kccgkgwsockoocow8sg88s-050839855763  Creating
+2026-Feb-25 05:09:50.777592
+Container api-o8kccgkgwsockoocow8sg88s-050839855763  Created
+2026-Feb-25 05:09:50.777592
+Container frontend-o8kccgkgwsockoocow8sg88s-050839857720  Creating
+2026-Feb-25 05:09:50.802188
+Container frontend-o8kccgkgwsockoocow8sg88s-050839857720  Created
+2026-Feb-25 05:09:50.810722
+Container gpu-worker-o8kccgkgwsockoocow8sg88s-050839852837  Starting
+2026-Feb-25 05:09:51.046368
+Container gpu-worker-o8kccgkgwsockoocow8sg88s-050839852837  Started
+2026-Feb-25 05:09:51.049264
+Container api-o8kccgkgwsockoocow8sg88s-050839855763  Starting
+2026-Feb-25 05:09:51.195330
+Container api-o8kccgkgwsockoocow8sg88s-050839855763  Started
+2026-Feb-25 05:09:51.195330
+Container frontend-o8kccgkgwsockoocow8sg88s-050839857720  Starting
+2026-Feb-25 05:09:51.355222
+Container frontend-o8kccgkgwsockoocow8sg88s-050839857720  Started
+2026-Feb-25 05:09:52.233810
+New container started.
