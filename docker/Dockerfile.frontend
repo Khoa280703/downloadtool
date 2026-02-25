@@ -12,8 +12,8 @@ COPY frontend/ ./
 # Install — prepare script runs svelte-kit sync with svelte.config.js available
 RUN npm install
 
-# Build
-RUN npm run build
+# Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
+RUN node build-docker.mjs
 
 # Runtime
 FROM node:22-alpine AS runtime
