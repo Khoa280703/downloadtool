@@ -112,7 +112,8 @@ export function subscribeBatch(
 			onMessage(data);
 
 			if (data.type === 'progress' && data.url) {
-				const filename = `${data.title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
+				const title = data.title ?? 'video';
+				const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
 				downloadPool.add(data.url, filename);
 			}
 		} catch (err) {

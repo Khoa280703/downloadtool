@@ -478,9 +478,16 @@ cargo fmt --all -- --check     # Format verification
 
 ### Docker Build
 ```bash
+# Frontend requires build-time API base URL (injected into client bundle)
+docker build \
+  --build-arg VITE_API_URL=https://api.example.com \
+  -f docker/Dockerfile.frontend .
+
 # Multi-stage build for smaller images
 # Extracts release artifacts only
 ```
+
+**Important:** Do not rely on runtime env for `import.meta.env.VITE_API_URL`. Browser bundle values are fixed at build time.
 
 ## Documentation Standards
 

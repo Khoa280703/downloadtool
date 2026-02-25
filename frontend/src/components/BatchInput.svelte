@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isValidVideoUrl } from '$lib/api';
+	import { isValidVideoUrl, subscribeBatch, buildStreamUrl } from '$lib/api';
 	import {
 		batchQueue,
 		batchProgress,
@@ -12,7 +12,6 @@
 		completeBatch
 	} from '$stores/batch';
 	import { downloadPool } from '$lib/download-pool';
-	import type { BatchMessage } from '$lib/types';
 
 	interface Props {
 		onStart?: () => void;
@@ -60,15 +59,15 @@
 		startBatch();
 		onStart?.();
 
-		const encodedUrl = encodeURIComponent(url);
-		const es = new EventSource(`/api/batch?url=${encodedUrl}`);
-		setEventSource(es);
-
-		es.onmessage = (event) => {
-			try {
-				const data: BatchMessage = JSON.parse(event.data);
-
+		const es = subscribeBatch(
+			url,
+			(data) => {
 				if (data.type === 'link') {
+					if (!data.url || !data.title || data.index == null || data.total == null) {
+						console.error('Invalid batch link payload:', data);
+						return;
+					}
+
 					addBatchItem({
 						url: data.url,
 						title: data.title,
@@ -78,7 +77,7 @@
 
 					// Add to download pool
 					const filename = `${data.title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
-					const streamUrl = `/api/stream?url=${encodeURIComponent(data.url)}&title=${encodeURIComponent(data.title)}`;
+					const streamUrl = buildStreamUrl(data.url, data.title);
 					downloadPool.add(streamUrl, filename);
 				} else if (data.type === 'done') {
 					completeBatch();
@@ -90,17 +89,15 @@
 					completeBatch();
 					es.close();
 				}
-			} catch (err) {
-				console.error('Failed to parse SSE message:', err);
+			},
+			() => {
+				error = 'Connection error. Please try again.';
+				completeBatch();
+				onComplete?.();
 			}
-		};
+		);
+		setEventSource(es);
 
-		es.onerror = (err) => {
-			console.error('SSE error:', err);
-			error = 'Connection error. Please try again.';
-			completeBatch();
-			es.close();
-		};
 	}
 
 	/** Cancel batch download */
