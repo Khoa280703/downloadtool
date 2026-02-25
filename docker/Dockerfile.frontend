@@ -1,22 +1,18 @@
 # Dockerfile for frontend (SvelteKit Node server)
-# Use npm (not pnpm) to avoid pnpm v10 blocking esbuild postinstall script.
-# esbuild native binary is required by vite to transform vite.config.ts.
+# Copy ALL source files BEFORE npm install so svelte-kit sync (prepare script)
+# can find svelte.config.js and generate .svelte-kit/ correctly.
 
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package.json first for cache-friendly layer ordering
-COPY frontend/package.json ./package.json
-
-# Install with npm — runs all postinstall scripts including esbuild native binary
-RUN npm install
-
-# Copy all source files
+# Copy all frontend source files first (node_modules excluded via .dockerignore)
 COPY frontend/ ./
 
-# Sync SvelteKit types then build
-RUN npx svelte-kit sync
+# Install — prepare script runs svelte-kit sync with svelte.config.js available
+RUN npm install
+
+# Build
 RUN npm run build
 
 # Runtime

@@ -1,0 +1,28 @@
+# Exclude build artifacts and local dev files from Docker context
+node_modules/
+**/node_modules/
+.svelte-kit/
+**/.svelte-kit/
+frontend/build/
+target/
+**/*.rs.bk
+
+# Environment files
+.env
+.env.*
+
+# IDE files
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/

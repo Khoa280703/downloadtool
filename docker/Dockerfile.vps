@@ -2,7 +2,7 @@
 # Builds the API server and related components without GPU support
 
 # Stage 1: Builder
-FROM rust:1.82-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 WORKDIR /app
 
