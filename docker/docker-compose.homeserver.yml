@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.homeserver
+    container_name: downloadtool-gpu-worker
     environment:
       - GPU_WORKER_BIND=0.0.0.0:50051
       - GPU_WORKER_MAX_JOBS=4
@@ -25,9 +26,10 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.vps
+    container_name: downloadtool-api
     environment:
       - PORT=3068
-      - GPU_WORKER_ADDR=http://gpu-worker:50051
+      - GPU_WORKER_ADDR=http://downloadtool-gpu-worker:50051
       - GPU_ENABLED=true
       - RUST_LOG=info
     expose:
@@ -41,11 +43,14 @@ services:
       - coolify
     labels:
       - "traefik.docker.network=coolify"
+      - "traefik.http.routers.http-0-o8kccgkgwsockoocow8sg88s-api.service=http-0-o8kccgkgwsockoocow8sg88s-api"
+      - "traefik.http.services.http-0-o8kccgkgwsockoocow8sg88s-api.loadbalancer.server.port=3068"
 
   frontend:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
+    container_name: downloadtool-frontend
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -61,6 +66,8 @@ services:
       - coolify
     labels:
       - "traefik.docker.network=coolify"
+      - "traefik.http.routers.http-0-o8kccgkgwsockoocow8sg88s-frontend.service=http-0-o8kccgkgwsockoocow8sg88s-frontend"
+      - "traefik.http.services.http-0-o8kccgkgwsockoocow8sg88s-frontend.loadbalancer.server.port=3000"
 
 volumes:
   gpu-worker-data:
