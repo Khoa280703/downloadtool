@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev \
     libavutil-dev \
     libswscale-dev \
+    libavfilter-dev \
+    libavdevice-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
@@ -50,6 +52,8 @@ RUN apt-get update && apt-get install -y \
     libavformat58 \
     libavutil56 \
     libswscale5 \
+    libavfilter7 \
+    libavdevice58 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
