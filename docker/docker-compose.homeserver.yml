@@ -41,10 +41,6 @@ services:
       - gpu-worker
     networks:
       - coolify
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.downloadtool-api.rule=Host(`api-download.khoadangbui.online`)"
-      - "traefik.http.services.downloadtool-api.loadbalancer.server.port=3068"
 
   frontend:
     build:
@@ -64,10 +60,6 @@ services:
       - api
     networks:
       - coolify
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.downloadtool-frontend.rule=Host(`download.khoadangbui.online`)"
-      - "traefik.http.services.downloadtool-frontend.loadbalancer.server.port=3000"
 
 volumes:
   gpu-worker-data:
