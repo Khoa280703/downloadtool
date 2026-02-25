@@ -1,7 +1,27 @@
 # Dockerfile for VPS deployment
 # Builds the API server and related components without GPU support
 
-# Stage 1: Builder
+# Stage 0: Build injector JS (embedded into api crate via include_str! at compile time)
+FROM node:22-alpine AS js-builder
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+# Copy workspace manifests for pnpm resolution
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/api-client/package.json ./packages/api-client/
+COPY apps/injector/package.json ./apps/injector/
+
+# Copy injector source and shared packages
+COPY apps/injector/ ./apps/injector/
+COPY packages/ ./packages/
+
+# Install deps and build injector (produces dist/bm.js and dist/youtube-downloader.user.js)
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @downloadtool/injector build
+
+# Stage 1: Rust builder
 FROM rust:1.88-bookworm AS builder
 
 WORKDIR /app
@@ -22,6 +42,9 @@ COPY crates/ ./crates/
 
 # Copy proto files
 COPY proto/ ./proto/
+
+# Copy injector dist (required by include_str! in crates/api/src/routes/static_files.rs)
+COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
 
 # Build the release binary
 RUN cargo build --release --bin vps-gateway
