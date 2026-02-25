@@ -4,7 +4,7 @@ version: "3.8"
 services:
   api:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.vps
     container_name: downloadtool-api
     ports:

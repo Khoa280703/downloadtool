@@ -5,7 +5,7 @@
 services:
   gpu-worker:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.homeserver
     container_name: downloadtool-gpu-worker
     environment:
@@ -28,7 +28,7 @@ services:
 
   api:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.vps
     container_name: downloadtool-api
     environment:
@@ -54,7 +54,7 @@ services:
 
   frontend:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.frontend
     container_name: downloadtool-frontend
     environment:
