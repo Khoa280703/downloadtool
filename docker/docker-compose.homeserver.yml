@@ -41,6 +41,9 @@ services:
       - gpu-worker
     networks:
       - coolify
+    labels:
+      - "traefik.http.routers.http-0-o8kccgkgwsockoocow8sg88s-api.service=http-0-o8kccgkgwsockoocow8sg88s-api"
+      - "traefik.http.services.http-0-o8kccgkgwsockoocow8sg88s-api.loadbalancer.server.port=3068"
 
   frontend:
     build:
@@ -60,6 +63,9 @@ services:
       - api
     networks:
       - coolify
+    labels:
+      - "traefik.http.routers.http-0-o8kccgkgwsockoocow8sg88s-frontend.service=http-0-o8kccgkgwsockoocow8sg88s-frontend"
+      - "traefik.http.services.http-0-o8kccgkgwsockoocow8sg88s-frontend.loadbalancer.server.port=3000"
 
 volumes:
   gpu-worker-data:
