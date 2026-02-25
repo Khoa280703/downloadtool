@@ -34,7 +34,7 @@ COPY crates/ ./crates/
 COPY proto/ ./proto/
 
 # Build the GPU worker with CUDA support
-RUN cargo build --release --bin gpu-node --features gpu-support
+RUN cargo build --release --bin gpu-node --features gpu
 
 # Stage 2: Runtime
 FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04 AS runtime
