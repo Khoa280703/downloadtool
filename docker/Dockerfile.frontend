@@ -12,6 +12,12 @@ COPY frontend/ ./
 # Install — prepare script runs svelte-kit sync with svelte.config.js available
 RUN npm install
 
+# Build-time public API URL (embedded into client bundle by Vite)
+# Runtime env is too late for import.meta.env in browser bundle.
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+RUN test -n "$VITE_API_URL" || (echo "VITE_API_URL build arg is required" && exit 1)
+
 # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
 RUN node build-docker.mjs
 
