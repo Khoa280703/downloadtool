@@ -16,8 +16,6 @@ services:
     volumes:
       - gpu-worker-data:/app/data
     restart: unless-stopped
-    networks:
-      - coolify
     deploy:
       resources:
         reservations:
@@ -41,8 +39,6 @@ services:
     restart: unless-stopped
     depends_on:
       - gpu-worker
-    networks:
-      - coolify
 
   frontend:
     build:
@@ -56,13 +52,8 @@ services:
     restart: unless-stopped
     depends_on:
       - api
-    networks:
-      - coolify
 
 volumes:
   gpu-worker-data:
   api-data:
 
-networks:
-  coolify:
-    external: true
