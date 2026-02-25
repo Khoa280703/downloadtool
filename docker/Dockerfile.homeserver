@@ -38,7 +38,9 @@ COPY crates/ ./crates/
 COPY proto/ ./proto/
 
 # Build the GPU worker with CUDA support
-RUN cargo build --release --bin gpu-node --features gpu
+# NOTE: --features gpu disabled until FFmpeg 7.x is available in the build environment
+# Ubuntu 22.04 apt provides FFmpeg 4.4.x but ffmpeg-next = "7" requires FFmpeg 7.x
+RUN cargo build --release --bin gpu-node
 
 # Stage 2: Runtime
 FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04 AS runtime
