@@ -42,6 +42,7 @@ services:
     networks:
       - coolify
     labels:
+      - "traefik.docker.network=coolify"
       - "traefik.http.routers.http-0-o8kccgkgwsockoocow8sg88s-api.service=http-0-o8kccgkgwsockoocow8sg88s-api"
       - "traefik.http.services.http-0-o8kccgkgwsockoocow8sg88s-api.loadbalancer.server.port=3068"
 
@@ -64,6 +65,7 @@ services:
     networks:
       - coolify
     labels:
+      - "traefik.docker.network=coolify"
       - "traefik.http.routers.http-0-o8kccgkgwsockoocow8sg88s-frontend.service=http-0-o8kccgkgwsockoocow8sg88s-frontend"
       - "traefik.http.services.http-0-o8kccgkgwsockoocow8sg88s-frontend.loadbalancer.server.port=3000"
 
