@@ -24,7 +24,7 @@ COPY crates/ ./crates/
 COPY proto/ ./proto/
 
 # Build the release binary
-RUN cargo build --release --bin api-server
+RUN cargo build --release --bin vps-gateway
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim AS runtime
@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 -s /bin/bash appuser
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/api-server /usr/local/bin/
+COPY --from=builder /app/target/release/vps-gateway /usr/local/bin/
 
 # Copy extractor scripts
 COPY --from=builder /app/crates/extractor/scripts/ /app/extractors/ || true
@@ -66,4 +66,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3068/health || exit 1
 
 # Run the server
-CMD ["api-server"]
+CMD ["vps-gateway"]

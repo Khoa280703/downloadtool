@@ -34,7 +34,7 @@ COPY crates/ ./crates/
 COPY proto/ ./proto/
 
 # Build the GPU worker with CUDA support
-RUN cargo build --release --bin gpu-worker-server --features gpu-support
+RUN cargo build --release --bin gpu-node --features gpu-support
 
 # Stage 2: Runtime
 FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04 AS runtime
@@ -56,7 +56,7 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 -s /bin/bash appuser
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/gpu-worker-server /usr/local/bin/
+COPY --from=builder /app/target/release/gpu-node /usr/local/bin/
 
 # Create directories
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
@@ -82,4 +82,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD echo "health check placeholder" || exit 0
 
 # Run the GPU worker
-CMD ["gpu-worker-server"]
+CMD ["gpu-node"]
