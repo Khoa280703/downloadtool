@@ -21,6 +21,12 @@ COPY packages/ ./packages/
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @downloadtool/injector build
 
+# Build extractor TypeScript to IIFE format (required by crates/extractor/build.rs)
+COPY extractors/ ./extractors/
+RUN mkdir -p extractors/dist && \
+    npx --yes esbuild extractors/types.ts --bundle --format=iife --global-name=types --platform=neutral --target=es2020 --outfile=extractors/dist/types.js && \
+    npx --yes esbuild extractors/youtube.ts --bundle --format=iife --global-name=youtube --platform=neutral --target=es2020 --outfile=extractors/dist/youtube.js
+
 # Stage 1: Rust builder
 FROM rust:1.88-bookworm AS builder
 
@@ -45,6 +51,10 @@ COPY proto/ ./proto/
 
 # Copy injector dist (required by include_str! in crates/api/src/routes/static_files.rs)
 COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
+
+# Copy extractor source + pre-built IIFE dist (built by js-builder stage)
+COPY extractors/ ./extractors/
+COPY --from=js-builder /app/extractors/dist ./extractors/dist/
 
 # Build the release binary
 RUN cargo build --release --bin vps-gateway

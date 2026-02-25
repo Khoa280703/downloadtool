@@ -28,12 +28,6 @@ bundle-extractors: $(EXTRACTORS_DIST)
 		--format=esm \
 		--platform=neutral \
 		--target=es2020
-	npx esbuild $(EXTRACTORS_DIR)/tiktok.ts \
-		--bundle \
-		--outfile=$(EXTRACTORS_DIST)/tiktok.js \
-		--format=esm \
-		--platform=neutral \
-		--target=es2020
 	npx esbuild $(EXTRACTORS_DIR)/types.ts \
 		--bundle \
 		--outfile=$(EXTRACTORS_DIST)/types.js \
@@ -50,9 +44,7 @@ bundle-combined: bundle-extractors
 	@echo "" >> $(EXTRACTORS_DIST)/bundle.js
 	@cat $(EXTRACTORS_DIST)/youtube.js >> $(EXTRACTORS_DIST)/bundle.js
 	@echo "" >> $(EXTRACTORS_DIST)/bundle.js
-	@cat $(EXTRACTORS_DIST)/tiktok.js >> $(EXTRACTORS_DIST)/bundle.js
-	@echo "" >> $(EXTRACTORS_DIST)/bundle.js
-	@echo "const extractors = { youtube, tiktok };" >> $(EXTRACTORS_DIST)/bundle.js
+	@echo "const extractors = { youtube };" >> $(EXTRACTORS_DIST)/bundle.js
 	@echo "Combined bundle created at $(EXTRACTORS_DIST)/bundle.js"
 
 # Create dist directory
@@ -65,13 +57,6 @@ watch-extractors: $(EXTRACTORS_DIST)
 	npx esbuild $(EXTRACTORS_DIR)/youtube.ts \
 		--bundle \
 		--outfile=$(EXTRACTORS_DIST)/youtube.js \
-		--format=esm \
-		--platform=neutral \
-		--target=es2020 \
-		--watch &
-	npx esbuild $(EXTRACTORS_DIR)/tiktok.ts \
-		--bundle \
-		--outfile=$(EXTRACTORS_DIST)/tiktok.js \
 		--format=esm \
 		--platform=neutral \
 		--target=es2020 \

@@ -43,7 +43,8 @@ fn main() {
     let bundle_content = if let Some(npx) = npx_bin {
         bundle_with_esbuild_cmd(&extractors_dir, &dist_dir, npx)
     } else {
-        create_inline_fallback_bundle()
+        // npx not available (e.g. Docker build without Node.js): fall back to pre-built IIFE dist
+        create_fallback_bundle(&extractors_dir)
     };
 
     // Write the combined bundle
