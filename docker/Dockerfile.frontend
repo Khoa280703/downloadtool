@@ -1,0 +1,43 @@
+# Dockerfile for frontend (SvelteKit Node server)
+
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy workspace config and all package.json manifests for dep resolution
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY frontend/package.json ./frontend/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY apps/injector/package.json ./apps/injector/
+COPY apps/extension/package.json ./apps/extension/
+
+# Install all deps (workspace-aware)
+RUN pnpm install --frozen-lockfile
+
+# Copy source for packages the frontend may depend on
+COPY packages/ ./packages/
+COPY frontend/ ./frontend/
+
+# Build frontend
+RUN pnpm --filter frontend build
+
+# Runtime
+FROM node:22-alpine AS runtime
+
+WORKDIR /app
+
+COPY --from=builder /app/frontend/build ./build
+COPY --from=builder /app/frontend/package.json ./
+
+ENV PORT=3000
+ENV HOST=0.0.0.0
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -qO- http://localhost:3000 || exit 1
+
+CMD ["node", "build"]

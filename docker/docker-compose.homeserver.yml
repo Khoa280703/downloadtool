@@ -1,5 +1,6 @@
 # Docker Compose for Home Server deployment
-version: "3.8"
+# Routes: download.khoadangbui.online/api/* → api:3068 | /* → frontend:3000
+# Requires: coolify network (external), NVIDIA Container Toolkit
 
 services:
   gpu-worker:
@@ -7,8 +8,6 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.homeserver
     container_name: downloadtool-gpu-worker
-    ports:
-      - "50051:50051"
     environment:
       - GPU_WORKER_BIND=0.0.0.0:50051
       - GPU_WORKER_MAX_JOBS=4
@@ -18,7 +17,7 @@ services:
       - gpu-worker-data:/app/data
     restart: unless-stopped
     networks:
-      - downloadtool-net
+      - coolify
     deploy:
       resources:
         reservations:
@@ -27,9 +26,57 @@ services:
               count: 1
               capabilities: [gpu]
 
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.vps
+    container_name: downloadtool-api
+    environment:
+      - PORT=3068
+      - GPU_WORKER_ADDR=downloadtool-gpu-worker:50051
+      - GPU_ENABLED=true
+      - RUST_LOG=info
+    volumes:
+      - api-data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - gpu-worker
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.downloadtool-api.rule=Host(`download.khoadangbui.online`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.downloadtool-api.entrypoints=http"
+      - "traefik.http.routers.downloadtool-api.priority=10"
+      - "traefik.http.routers.downloadtool-api.middlewares=downloadtool-strip-api@docker"
+      - "traefik.http.middlewares.downloadtool-strip-api.stripprefix.prefixes=/api"
+      - "traefik.http.services.downloadtool-api.loadbalancer.server.port=3068"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: downloadtool-frontend
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - ORIGIN=https://download.khoadangbui.online
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.downloadtool-frontend.rule=Host(`download.khoadangbui.online`)"
+      - "traefik.http.routers.downloadtool-frontend.entrypoints=http"
+      - "traefik.http.routers.downloadtool-frontend.priority=1"
+      - "traefik.http.services.downloadtool-frontend.loadbalancer.server.port=3000"
+
 volumes:
   gpu-worker-data:
+  api-data:
 
 networks:
-  downloadtool-net:
-    driver: bridge
+  coolify:
+    external: true
