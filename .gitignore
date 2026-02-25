@@ -23,7 +23,6 @@ Thumbs.db
 data/
 temp/
 *.mp4
-*.ts
 *.m4s
 *.m3u8
 
