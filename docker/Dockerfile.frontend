@@ -1,4 +1,6 @@
 # Dockerfile for frontend (SvelteKit Node server)
+# NOTE: frontend source must be copied BEFORE pnpm install
+# so svelte-kit sync (prepare script) can find svelte.config.js
 
 FROM node:22-alpine AS builder
 
@@ -7,19 +9,21 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy workspace config and all package.json manifests for dep resolution
+# Copy workspace manifests
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY frontend/package.json ./frontend/
+
+# Copy workspace member package.json manifests (for pnpm resolution)
 COPY packages/api-client/package.json ./packages/api-client/
 COPY apps/injector/package.json ./apps/injector/
 COPY apps/extension/package.json ./apps/extension/
 
-# Install all deps (workspace-aware)
-RUN pnpm install --frozen-lockfile
-
-# Copy source for packages the frontend may depend on
-COPY packages/ ./packages/
+# Copy frontend SOURCE before pnpm install — required so svelte-kit sync
+# (run as prepare script) finds svelte.config.js and generates .svelte-kit/
 COPY frontend/ ./frontend/
+COPY packages/ ./packages/
+
+# Install all workspace deps (runs svelte-kit sync which now finds config)
+RUN pnpm install --frozen-lockfile
 
 # Build frontend
 RUN pnpm --filter frontend build
