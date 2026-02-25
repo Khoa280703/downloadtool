@@ -5,6 +5,9 @@
   "engines": {
     "pnpm": ">=9"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "@parcel/watcher", "vite-plugin-monkey"]
+  },
   "scripts": {
     "dev:web": "pnpm --filter frontend dev",
     "build:web": "pnpm --filter frontend build",
