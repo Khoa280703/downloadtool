@@ -28,8 +28,8 @@ RUN pnpm install --frozen-lockfile
 # Build frontend — run svelte-kit sync then vite from frontend/ directory
 # Use explicit binary paths to bypass pnpm workspace resolution ambiguity
 WORKDIR /app/frontend
-RUN /app/node_modules/.bin/svelte-kit sync
-RUN /app/node_modules/.bin/vite build
+RUN node_modules/.bin/svelte-kit sync
+RUN node_modules/.bin/vite build
 
 # Runtime
 FROM node:22-alpine AS runtime
