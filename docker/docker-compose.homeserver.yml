@@ -43,19 +43,6 @@ services:
       - gpu-worker
     networks:
       - coolify
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.downloadtool-api.rule=Host(`download.khoadangbui.online`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.downloadtool-api.tls=true"
-      - "traefik.http.routers.downloadtool-api.priority=10"
-      - "traefik.http.routers.downloadtool-api.middlewares=downloadtool-strip-api@docker"
-      - "traefik.http.routers.downloadtool-api.service=downloadtool-api"
-      - "traefik.http.routers.downloadtool-api-http.rule=Host(`download.khoadangbui.online`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.downloadtool-api-http.priority=10"
-      - "traefik.http.routers.downloadtool-api-http.middlewares=downloadtool-strip-api@docker"
-      - "traefik.http.routers.downloadtool-api-http.service=downloadtool-api"
-      - "traefik.http.middlewares.downloadtool-strip-api.stripprefix.prefixes=/api"
-      - "traefik.http.services.downloadtool-api.loadbalancer.server.port=3068"
 
   frontend:
     build:
@@ -71,16 +58,6 @@ services:
       - api
     networks:
       - coolify
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.downloadtool-frontend.rule=Host(`download.khoadangbui.online`)"
-      - "traefik.http.routers.downloadtool-frontend.tls=true"
-      - "traefik.http.routers.downloadtool-frontend.priority=1"
-      - "traefik.http.routers.downloadtool-frontend.service=downloadtool-frontend"
-      - "traefik.http.routers.downloadtool-frontend-http.rule=Host(`download.khoadangbui.online`)"
-      - "traefik.http.routers.downloadtool-frontend-http.priority=1"
-      - "traefik.http.routers.downloadtool-frontend-http.service=downloadtool-frontend"
-      - "traefik.http.services.downloadtool-frontend.loadbalancer.server.port=3000"
 
 volumes:
   gpu-worker-data:
