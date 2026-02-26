@@ -1,27 +1,4 @@
 services:
-  gpu-worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.gpu-worker
-    container_name: downloadtool-gpu-worker
-    environment:
-      - GPU_WORKER_BIND=0.0.0.0:50051
-      - GPU_WORKER_MAX_JOBS=4
-      - CUDA_DEVICE_ID=0
-      - RUST_LOG=info
-    volumes:
-      - gpu-worker-data:/app/data
-    restart: unless-stopped
-    networks:
-      - coolify
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
   api:
     build:
       context: .
@@ -29,16 +6,12 @@ services:
     container_name: downloadtool-api
     environment:
       - PORT=3068
-      - GPU_WORKER_ADDR=http://downloadtool-gpu-worker:50051
-      - GPU_ENABLED=true
       - RUST_LOG=info
     expose:
       - "3068"
     volumes:
       - api-data:/app/data
     restart: unless-stopped
-    depends_on:
-      - gpu-worker
     networks:
       - coolify
     labels:
@@ -67,7 +40,6 @@ services:
       - "traefik.docker.network=coolify"
 
 volumes:
-  gpu-worker-data:
   api-data:
 
 networks:

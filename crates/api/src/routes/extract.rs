@@ -6,7 +6,7 @@ use axum::{extract::Json as ExtractJson, http::StatusCode, response::IntoRespons
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
-use extractor::{VideoFormat, VideoInfo};
+use extractor::VideoFormat;
 
 /// Request body for video extraction.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -131,7 +131,11 @@ pub async fn extract_handler(
             };
 
             // Select best stream based on quality preference
-            let selected_stream_url = select_best_stream(&video_info.formats, body.quality.as_deref());
+            let selected_stream_url = select_best_stream(
+                &video_info.formats,
+                body.quality.as_deref(),
+                body.format.as_deref(),
+            );
 
             let response = ExtractResponse {
                 status: "success".to_string(),
@@ -174,10 +178,30 @@ fn convert_format(format: &VideoFormat) -> StreamFormat {
 }
 
 /// Select the best stream URL based on quality preference.
-fn select_best_stream(formats: &[VideoFormat], quality_pref: Option<&str>) -> Option<String> {
+fn select_best_stream(
+    formats: &[VideoFormat],
+    quality_pref: Option<&str>,
+    format_pref: Option<&str>,
+) -> Option<String> {
     if formats.is_empty() {
         return None;
     }
+
+    // Optional extension preference (e.g., mp4/webm)
+    let filtered: Vec<&VideoFormat> = if let Some(pref) = format_pref {
+        let ext = pref.trim_start_matches('.').to_lowercase();
+        let list: Vec<&VideoFormat> = formats
+            .iter()
+            .filter(|f| f.ext.eq_ignore_ascii_case(&ext))
+            .collect();
+        if list.is_empty() {
+            formats.iter().collect()
+        } else {
+            list
+        }
+    } else {
+        formats.iter().collect()
+    };
 
     // If quality preference is specified, try to match it
     if let Some(pref) = quality_pref {
@@ -189,17 +213,10 @@ fn select_best_stream(formats: &[VideoFormat], quality_pref: Option<&str>) -> Op
             .unwrap_or(1080);
 
         // Find closest match
-        let best_match = formats
+        let best_match = filtered
             .iter()
             .filter(|f| f.height.is_some())
-            .min_by_key(|f| {
-                let h = f.height.unwrap_or(0);
-                if h >= target_height {
-                    h - target_height
-                } else {
-                    target_height - h
-                }
-            });
+            .min_by_key(|f| f.height.unwrap_or(0).abs_diff(target_height));
 
         if let Some(f) = best_match {
             return Some(f.url.clone());
@@ -207,12 +224,12 @@ fn select_best_stream(formats: &[VideoFormat], quality_pref: Option<&str>) -> Op
     }
 
     // Default: return the format with highest resolution
-    formats
+    filtered
         .iter()
         .filter(|f| f.height.is_some())
         .max_by_key(|f| f.height.unwrap_or(0))
         .map(|f| f.url.clone())
-        .or_else(|| Some(formats[0].url.clone()))
+        .or_else(|| filtered.first().map(|f| f.url.clone()))
 }
 
 #[cfg(test)]
@@ -266,19 +283,19 @@ mod tests {
 
         // Should return 1080p for "1080p" preference
         assert_eq!(
-            select_best_stream(&formats, Some("1080p")),
+            select_best_stream(&formats, Some("1080p"), None),
             Some("http://example.com/1080".to_string())
         );
 
         // Should return 720p for "720p" preference
         assert_eq!(
-            select_best_stream(&formats, Some("720p")),
+            select_best_stream(&formats, Some("720p"), None),
             Some("http://example.com/720".to_string())
         );
 
         // Should return highest resolution without preference
         assert_eq!(
-            select_best_stream(&formats, None),
+            select_best_stream(&formats, None, None),
             Some("http://example.com/1080".to_string())
         );
     }

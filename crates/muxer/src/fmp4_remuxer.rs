@@ -104,7 +104,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::box_parser::{iter_boxes, read_box_header, write_u32_be};
+    use crate::box_parser::write_u32_be;
     use futures::stream;
 
     /// Build a minimal valid fMP4 byte sequence with one moof+mdat fragment.

@@ -207,7 +207,7 @@ fn patch_trun_data_offset(traf: &mut Vec<u8>, new_offset: u32) {
 
 /// Patch `mfhd.sequence_number` in a standalone moof-sized buffer.
 /// Used in the fast-path (no audio to merge).
-fn patch_mfhd_sequence_number(moof: &mut Vec<u8>, seq: u32) {
+fn patch_mfhd_sequence_number(moof: &mut [u8], seq: u32) {
     let hdr = match read_box_header(moof) {
         Some(h) => h,
         None => return,
