@@ -13,6 +13,10 @@
 		trackFormatSelected
 	} from '$lib/analytics';
 
+	const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+	const USERSCRIPT_INSTALL_URL =
+		(API_BASE ? `${API_BASE}/userscript` : 'https://api-download.khoadangbui.online/userscript');
+
 	let extractResult = $state<ExtractResult | null>(null);
 	let isExtracting = $state(false);
 	/** Audio stream to pair with video-only stream for transparent muxing */
@@ -68,9 +72,10 @@
 		};
 		window.addEventListener('yturl-detected', onUrlDetected);
 
+		const bookmarkletScriptBase = API_BASE || window.location.origin;
 		bookmarkletHref =
 			`javascript:(function(){var s=document.createElement("script");` +
-			`s.src="${window.location.origin}/bm.js?t="+Date.now();` +
+			`s.src="${bookmarkletScriptBase}/bm.js?t="+Date.now();` +
 			`document.body.appendChild(s);})()`;
 
 		return () => {
@@ -191,7 +196,7 @@
 			<p>Install the userscript for Tampermonkey or Violentmonkey.</p>
 			<a
 				class="install-link userscript-link"
-				href="/userscript"
+				href={USERSCRIPT_INSTALL_URL}
 				target="_blank"
 				rel="external noopener noreferrer"
 			>
