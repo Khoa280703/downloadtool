@@ -60,10 +60,9 @@
 
 	// --- Default selection logic ---
 
-	/** Pick default resolution: prefer 1080p, fallback to highest available */
+	/** Pick default resolution: highest available */
 	function getDefaultResolution(resList: string[]): string | null {
 		if (!resList.length) return null;
-		if (resList.includes('1080p')) return '1080p';
 		return [...resList].sort((a, b) => (parseInt(b) || 0) - (parseInt(a) || 0))[0];
 	}
 
