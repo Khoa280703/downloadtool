@@ -17,7 +17,7 @@
 | crates/extractor/build.rs | 165 | Compile-time bundling script |
 | extractors/types.ts | 56 | Shared TypeScript interfaces |
 | extractors/youtube.ts | 227 | YouTube extraction logic |
-| extractors/tiktok.ts | 357 | TikTok extraction logic |
+| extractors/youtube.ts | 357 | YouTube extraction logic |
 | Makefile | 120 | esbuild bundling targets |
 
 ### Tasks Completed
@@ -27,7 +27,7 @@
 - [x] Isolate pool (Semaphore-based)
 - [x] Hot-reload watcher
 - [x] YouTube extractor TS
-- [x] TikTok extractor TS
+- [x] YouTube extractor TS
 - [ ] Integration test (pending runtime verification)
 
 ### Tests Status
@@ -64,7 +64,7 @@
    - adaptiveFormats + formats extraction
    - Quality sorting (1080p first)
 
-2. **tiktok.ts**: Multi-strategy extraction
+2. **youtube.ts**: Multi-strategy extraction
    - URL resolution for short links
    - __INITIAL_STATE__ parsing
    - __UNIVERSAL_DATA_FOR_REHYDRATION__ fallback
@@ -88,6 +88,6 @@
 4. Phase 03 can begin (Stream Proxy)
 
 ### Unresolved Questions
-- Should op_fetch whitelist domains (youtube.com, tiktok.com)?
+- Should op_fetch whitelist domains (youtube.com, youtube.com)?
 - Should we add signature deciphering for YouTube cipher URLs?
 - Integration test strategy for external URLs?

@@ -78,13 +78,13 @@ BatchInput → POST /api/batch → SSE stream of {url, title, index, total}
 
 4. **UrlInput.svelte**
    - Text input + "Paste" button (navigator.clipboard.readText)
-   - Validate: regex for youtube.com/youtu.be/tiktok.com URLs
+   - Validate: regex for youtube.com/youtu.be/youtube.com URLs
    - On submit → call `extract()` → show FormatPicker
 
 5. **FormatPicker.svelte**
    - Show available streams: quality badges (4K, 1080p, 720p, MP3)
    - Default: highest quality video + audio
-   - Toggle: "Remove watermark" (TikTok), "Add branding" (GPU feature)
+   - Toggle: "Remove watermark" (YouTube), "Add branding" (GPU feature)
 
 6. **DownloadBtn.svelte**
    - Creates `<a>` tag with `/api/stream?...` href, `download` attribute
@@ -93,7 +93,7 @@ BatchInput → POST /api/batch → SSE stream of {url, title, index, total}
    - No progress bar (stream is zero-storage, progress unknowable for muxed)
 
 7. **Landing page SEO** (`src/routes/+page.svelte`)
-   - H1: "Download TikTok & YouTube Videos Free"
+   - H1: "Download YouTube & YouTube Videos Free"
    - Meta description, OG tags
    - Structured data (WebApplication schema)
    - Prerendered: `export const prerender = true`

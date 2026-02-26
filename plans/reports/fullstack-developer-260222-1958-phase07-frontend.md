@@ -56,7 +56,7 @@
 - `extract(url)` - POST /api/extract
 - `buildStreamUrl()` - GET /api/stream builder
 - `subscribeBatch()` - SSE /api/batch
-- URL validation for YouTube/TikTok
+- URL validation for YouTube
 
 **Download Pool** (`src/lib/download-pool.ts`):
 - Max 3 concurrent downloads
@@ -74,7 +74,7 @@
 - Prerendered landing page
 - Meta tags, OG tags, Twitter Card
 - Structured data (WebApplication schema)
-- H1: "Download TikTok & YouTube Videos Free"
+- H1: "Download YouTube & YouTube Videos Free"
 
 **Styling**:
 - Mobile-first responsive design

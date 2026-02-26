@@ -464,10 +464,7 @@ if params.video_url.contains("mime=video%2Fwebm")
 ```rust
 enum Platform {
   YouTube,
-  TikTok,
-  Instagram,
-  Twitter,
-  // ...
+  // Single-platform scope: YouTube only
 }
 ```
 

@@ -76,12 +76,12 @@
 </script>
 
 <svelte:head>
-	<title>Download TikTok & YouTube Videos Free | VideoDL</title>
-	<meta name="description" content="Free online video downloader for TikTok and YouTube. No registration, no watermarks. Download videos in HD quality instantly." />
-	<meta name="keywords" content="video downloader, tiktok downloader, youtube downloader, free download, no watermark" />
+	<title>Download YouTube Videos Free | VideoDL</title>
+	<meta name="description" content="Free online YouTube video downloader. No registration required. Download videos in high quality instantly." />
+	<meta name="keywords" content="video downloader, youtube downloader, free download, youtube video download" />
 
 	<!-- Open Graph -->
-	<meta property="og:title" content="Download TikTok & YouTube Videos Free" />
+	<meta property="og:title" content="Download YouTube Videos Free" />
 	<meta property="og:description" content="Free online video downloader. No registration required." />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://videodl.app" />
@@ -89,7 +89,7 @@
 
 	<!-- Twitter Card -->
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="Download TikTok & YouTube Videos Free" />
+	<meta name="twitter:title" content="Download YouTube Videos Free" />
 	<meta name="twitter:description" content="Free online video downloader. No registration required." />
 
 	<!-- Structured Data -->
@@ -98,7 +98,7 @@
 			"@context": "https://schema.org",
 			"@type": "WebApplication",
 			"name": "VideoDL",
-			"description": "Free online video downloader for TikTok and YouTube",
+			"description": "Free online video downloader for YouTube",
 			"applicationCategory": "UtilityApplication",
 			"operatingSystem": "Any",
 			"offers": {
@@ -118,7 +118,7 @@
 />
 
 <div class="hero">
-	<h1>Download TikTok & YouTube Videos Free</h1>
+	<h1>Download YouTube Videos Free</h1>
 	<p class="subtitle">
 		Fast, free, no registration required. Paste a link and download instantly.
 	</p>
@@ -154,7 +154,6 @@
 
 			<FormatPicker
 				streams={extractResult.streams}
-				platform={extractResult.platform}
 				onSelect={handleFormatSelect}
 			/>
 
@@ -199,8 +198,8 @@
 			<div class="feature-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
 				<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
 			</svg></div>
-			<h3>No Watermark</h3>
-			<p>Download TikTok videos without watermarks. Clean and professional.</p>
+			<h3>Smart Muxing</h3>
+			<p>Automatically combines video and audio streams for high-quality YouTube downloads.</p>
 		</div>
 		<div class="feature">
 			<div class="feature-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">

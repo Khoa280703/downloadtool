@@ -170,8 +170,8 @@ $effect(() => {
     </div>
   {/if}
 
-  <!-- TikTok toggle (keep existing) -->
-  {#if platform === 'tiktok'}
+  <!-- YouTube toggle (keep existing) -->
+  {#if platform === 'youtube'}
     <!-- ... existing watermark toggle ... -->
   {/if}
 </div>
@@ -231,7 +231,7 @@ Update DownloadBtn usage:
 - [ ] Add auto-select logic (1080p default, H.264 priority)
 - [ ] Build 2-row template (resolution row + codec row)
 - [ ] Style resolution and codec buttons
-- [ ] Keep TikTok watermark toggle
+- [ ] Keep YouTube watermark toggle
 - [ ] Update +page.svelte handleFormatSelect to accept (videoStream, audioStream)
 - [ ] Add selectedAudioStream state in +page.svelte
 - [ ] Pass audioStream prop to DownloadBtn

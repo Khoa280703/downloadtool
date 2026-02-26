@@ -223,7 +223,7 @@ mod tests {
     fn test_is_valid_video_url() {
         assert!(is_valid_video_url("https://youtube.com/watch?v=abc123"));
         assert!(is_valid_video_url("https://youtu.be/abc123"));
-        assert!(!is_valid_video_url("https://tiktok.com/@user/video/123"));
+        assert!(!is_valid_video_url("https://vimeo.com/123456"));
         assert!(!is_valid_video_url("https://example.com/video"));
     }
 

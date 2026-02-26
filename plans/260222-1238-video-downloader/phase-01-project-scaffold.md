@@ -27,8 +27,8 @@ downloadtool/
 ├── extractors/             # TypeScript extractor scripts
 │   ├── youtube.ts
 │   ├── youtube-channel.ts  # channel/playlist batch
-│   ├── tiktok.ts
-│   └── tiktok-channel.ts   # TikTok profile/hashtag batch
+│   ├── youtube.ts
+│   └── youtube-channel.ts   # YouTube profile/hashtag batch
 ├── proto/
 │   └── transcode.proto     # gRPC service definition
 ├── frontend/               # Svelte app

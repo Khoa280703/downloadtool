@@ -13,9 +13,9 @@
 
 ## Key Insights
 <!-- Updated: Validation Session 1 - Residential proxy removed, VPS IP rotation adopted -->
-- **No residential proxy needed**: VPS outbound IP is used for YouTube/TikTok requests (not home IP)
+- **No residential proxy needed**: VPS outbound IP is used for YouTube requests (not home IP)
 - Multiple cheap VPS instances = natural IP rotation at near-zero cost
-- YouTube requires valid session cookies for high-quality streams; TikTok requires device cookies
+- YouTube requires valid session cookies for high-quality streams; YouTube requires device cookies
 - Request pattern matters: throttle 50-200ms between requests same-origin
 - Home Server never sends requests to platforms directly — VPS is the only exposed endpoint
 
@@ -67,7 +67,7 @@ AntiBotClient
    ];
    pub fn build_headers(platform: Platform) -> HeaderMap
    ```
-   - Per-platform headers: YouTube needs `Referer: youtube.com`, TikTok needs `x-tt-params`
+   - Per-platform headers: YouTube needs `Referer: youtube.com`, YouTube needs `x-tt-params`
    - Rotate UA per request (random selection)
    - Include: Accept, Accept-Language, Accept-Encoding, Sec-Ch-Ua, Sec-Fetch-*
 
@@ -118,7 +118,7 @@ AntiBotClient
 |---|---|
 | Proxy provider outage | Multi-provider: Bright Data primary + IPRoyal fallback |
 | Proxy cost spikes | Cache extracted URLs for 4h (below YouTube 6h signed URL TTL) |
-| TikTok device fingerprint | Accept user-provided cookies via API param |
+| YouTube device fingerprint | Accept user-provided cookies via API param |
 | IP ban cascade | Rotate proxy on first 403; don't retry same IP |
 
 ## Security

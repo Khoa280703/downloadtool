@@ -26,7 +26,7 @@
 			return false;
 		}
 		if (!isValidVideoUrl(input)) {
-			validationError = 'Please enter a valid YouTube or TikTok URL';
+			validationError = 'Please enter a valid YouTube URL';
 			return false;
 		}
 		validationError = '';
@@ -53,8 +53,7 @@
 		if (!validate(url)) return;
 
 		// Track URL submission
-		const platform = url.includes('tiktok') ? 'tiktok' : 'youtube';
-		trackUrlSubmitted(platform, url.length);
+		trackUrlSubmitted('youtube', url.length);
 
 		setVideoUrl(url);
 
@@ -81,7 +80,7 @@
 		<div class="input-wrapper">
 			<input
 				type="url"
-				placeholder="Paste YouTube or TikTok link..."
+				placeholder="Paste YouTube link..."
 				value={url}
 				oninput={handleInput}
 				aria-label="Video URL"

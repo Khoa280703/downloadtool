@@ -128,16 +128,12 @@ export function subscribeBatch(
 }
 
 /**
- * Validate video URL (YouTube or TikTok)
+ * Validate video URL (YouTube only)
  * @param url - URL to validate
  * @returns True if valid video URL
  */
 export function isValidVideoUrl(url: string): boolean {
-	const patterns = [
-		/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/,
-		/^https?:\/\/(www\.)?tiktok\.com\/.+/,
-		/^https?:\/\/vm\.tiktok\.com\/.+/
-	];
+	const patterns = [/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/];
 	return patterns.some((p) => p.test(url));
 }
 
@@ -146,12 +142,9 @@ export function isValidVideoUrl(url: string): boolean {
  * @param url - Video URL
  * @returns Platform name or 'unknown'
  */
-export function getPlatform(url: string): 'youtube' | 'tiktok' | 'unknown' {
+export function getPlatform(url: string): 'youtube' | 'unknown' {
 	if (/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/.test(url)) {
 		return 'youtube';
-	}
-	if (/^https?:\/\/(www\.)?(tiktok\.com|vm\.tiktok\.com)\/.+/.test(url)) {
-		return 'tiktok';
 	}
 	return 'unknown';
 }

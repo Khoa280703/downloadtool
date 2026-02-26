@@ -21,8 +21,7 @@
 		if (!stream) return;
 
 		// Track download start
-		const platform = stream.url?.includes('tiktok') ? 'tiktok' : 'youtube';
-		trackDownloadStarted(platform, stream.quality || 'unknown', stream.format || 'mp4');
+		trackDownloadStarted('youtube', stream.quality || 'unknown', stream.format || 'mp4');
 
 		isLoading = true;
 		setDownloading(true);

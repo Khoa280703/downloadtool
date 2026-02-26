@@ -4,7 +4,7 @@
  */
 
 /** Supported video platforms */
-export type Platform = 'youtube' | 'tiktok' | 'unknown';
+export type Platform = 'youtube' | 'unknown';
 
 /** Video stream information */
 export interface Stream {

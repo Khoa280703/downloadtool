@@ -16,7 +16,7 @@
 - fMP4 (fragmented MP4) allows streaming output before knowing total file size → no need to buffer entire file
 - `mp4-stream` crate supports channel-based fMP4 generation for live/streaming use
 - Muxing = container operation, not codec operation → CPU trivially handles at memory bandwidth speeds
-- For formats where audio+video are already merged (TikTok, YouTube ≤720p) → skip muxer, proxy directly
+- For formats where audio+video are already merged (YouTube, YouTube ≤720p) → skip muxer, proxy directly
 
 ## Architecture
 

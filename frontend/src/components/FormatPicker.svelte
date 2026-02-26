@@ -1,13 +1,12 @@
 <script lang="ts">
-	import type { Stream, Platform } from '$lib/types';
+	import type { Stream } from '$lib/types';
 
 	interface Props {
 		streams: Stream[];
-		platform: Platform;
 		onSelect: (videoStream: Stream, audioStream: Stream | null) => void;
 	}
 
-	let { streams, platform, onSelect }: Props = $props();
+	let { streams, onSelect }: Props = $props();
 
 	// --- Data preparation ---
 
@@ -211,15 +210,6 @@
 				</button>
 			{/each}
 		</div>
-	{/if}
-
-	{#if platform === 'tiktok'}
-		<label class="toggle-option">
-			<input type="checkbox" disabled />
-			<span class="toggle-slider"></span>
-			<span class="toggle-label">Remove watermark</span>
-			<span class="coming-soon">Soon</span>
-		</label>
 	{/if}
 
 	<label class="toggle-option">

@@ -35,7 +35,7 @@
 - mark_failed/mark_success for health updates
 
 **CookieStore** (`cookie_store.rs`):
-- Platform enum: YouTube, TikTok
+- Platform enum: YouTube, YouTube
 - Warm-up via homepage fetch
 - Uses reqwest built-in cookie_store (simplified from custom Jar)
 

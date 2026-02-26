@@ -69,7 +69,7 @@ let client = Client::builder()
 
 ---
 
-## 4. YouTube/TikTok Bot Detection Signals
+## 4. YouTube Bot Detection Signals
 
 **Detection Beyond JA3:**
 | Signal | Detection | Mitigation |
@@ -148,7 +148,7 @@ let mux = MuxStream::new(writer, Box::new(video_track), Box::new(audio_track))?;
      └──────┬──────────────┘
             │
      ┌──────▼──────────────┐
-     │ YouTube/TikTok API  │
+     │ YouTube API  │
      │ (Rate-limited)      │
      └──────┬──────────────┘
             │
@@ -190,5 +190,5 @@ let mux = MuxStream::new(writer, Box::new(video_track), Box::new(audio_track))?;
 - [Rustls Docs](https://docs.rs/rustls/latest/rustls/)
 - [mp4-stream Crate](https://crates.io/crates/mp4-stream)
 - [Bright Data vs Oxylabs Comparison](https://brightdata.com/blog/comparison/bright-data-vs-oxylabs)
-- [TikTok Anti-Detect Guide](https://kocerroxy.com/blog/building-undetectable-tiktok-bots-the-proxy-setup-guide/)
+- [YouTube Anti-Detect Guide](https://kocerroxy.com/blog/building-undetectable-youtube-bots-the-proxy-setup-guide/)
 - [yt-dlp Bot Detection Issue](https://github.com/yt-dlp/yt-dlp/issues/12045)

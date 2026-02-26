@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-A high-performance, self-hosted video downloader platform enabling users to download content from YouTube and other platforms with anti-bot protection, GPU-accelerated transcoding, and full-speed CDN downloads via YouTube n-parameter transformation.
+A high-performance, self-hosted video downloader platform enabling users to download content from YouTube with anti-bot protection, GPU-accelerated transcoding, and full-speed CDN downloads via YouTube n-parameter transformation.
 
 **Key Achievements (as of 2026-02-24):**
 - Complete end-to-end video download pipeline
@@ -32,9 +32,6 @@ Enable creators and power users to reliably download video content at maximum sp
 | Platform | Status | Strategy |
 |----------|--------|----------|
 | YouTube | ✅ Complete | InnerTube API + HTML fallback |
-| TikTok | Planned | Platform extractor |
-| Instagram | Planned | Platform extractor |
-| Twitter | Planned | Platform extractor |
 
 ## Functional Requirements
 
@@ -403,8 +400,7 @@ Enable creators and power users to reliably download video content at maximum sp
 ## Future Roadmap
 
 ### Q1 2026
-- [ ] TikTok extractor
-- [ ] Instagram extractor
+- [ ] YouTube playlist/channel extraction hardening
 - [ ] Advanced filtering (date range, duration)
 - [ ] Download history export (CSV/JSON)
 
@@ -494,9 +490,6 @@ docker-compose -f docker/docker-compose.vps.yml up -d
 
 ### Platform ToS
 - YouTube: Non-commercial use recommended
-- TikTok: Check ToS per region
-- Instagram: Private content only
-- Twitter: Respect copyright & attribution
 
 ## Support & Documentation
 

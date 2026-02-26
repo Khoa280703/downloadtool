@@ -142,7 +142,7 @@ export function trackPageView(path?: string, title?: string): void {
 /**
  * Track when user submits a URL for extraction
  *
- * @param platform - Video platform (youtube, tiktok, etc.)
+ * @param platform - Video platform (youtube)
  * @param urlLength - Length of submitted URL
  */
 export function trackUrlSubmitted(platform: string, urlLength: number): void {

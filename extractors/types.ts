@@ -56,7 +56,7 @@ export type ExtractFn = (url: string, cookies?: string) => Promise<ExtractionRes
 /**
  * Platform identifier
  */
-export type Platform = "youtube" | "tiktok" | "unknown";
+export type Platform = "youtube" | "unknown";
 
 /**
  * Error thrown during extraction

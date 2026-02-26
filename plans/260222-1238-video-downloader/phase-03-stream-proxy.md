@@ -55,7 +55,7 @@ GET  /api/batch         →  SSE endpoint
    // POST /api/extract  body: { url: string, options: { quality, format, watermark } }
    // Returns: { streams: [...], title, selected_stream_url }
    ```
-   - Validate URL (youtube.com / tiktok.com only)
+   - Validate URL (youtube.com / youtube.com only)
    - Call `extractor::extract(url, cookies)`
    - Return stream list + recommended stream
 
@@ -64,7 +64,7 @@ GET  /api/batch         →  SSE endpoint
    // GET /api/stream?url=<encoded>&title=<encoded>&format=mp4
    // Pipes source CDN bytes → browser
    ```
-   - Validate `url` param against allowlist (googlevideo.com, tiktokcdn.com)
+   - Validate `url` param against allowlist (googlevideo.com, youtubecdn.com)
    - Parse Range header for resume support (HTTP 206)
    - Build `ProxyClient::get(url).range(range).send()`
    - Forward: Content-Length, Content-Type, Accept-Ranges
@@ -95,7 +95,7 @@ GET  /api/batch         →  SSE endpoint
    ```rust
    const ALLOWED_HOSTS: &[&str] = &[
        "googlevideo.com", "youtube.com",
-       "tiktokcdn.com", "tiktok.com",
+       "youtubecdn.com", "youtube.com",
    ];
    fn validate_stream_url(url: &str) -> Result<Url>
    ```

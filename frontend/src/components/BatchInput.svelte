@@ -28,8 +28,6 @@
 		// YouTube playlist/channel patterns
 		if (/youtube\.com\/(playlist|channel|@|c\/|user\/)/.test(input)) return true;
 		if (/[?&]list=/.test(input)) return true;
-		// TikTok user patterns
-		if (/tiktok\.com\/@/.test(input)) return true;
 		return false;
 	}
 
@@ -40,7 +38,7 @@
 			return false;
 		}
 		if (!isValidVideoUrl(input) && !isChannelOrPlaylist(input)) {
-			error = 'Please enter a valid YouTube or TikTok URL';
+			error = 'Please enter a valid YouTube URL';
 			return false;
 		}
 		if (!isChannelOrPlaylist(input)) {

@@ -311,7 +311,7 @@ downloadtool/
 
 ## Future Improvements
 
-- Additional platform support (TikTok, Instagram, etc.)
+- Deeper YouTube support (channels, playlists, and richer metadata)
 - Distributed GPU worker scaling
 - Advanced analytics & monitoring
 - API rate limiting & authentication

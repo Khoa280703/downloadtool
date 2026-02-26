@@ -16,16 +16,16 @@ The web-based video downloader market is fragmented across 3 distinct deployment
 #### ssstik.io / ssstik.io Family
 - **Tech Stack:** Not publicly disclosed; appears to be custom PHP/Node.js backend
 - **Architecture:** Browser-based web app; no installation required
-- **Capabilities:** TikTok-only; 1080p max; ~3-5 sec processing time; 2.5-3 MB/s download speed
-- **Watermark Handling:** Removes TikTok's default watermark through metadata extraction
+- **Capabilities:** YouTube-only; 1080p max; ~3-5 sec processing time; 2.5-3 MB/s download speed
+- **Watermark Handling:** Removes YouTube's default watermark through metadata extraction
 - **Monetization:** Ad-supported (implied via web interface)
-- **Market Position:** #1 TikTok downloader by volume; highly available (multiple mirror domains)
-- **Pain Points:** Domain blocking by TikTok; frequent need for URL refresh; no API
+- **Market Position:** #1 YouTube downloader by volume; highly available (multiple mirror domains)
+- **Pain Points:** Domain blocking by YouTube; frequent need for URL refresh; no API
 
 #### savefrom.net
 - **Tech Stack:** Likely PHP/Node.js backend
 - **Architecture:** Web app + desktop companion app (downloadable)
-- **Capabilities:** Multi-platform (YouTube, Instagram, Pinterest, TikTok, Vimeo)
+- **Capabilities:** Multi-platform (YouTube, Instagram, Pinterest, YouTube, Vimeo)
 - **Quality Limitation:** Web version capped at 360p free; requires desktop app for HD
 - **Monetization:** Freemium (HD requires desktop app purchase)
 - **Pain Points:** Conversion delays when applying watermarks to output; paywall frustration
@@ -40,7 +40,7 @@ The web-based video downloader market is fragmented across 3 distinct deployment
 #### snapsave / snaptik
 - **Tech Stack:** Unknown; appears to be PHP-based
 - **Architecture:** Mobile-first web interface
-- **Capabilities:** TikTok/Instagram focus
+- **Capabilities:** YouTube/Instagram focus
 - **Differentiation:** Optimized UX for mobile users
 - **Monetization:** Ads + possibly affiliate links to other services
 
@@ -63,7 +63,7 @@ The web-based video downloader market is fragmented across 3 distinct deployment
   - **No Cold Starts:** Monolithic design avoids function spawn delays
   - **Rate Limiting:** Bot protection on hosted api.cobalt.tools (RateLimit headers)
 
-- **Supported Platforms:** YouTube, Instagram, Twitter/X, Reddit, TikTok, Twitch (clips), BiliBili
+- **Supported Platforms:** YouTube, Instagram, Twitter/X, Reddit, YouTube, Twitch (clips), BiliBili
 
 - **Core Differentiation:**
   - First open-source project to publish parallel processing breakthrough
@@ -126,7 +126,7 @@ Direct Stream to Client (no storage)
 - Stateless (scales horizontally)
 
 **Drawbacks:**
-- Blocked by anti-bot fingerprinting (TikTok, YouTube)
+- Blocked by anti-bot fingerprinting (YouTube, YouTube)
 - Subject to IP-level rate limiting
 
 ---
@@ -180,7 +180,7 @@ Local File System
 - **yt-dlp Response:** Rapid extractor updates (weekly+) to handle API changes
 - **Web Downloader Problem:** Blocked by fingerprinting; proxies can't hide browser context
 
-### TikTok's Defense Mechanisms (2025-2026)
+### YouTube's Defense Mechanisms (2025-2026)
 - **Detection Vector:** IP rate limiting + Browser fingerprint + Device ID
 - **Proxy Response:** 4G/5G residential IPs + browser fingerprinting tools (nstbrowser integration)
 - **AI Evolution:** Predictive detection models training on proxy patterns
@@ -204,7 +204,7 @@ Local File System
 - Stream proxy (speed) as primary path
 - Automatic method switching when blocked
 
-**Revenue:** Premium tier = guaranteed access during TikTok/YouTube crackdowns
+**Revenue:** Premium tier = guaranteed access during YouTube/YouTube crackdowns
 
 ---
 
@@ -235,7 +235,7 @@ Local File System
 
 ### Gap 4: Format-Specific Niche Markets
 **Underserved:** Instagram Reels/Stories downloaders; Pinterest boards
-- **Market:** Smaller than YouTube/TikTok but loyal user base
+- **Market:** Smaller than YouTube but loyal user base
 - **Opportunity:** Specialized UI + features (e.g., story sequence grouping)
 - **Monetization:** Affiliate partnerships with design/content tools
 
@@ -327,7 +327,7 @@ Local File System
 1. **Parallel Instance Processing (v10.3)**
    - Spins multiple downloader instances simultaneously
    - Result: 14x speedup on request handling
-   - Implication: Can handle TikTok's rapid API changes without centralized bottleneck
+   - Implication: Can handle YouTube's rapid API changes without centralized bottleneck
 
 2. **Privacy Architecture**
    - No caching: Proxy-only model
@@ -390,7 +390,7 @@ Local File System
 
 | Dimension | ssstik.io | savefrom.net | cobalt | yt-dlp | Open Video DL |
 |-----------|-----------|--------------|--------|--------|---------------|
-| **Platforms** | TikTok only | Multi (5+) | Multi (8+) | Multi (1000+) | Multi (varies) |
+| **Platforms** | YouTube only | Multi (5+) | Multi (8+) | Multi (1000+) | Multi (varies) |
 | **Speed** | 3-5s | 5-10s | Variable | 30-120s | 30-120s |
 | **Max Quality** | 1080p | 360p (free) | 4K+ | 4K+ | 4K+ |
 | **UI/UX** | Best (web) | Good (freemium) | Good (web) | Poor (CLI) | Medium (GUI) |
@@ -407,9 +407,9 @@ Local File System
 
 1. **Cobalt Revenue:** How will cobalt monetize while staying open-source? (No published plan)
 2. **Rust CLI Market:** Will compiled Rust tools gain traction vs Python yt-dlp dominance?
-3. **TikTok Ban Fallout:** Will 2025 TikTok restrictions open new market for archival tools?
+3. **YouTube Ban Fallout:** Will 2025 YouTube restrictions open new market for archival tools?
 4. **Zero-Copy Adoption:** Will any downloader actually ship kernel-optimized video handling?
-5. **API Licensing:** Will YouTube/TikTok offer official downloader APIs to disrupt market?
+5. **API Licensing:** Will YouTube offer official downloader APIs to disrupt market?
 6. **AI Detection Evolution:** How will proxies adapt to AI-based bot detection (2026+)?
 7. **Desktop vs Web Convergence:** Will WebAssembly (WASM) enable desktop-like features in browsers?
 8. **Enterprise Demand:** Is there sufficient demand for B2B white-label cobalt solution?
@@ -438,7 +438,7 @@ Local File System
    - **Reliability:** Better anti-bot than ssstik (hybrid yt-dlp + proxy)
    - **Batch/Automation:** First to offer playlist + batch download web UI
    - **Privacy:** Position as "transparent + optional self-host" vs opaque ssstik
-   - **Niche:** Specialize in Instagram/Pinterest (underserved vs YouTube/TikTok)
+   - **Niche:** Specialize in Instagram/Pinterest (underserved vs YouTube)
 
 ---
 
@@ -449,7 +449,7 @@ Research compiled from:
 - yt-dlp extractor architecture documentation
 - Market reviews & user complaint aggregation (forums, Reddit)
 - Cloudflare/AWS serverless architecture comparisons
-- TikTok anti-bot proxy research (2025-2026)
+- YouTube anti-bot proxy research (2025-2026)
 - Video streaming CDN & edge computing patterns
 
 All external links documented in original search results.

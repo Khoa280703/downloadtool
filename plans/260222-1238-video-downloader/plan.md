@@ -1,6 +1,6 @@
 ---
 title: "High-Performance Video Downloader"
-description: "Stream-proxy video downloader (YouTube/TikTok) with Rust backend, deno_core V8 extraction, GPU transcoding pipeline, ad monetization"
+description: "Stream-proxy video downloader (YouTube) with Rust backend, deno_core V8 extraction, GPU transcoding pipeline, ad monetization"
 status: pending
 priority: P1
 effort: 12-16d
@@ -102,7 +102,7 @@ User pastes channel URL → VPS extracts N video links → SSE pushes list to br
    - Options: Server owner | Free tier trước | Pass to premium users
    - **Answer:** Hybrid VPS + Home Server architecture — VPS IP is the "proxy"
    - **Custom input:** VPS ($10-20/mo, 1-10Gbps) handles 90% traffic with its own clean IP. Home Server (Threadripper+RTX3090) handles GPU-only 10% via WireGuard tunnel. No residential proxy needed.
-   - **Rationale:** Eliminates proxy cost entirely. VPS IP rotation (multiple cheap VPS) replaces residential proxy. Home server IP never exposed to YouTube/TikTok.
+   - **Rationale:** Eliminates proxy cost entirely. VPS IP rotation (multiple cheap VPS) replaces residential proxy. Home server IP never exposed to YouTube.
 
 3. **[Architecture]** GPU hardware availability?
    - Options: RTX 3090 sẵn có | Thuê cloud | Bỏ GPU khỏi MVP

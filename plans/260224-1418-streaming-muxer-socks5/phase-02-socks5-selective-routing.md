@@ -51,7 +51,7 @@
 |---|---|---|
 | `youtube.com`, `*.youtube.com` | SOCKS5 proxy (if `SOCKS5_PROXY_URL` set) | N/A (not fetched here) |
 | `googlevideo.com`, `*.googlevideo.com` | direct (already allowed, no proxy needed) | direct (already correct) |
-| `tiktok.com`, `tiktokcdn.com`, etc. | direct (no change) | direct (already correct) |
+| `youtube.com`, `youtubecdn.com`, etc. | direct (no change) | direct (already correct) |
 
 ### Change in `op_fetch` (runtime.rs)
 
@@ -215,7 +215,7 @@ Verify:
 - [ ] Run `cargo build -p extractor` — compiles clean
 - [ ] Run `cargo test -p extractor` — all tests pass
 - [ ] Run `cargo clippy -p extractor -- -D warnings` — no warnings
-- [ ] Add unit tests for `should_use_socks5`: youtube.com → true, www.youtube.com → true, googlevideo.com → false, tiktok.com → false
+- [ ] Add unit tests for `should_use_socks5`: youtube.com → true, www.youtube.com → true, googlevideo.com → false, youtube.com → false
 - [ ] Smoke test with `SOCKS5_PROXY_URL` set and unset
 
 ## Success Criteria

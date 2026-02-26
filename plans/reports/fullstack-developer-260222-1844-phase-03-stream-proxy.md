@@ -50,7 +50,7 @@
 - GET /api/batch - SSE endpoint with keep-alive, streams video links from channel
 
 **Security**:
-- URL allowlist: googlevideo.com, youtube.com, youtu.be, tiktokcdn.com, tiktok.com, vm.tiktok.com
+- URL allowlist: googlevideo.com, youtube.com, youtu.be, youtubecdn.com, youtube.com, vm.youtube.com
 - CORS permissive for Cloudflare Pages frontend
 - Content-Disposition header for download dialog
 

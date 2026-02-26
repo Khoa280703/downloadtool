@@ -166,7 +166,7 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 ### Objectives
 - [ ] Batch download scheduling
 - [ ] Playlist extraction (YouTube playlists, channels)
-- [ ] Additional platform support (TikTok, Instagram, etc.)
+- [ ] YouTube-only feature depth (channels, playlists, smarter filtering)
 - [ ] Advanced analytics & monitoring dashboard
 - [ ] API authentication & rate limiting
 - [ ] Distributed GPU worker scaling

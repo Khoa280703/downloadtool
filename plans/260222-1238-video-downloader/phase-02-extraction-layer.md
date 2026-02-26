@@ -10,7 +10,7 @@
 - **Priority**: P0
 - **Status**: completed
 - **Effort**: 2d
-- Embed V8 via deno_core into Rust; load TypeScript extractors at startup; hot-reload on file change; extract direct video URLs from YouTube/TikTok links.
+- Embed V8 via deno_core into Rust; load TypeScript extractors at startup; hot-reload on file change; extract direct video URLs from YouTube links.
 
 ## Key Insights
 - `deno_core` 0.295+ maps JS Promises → Rust Futures natively
@@ -35,7 +35,7 @@ ExtractorPool (N workers = num_cpus)
 - `crates/extractor/src/runtime.rs` — deno_core JsRuntime setup
 - `crates/extractor/src/hot_reload.rs` — file watcher
 - `extractors/youtube.ts` — YouTube extractor logic
-- `extractors/tiktok.ts` — TikTok extractor logic
+- `extractors/youtube.ts` — YouTube extractor logic
 - `extractors/types.ts` — shared TypeScript types
 - `Makefile` — esbuild bundling targets
 - `crates/extractor/build.rs` — compile-time bundling
@@ -88,9 +88,9 @@ ExtractorPool (N workers = num_cpus)
    - Extract `streamingData.adaptiveFormats` (separate audio+video for 1080p+)
    - Return streams sorted by quality
 
-9. **TikTok extractor** (`extractors/tiktok.ts`)
+9. **YouTube extractor** (`extractors/youtube.ts`)
    - Resolve shortened URLs to canonical
-   - Fetch TikTok page with auth cookies
+   - Fetch YouTube page with auth cookies
    - Parse `__INITIAL_STATE__` or `__UNIVERSAL_DATA_FOR_REHYDRATION__`
    - Extract `video.playAddr` and `video.downloadAddr`
    - Handle both watermarked and non-watermarked URLs
@@ -102,12 +102,12 @@ ExtractorPool (N workers = num_cpus)
 - [x] Isolate pool (Semaphore-based)
 - [x] Hot-reload watcher
 - [x] YouTube extractor TS
-- [x] TikTok extractor TS
+- [x] YouTube extractor TS
 - [ ] Integration test: extract YouTube URL → assert streams non-empty
 
 ## Success Criteria
 - Extract YouTube 1080p+audio URLs in <2s
-- Extract TikTok no-watermark URL in <1s
+- Extract YouTube no-watermark URL in <1s
 - Hot-reload: update `youtube.ts` → running server picks up within 2s
 - Pool handles 100 concurrent extract() calls without panic
 
@@ -116,9 +116,9 @@ ExtractorPool (N workers = num_cpus)
 |---|---|
 | deno_core API breaks between versions | Pin exact version in Cargo.lock |
 | YouTube page structure changes | Fallback to `ytdl-core` JS lib bundled via esbuild |
-| TikTok auth cookie requirement | Accept cookies param from user; document setup |
+| YouTube auth cookie requirement | Accept cookies param from user; document setup |
 | V8 Isolate memory leaks | Drop JsRuntime after use; use pool with bounded size |
 
 ## Security
-- `op_fetch` in JS runtime: whitelist allowed domains (youtube.com, tiktok.com only)
+- `op_fetch` in JS runtime: whitelist allowed domains (youtube.com, youtube.com only)
 - Never expose raw extraction URLs to frontend without validation

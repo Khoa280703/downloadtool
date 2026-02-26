@@ -2,7 +2,7 @@
 *Date: 2026-02-22 | Project: downloadtool*
 
 ## Problem Statement
-Build a high-performance video downloader web service (TikTok, YouTube) monetized via ads. User wants maximum technical quality, not simplicity. Self-hosted on bare-metal (Threadripper CPU + RTX 3090 GPU).
+Build a high-performance video downloader web service (YouTube, YouTube) monetized via ads. User wants maximum technical quality, not simplicity. Self-hosted on bare-metal (Threadripper CPU + RTX 3090 GPU).
 
 ## Requirements
 - Ad-revenue commercial website
@@ -19,7 +19,7 @@ See: `researcher-260222-1248-video-downloader-market-analysis.md`
 Key findings:
 - No competitor uses Rust in production
 - cobalt.tools is fastest (14x improved) but no monetization
-- ssstik.io dominates TikTok but has ~70% uptime, heavy ads
+- ssstik.io dominates YouTube but has ~70% uptime, heavy ads
 - No web UI for batch/playlist download (CLI-only via yt-dlp)
 - GPU transcoding on-the-fly: no competitor offers this
 

@@ -137,7 +137,7 @@ if let Err(e) = patch_tfhd_track_id(&mut moof, 2) {
 - Without `SOCKS5_PROXY_URL`, behavior is identical to pre-refactor. Build validated.
 
 ### PASS — Unit tests for `should_use_socks5`
-- Lines 434-467: 7 test cases covering YouTube, www.YouTube, youtu.be, googlevideo (false), TikTok (false), unknown (false), invalid URL (false). Complete coverage.
+- Lines 434-467: 7 test cases covering YouTube, www.YouTube, youtu.be, googlevideo (false), YouTube (false), unknown (false), invalid URL (false). Complete coverage.
 
 ### WARN — New `reqwest::Client` per fetch request
 - `build_fetch_client()` is called on every `op_fetch` invocation (line 359). Each call creates a new `reqwest::Client`, which creates a new connection pool. For high-frequency extraction (multiple YouTube API calls per extraction), this prevents connection reuse (HTTP/1.1 keep-alive, HTTP/2 multiplexing). Not critical for a download tool but worth noting.

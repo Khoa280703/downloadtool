@@ -1850,7 +1850,7 @@ pub async fn batch_handler(
         if !is_valid_batch_url(&params.url) {
             warn!("Invalid batch URL: {}", params.url);
             let error_event = BatchEvent::Error {
-                message: "Invalid URL. Only YouTube channels/playlists and TikTok users are supported.".to_string(),
+                message: "Invalid URL. Only YouTube channels/playlists and YouTube users are supported.".to_string(),
             };
             Box::pin(stream::once(async move {
                 Ok(Event::default().data(serde_json::to_string(&error_event).unwrap()))
@@ -1943,8 +1943,8 @@ fn is_valid_batch_url(url: &str) -> bool {
         || url_lower.contains("youtube.com/playlist")
         || url_lower.contains("youtube.com/@")
         || (url_lower.contains("youtube.com") && url_lower.contains("list="))
-        // TikTok users
-        || (url_lower.contains("tiktok.com/@") && !url_lower.contains("/video/"))
+        // YouTube users
+        || (url_lower.contains("youtube.com/@") && !url_lower.contains("/video/"))
 }
 
 #[cfg(test)]
@@ -1960,9 +1960,9 @@ mod tests {
         assert!(is_valid_batch_url("https://youtube.com/playlist?list=xxx"));
         assert!(is_valid_batch_url("https://youtube.com/@ChannelName"));
 
-        // TikTok users (not videos)
-        assert!(is_valid_batch_url("https://tiktok.com/@username"));
-        assert!(!is_valid_batch_url("https://tiktok.com/@username/video/123"));
+        // YouTube users (not videos)
+        assert!(is_valid_batch_url("https://youtube.com/@username"));
+        assert!(!is_valid_batch_url("https://youtube.com/@username/video/123"));
 
         // Invalid URLs
         assert!(!is_valid_batch_url("https://youtube.com/watch?v=xxx"));
@@ -2088,7 +2088,7 @@ impl IntoResponse for ApiError {
 /// POST /api/extract
 /// Body: { url: string, quality?: string, format?: string }
 ///
-/// Validates URL (youtube.com / tiktok.com only), calls extractor,
+/// Validates URL (youtube.com / youtube.com only), calls extractor,
 /// and returns stream list + recommended stream URL.
 pub async fn extract_handler(
     ExtractJson(body): ExtractJson<ExtractRequest>,
@@ -2099,7 +2099,7 @@ pub async fn extract_handler(
     if !is_valid_video_url(&body.url) {
         warn!("Invalid or unsupported URL: {}", body.url);
         return Err(ApiError {
-            error: "Invalid or unsupported URL. Only YouTube and TikTok URLs are supported.".to_string(),
+            error: "Invalid or unsupported URL. Only YouTube and YouTube URLs are supported.".to_string(),
             status: 400,
         });
     }
@@ -2146,8 +2146,8 @@ fn is_valid_video_url(url: &str) -> bool {
     let url_lower = url.to_lowercase();
     url_lower.contains("youtube.com")
         || url_lower.contains("youtu.be")
-        || url_lower.contains("tiktok.com")
-        || url_lower.contains("vm.tiktok.com")
+        || url_lower.contains("youtube.com")
+        || url_lower.contains("vm.youtube.com")
 }
 
 /// Convert VideoFormat to StreamFormat for response.
@@ -2217,8 +2217,8 @@ mod tests {
     fn test_is_valid_video_url() {
         assert!(is_valid_video_url("https://youtube.com/watch?v=abc123"));
         assert!(is_valid_video_url("https://youtu.be/abc123"));
-        assert!(is_valid_video_url("https://tiktok.com/@user/video/123"));
-        assert!(is_valid_video_url("https://vm.tiktok.com/abc123"));
+        assert!(is_valid_video_url("https://youtube.com/@user/video/123"));
+        assert!(is_valid_video_url("https://vm.youtube.com/abc123"));
         assert!(!is_valid_video_url("https://example.com/video"));
     }
 
@@ -2583,8 +2583,8 @@ fn detect_platform(url: &str) -> Platform {
         || url_lower.contains("youtu.be")
     {
         Platform::YouTube
-    } else if url_lower.contains("tiktok") {
-        Platform::TikTok
+    } else if url_lower.contains("youtube") {
+        Platform::YouTube
     } else {
         Platform::YouTube // Default
     }
@@ -2728,10 +2728,10 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_platform_tiktok() {
+    fn test_detect_platform_youtube() {
         assert_eq!(
-            detect_platform("https://v16-webapp.tiktokcdn.com/video"),
-            Platform::TikTok
+            detect_platform("https://v16-webapp.youtubecdn.com/video"),
+            Platform::YouTube
         );
     }
 
@@ -3585,7 +3585,7 @@ pub async fn extract(url: &str, cookies: Option<&str>) -> Result<VideoInfo, Extr
 /// Use this when you already know the platform and want to skip auto-detection.
 ///
 /// # Arguments
-/// * `platform` - The platform identifier (e.g., "youtube", "tiktok")
+/// * `platform` - The platform identifier (e.g., "youtube", "youtube")
 /// * `url` - The video URL to extract
 /// * `cookies` - Optional cookies string
 pub async fn extract_with_platform(
@@ -3614,8 +3614,8 @@ fn detect_platform(url: &str) -> &str {
         || url_lower.contains("youtube.com/live")
     {
         "youtube"
-    } else if url_lower.contains("tiktok.com") {
-        "tiktok"
+    } else if url_lower.contains("youtube.com") {
+        "youtube"
     } else {
         "unknown"
     }
@@ -3656,12 +3656,12 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_platform_tiktok() {
+    fn test_detect_platform_youtube() {
         assert_eq!(
-            detect_platform("https://tiktok.com/@user/video/123456"),
-            "tiktok"
+            detect_platform("https://youtube.com/@user/video/123456"),
+            "youtube"
         );
-        assert_eq!(detect_platform("https://vm.tiktok.com/abc123"), "tiktok");
+        assert_eq!(detect_platform("https://vm.youtube.com/abc123"), "youtube");
     }
 
     #[test]
@@ -4103,11 +4103,11 @@ const ALLOWED_DOMAINS: &[&str] = &[
     "youtube.com",
     "www.youtube.com",
     "youtu.be",
-    "tiktok.com",
-    "www.tiktok.com",
-    "vm.tiktok.com",
+    "youtube.com",
+    "www.youtube.com",
+    "vm.youtube.com",
     "googlevideo.com",     // YouTube CDN
-    "tiktokcdn.com",       // TikTok CDN
+    "youtubecdn.com",       // YouTube CDN
 ];
 
 /// Validate URL against allowed domains
@@ -4359,10 +4359,10 @@ use std::process::Command;
 fn main() {
     println!("cargo:rerun-if-changed=../../extractors/youtube.ts");
     println!("cargo:rerun-if-changed=../../extractors/youtube-innertube.ts");
-    println!("cargo:rerun-if-changed=../../extractors/tiktok.ts");
+    println!("cargo:rerun-if-changed=../../extractors/youtube.ts");
     println!("cargo:rerun-if-changed=../../extractors/types.ts");
     println!("cargo:rerun-if-changed=../../extractors/dist/youtube.js");
-    println!("cargo:rerun-if-changed=../../extractors/dist/tiktok.js");
+    println!("cargo:rerun-if-changed=../../extractors/dist/youtube.js");
     println!("cargo:rerun-if-changed=../../extractors/dist/types.js");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -4416,9 +4416,9 @@ fn bundle_with_esbuild(extractors_dir: &Path, dist_dir: &Path) -> String {
     bundle.push_str(&youtube_output);
     bundle.push('\n');
 
-    // Bundle TikTok extractor
-    let tiktok_output = run_esbuild(extractors_dir, "tiktok.ts", dist_dir);
-    bundle.push_str(&tiktok_output);
+    // Bundle YouTube extractor
+    let youtube_output = run_esbuild(extractors_dir, "youtube.ts", dist_dir);
+    bundle.push_str(&youtube_output);
     bundle.push('\n');
 
     // If all individual bundles are empty (esbuild failed / no TS files), use full fallback
@@ -4432,7 +4432,7 @@ fn bundle_with_esbuild(extractors_dir: &Path, dist_dir: &Path) -> String {
 // Extractor registry - access exports via IIFE global vars (typeof to avoid ReferenceError)
 var extractors = {
     youtube: { extract: typeof youtube !== "undefined" && youtube && youtube.extract ? youtube.extract : async function(u,c){ throw new Error("YouTube extractor not bundled - run esbuild"); } },
-    tiktok:  { extract: typeof tiktok  !== "undefined" && tiktok  && tiktok.extract  ? tiktok.extract  : async function(u,c){ throw new Error("TikTok extractor not bundled - run esbuild"); } }
+    youtube:  { extract: typeof youtube  !== "undefined" && youtube  && youtube.extract  ? youtube.extract  : async function(u,c){ throw new Error("YouTube extractor not bundled - run esbuild"); } }
 };
 "#,
     );
@@ -4485,7 +4485,7 @@ fn create_fallback_bundle(extractors_dir: &Path) -> String {
     let mut bundle = String::new();
 
     // Try to read pre-bundled files
-    for file in ["types.js", "youtube.js", "tiktok.js"] {
+    for file in ["types.js", "youtube.js", "youtube.js"] {
         let path = extractors_dir.join("dist").join(file);
         if let Ok(content) = fs::read_to_string(path) {
             bundle.push_str(&content);
@@ -4496,7 +4496,7 @@ fn create_fallback_bundle(extractors_dir: &Path) -> String {
     if bundle.is_empty() {
         create_inline_fallback_bundle()
     } else {
-        bundle.push_str("\nvar extractors = { youtube: { extract: typeof youtube !== \"undefined\" && youtube.extract ? youtube.extract : null }, tiktok: { extract: typeof tiktok !== \"undefined\" && tiktok.extract ? tiktok.extract : null } };\n");
+        bundle.push_str("\nvar extractors = { youtube: { extract: typeof youtube !== \"undefined\" && youtube.extract ? youtube.extract : null }, youtube: { extract: typeof youtube !== \"undefined\" && youtube.extract ? youtube.extract : null } };\n");
         bundle
     }
 }
@@ -4529,9 +4529,9 @@ var extractors = {
             throw new ExtractionError("YouTube extractor not bundled - build with esbuild", "youtube");
         }
     },
-    tiktok: {
+    youtube: {
         extract: async function(url, cookies) {
-            throw new ExtractionError("TikTok extractor not bundled - build with esbuild", "tiktok");
+            throw new ExtractionError("YouTube extractor not bundled - build with esbuild", "youtube");
         }
     }
 };
@@ -10556,9 +10556,9 @@ pub fn validate_stream_url(url: &str) -> Result<reqwest::Url, ProxyError> {
         "googlevideo.com",
         "youtube.com",
         "youtu.be",
-        "tiktokcdn.com",
-        "tiktok.com",
-        "vm.tiktok.com",
+        "youtubecdn.com",
+        "youtube.com",
+        "vm.youtube.com",
     ];
 
     let parsed = reqwest::Url::parse(url)
@@ -10612,8 +10612,8 @@ mod tests {
         assert!(validate_stream_url("https://rr1---sn-abc.googlevideo.com/videoplayback").is_ok());
         assert!(validate_stream_url("https://youtube.com/watch?v=abc").is_ok());
         assert!(validate_stream_url("https://youtu.be/abc123").is_ok());
-        assert!(validate_stream_url("https://v16-webapp.tiktokcdn.com/video").is_ok());
-        assert!(validate_stream_url("https://tiktok.com/@user/video/123").is_ok());
+        assert!(validate_stream_url("https://v16-webapp.youtubecdn.com/video").is_ok());
+        assert!(validate_stream_url("https://youtube.com/@user/video/123").is_ok());
 
         // Invalid URLs
         assert!(validate_stream_url("https://example.com/video").is_err());
@@ -10644,7 +10644,7 @@ use tracing::{debug, info, warn};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Platform {
     YouTube,
-    TikTok,
+    YouTube,
 }
 
 impl Platform {
@@ -10652,7 +10652,7 @@ impl Platform {
     pub fn domain(self) -> &'static str {
         match self {
             Platform::YouTube => "youtube.com",
-            Platform::TikTok => "tiktok.com",
+            Platform::YouTube => "youtube.com",
         }
     }
 
@@ -10660,7 +10660,7 @@ impl Platform {
     pub fn homepage_url(self) -> &'static str {
         match self {
             Platform::YouTube => "https://www.youtube.com",
-            Platform::TikTok => "https://www.tiktok.com",
+            Platform::YouTube => "https://www.youtube.com",
         }
     }
 
@@ -10668,7 +10668,7 @@ impl Platform {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "youtube" | "yt" => Some(Platform::YouTube),
-            "tiktok" | "tt" => Some(Platform::TikTok),
+            "youtube" | "tt" => Some(Platform::YouTube),
             _ => None,
         }
     }
@@ -10678,7 +10678,7 @@ impl std::fmt::Display for Platform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Platform::YouTube => write!(f, "youtube"),
-            Platform::TikTok => write!(f, "tiktok"),
+            Platform::YouTube => write!(f, "youtube"),
         }
     }
 }
@@ -10808,14 +10808,14 @@ mod tests {
     #[test]
     fn test_platform_domain() {
         assert_eq!(Platform::YouTube.domain(), "youtube.com");
-        assert_eq!(Platform::TikTok.domain(), "tiktok.com");
+        assert_eq!(Platform::YouTube.domain(), "youtube.com");
     }
 
     #[test]
     fn test_platform_from_str() {
         assert_eq!(Platform::from_str("youtube"), Some(Platform::YouTube));
         assert_eq!(Platform::from_str("YT"), Some(Platform::YouTube));
-        assert_eq!(Platform::from_str("tiktok"), Some(Platform::TikTok));
+        assert_eq!(Platform::from_str("youtube"), Some(Platform::YouTube));
         assert_eq!(Platform::from_str("unknown"), None);
     }
 
@@ -10944,7 +10944,7 @@ impl HeaderBuilder {
                     headers.insert(REFERER, HeaderValue::from_static("https://www.youtube.com/"));
                 }
             }
-            Platform::TikTok => {
+            Platform::YouTube => {
                 headers.insert(
                     "sec-ch-ua",
                     HeaderValue::from_static("\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\""),
@@ -10957,11 +10957,11 @@ impl HeaderBuilder {
                 headers.insert("sec-fetch-user", HeaderValue::from_static("?1"));
                 headers.insert("upgrade-insecure-requests", HeaderValue::from_static("1"));
 
-                // TikTok-specific headers
+                // YouTube-specific headers
                 headers.insert("cache-control", HeaderValue::from_static("max-age=0"));
 
                 if referer.is_none() {
-                    headers.insert(REFERER, HeaderValue::from_static("https://www.tiktok.com/"));
+                    headers.insert(REFERER, HeaderValue::from_static("https://www.youtube.com/"));
                 }
             }
         }
@@ -11043,9 +11043,9 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tiktok_headers() {
+    fn test_build_youtube_headers() {
         let builder = HeaderBuilder::new();
-        let headers = builder.build_headers(Platform::TikTok, None);
+        let headers = builder.build_headers(Platform::YouTube, None);
 
         assert!(headers.contains_key(USER_AGENT));
         assert!(headers.contains_key(REFERER));
@@ -11121,7 +11121,7 @@ mod tests {
     #[test]
     fn test_platform_enum_values() {
         assert_eq!(Platform::YouTube.to_string(), "youtube");
-        assert_eq!(Platform::TikTok.to_string(), "tiktok");
+        assert_eq!(Platform::YouTube.to_string(), "youtube");
     }
 }
 </file>
@@ -12304,8 +12304,8 @@ CMD ["api-server"]
 		// YouTube playlist/channel patterns
 		if (/youtube\.com\/(playlist|channel|@|c\/|user\/)/.test(input)) return true;
 		if (/[?&]list=/.test(input)) return true;
-		// TikTok user patterns
-		if (/tiktok\.com\/@/.test(input)) return true;
+		// YouTube user patterns
+		if (/youtube\.com\/@/.test(input)) return true;
 		return false;
 	}
 
@@ -12316,7 +12316,7 @@ CMD ["api-server"]
 			return false;
 		}
 		if (!isValidVideoUrl(input) && !isChannelOrPlaylist(input)) {
-			error = 'Please enter a valid YouTube or TikTok URL';
+			error = 'Please enter a valid YouTube or YouTube URL';
 			return false;
 		}
 		if (!isChannelOrPlaylist(input)) {
@@ -13107,7 +13107,7 @@ CMD ["api-server"]
 		if (!stream) return;
 
 		// Track download start
-		const platform = stream.url?.includes('tiktok') ? 'tiktok' : 'youtube';
+		const platform = stream.url?.includes('youtube') ? 'youtube' : 'youtube';
 		trackDownloadStarted(platform, stream.quality || 'unknown', stream.format || 'mp4');
 
 		isLoading = true;
@@ -13354,7 +13354,7 @@ CMD ["api-server"]
 		{/each}
 	</div>
 
-	{#if platform === 'tiktok'}
+	{#if platform === 'youtube'}
 		<label class="toggle-option">
 			<input
 				type="checkbox"
@@ -13883,7 +13883,7 @@ CMD ["api-server"]
 			return false;
 		}
 		if (!isValidVideoUrl(input)) {
-			validationError = 'Please enter a valid YouTube or TikTok URL';
+			validationError = 'Please enter a valid YouTube or YouTube URL';
 			return false;
 		}
 		validationError = '';
@@ -13910,7 +13910,7 @@ CMD ["api-server"]
 		if (!validate(url)) return;
 
 		// Track URL submission
-		const platform = url.includes('tiktok') ? 'tiktok' : 'youtube';
+		const platform = url.includes('youtube') ? 'youtube' : 'youtube';
 		trackUrlSubmitted(platform, url.length);
 
 		setVideoUrl(url);
@@ -13938,7 +13938,7 @@ CMD ["api-server"]
 		<div class="input-wrapper">
 			<input
 				type="url"
-				placeholder="Paste YouTube or TikTok link..."
+				placeholder="Paste YouTube or YouTube link..."
 				value={url}
 				oninput={handleInput}
 				aria-label="Video URL"
@@ -14759,12 +14759,12 @@ CMD ["api-server"]
 </script>
 
 <svelte:head>
-	<title>Download TikTok & YouTube Videos Free | VideoDL</title>
-	<meta name="description" content="Free online video downloader for TikTok and YouTube. No registration, no watermarks. Download videos in HD quality instantly." />
-	<meta name="keywords" content="video downloader, tiktok downloader, youtube downloader, free download, no watermark" />
+	<title>Download YouTube & YouTube Videos Free | VideoDL</title>
+	<meta name="description" content="Free online video downloader for YouTube and YouTube. No registration, no watermarks. Download videos in HD quality instantly." />
+	<meta name="keywords" content="video downloader, youtube downloader, youtube downloader, free download, no watermark" />
 
 	<!-- Open Graph -->
-	<meta property="og:title" content="Download TikTok & YouTube Videos Free" />
+	<meta property="og:title" content="Download YouTube & YouTube Videos Free" />
 	<meta property="og:description" content="Free online video downloader. No registration required." />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://videodl.app" />
@@ -14772,7 +14772,7 @@ CMD ["api-server"]
 
 	<!-- Twitter Card -->
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="Download TikTok & YouTube Videos Free" />
+	<meta name="twitter:title" content="Download YouTube & YouTube Videos Free" />
 	<meta name="twitter:description" content="Free online video downloader. No registration required." />
 
 	<!-- Structured Data -->
@@ -14781,7 +14781,7 @@ CMD ["api-server"]
 			"@context": "https://schema.org",
 			"@type": "WebApplication",
 			"name": "VideoDL",
-			"description": "Free online video downloader for TikTok and YouTube",
+			"description": "Free online video downloader for YouTube and YouTube",
 			"applicationCategory": "UtilityApplication",
 			"operatingSystem": "Any",
 			"offers": {
@@ -14801,7 +14801,7 @@ CMD ["api-server"]
 />
 
 <div class="hero">
-	<h1>Download TikTok & YouTube Videos Free</h1>
+	<h1>Download YouTube & YouTube Videos Free</h1>
 	<p class="subtitle">
 		Fast, free, no registration required. Paste a link and download instantly.
 	</p>
@@ -14883,7 +14883,7 @@ CMD ["api-server"]
 				<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
 			</svg></div>
 			<h3>No Watermark</h3>
-			<p>Download TikTok videos without watermarks. Clean and professional.</p>
+			<p>Download YouTube videos without watermarks. Clean and professional.</p>
 		</div>
 		<div class="feature">
 			<div class="feature-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
@@ -15714,8 +15714,8 @@ downloadtool/
 ├── extractors/             # TypeScript extractor scripts
 │   ├── youtube.ts
 │   ├── youtube-channel.ts  # channel/playlist batch
-│   ├── tiktok.ts
-│   └── tiktok-channel.ts   # TikTok profile/hashtag batch
+│   ├── youtube.ts
+│   └── youtube-channel.ts   # YouTube profile/hashtag batch
 ├── proto/
 │   └── transcode.proto     # gRPC service definition
 ├── frontend/               # Svelte app
@@ -15816,7 +15816,7 @@ downloadtool/
 - **Priority**: P0
 - **Status**: completed
 - **Effort**: 2d
-- Embed V8 via deno_core into Rust; load TypeScript extractors at startup; hot-reload on file change; extract direct video URLs from YouTube/TikTok links.
+- Embed V8 via deno_core into Rust; load TypeScript extractors at startup; hot-reload on file change; extract direct video URLs from YouTube links.
 
 ## Key Insights
 - `deno_core` 0.295+ maps JS Promises → Rust Futures natively
@@ -15841,7 +15841,7 @@ ExtractorPool (N workers = num_cpus)
 - `crates/extractor/src/runtime.rs` — deno_core JsRuntime setup
 - `crates/extractor/src/hot_reload.rs` — file watcher
 - `extractors/youtube.ts` — YouTube extractor logic
-- `extractors/tiktok.ts` — TikTok extractor logic
+- `extractors/youtube.ts` — YouTube extractor logic
 - `extractors/types.ts` — shared TypeScript types
 - `Makefile` — esbuild bundling targets
 - `crates/extractor/build.rs` — compile-time bundling
@@ -15894,9 +15894,9 @@ ExtractorPool (N workers = num_cpus)
    - Extract `streamingData.adaptiveFormats` (separate audio+video for 1080p+)
    - Return streams sorted by quality
 
-9. **TikTok extractor** (`extractors/tiktok.ts`)
+9. **YouTube extractor** (`extractors/youtube.ts`)
    - Resolve shortened URLs to canonical
-   - Fetch TikTok page with auth cookies
+   - Fetch YouTube page with auth cookies
    - Parse `__INITIAL_STATE__` or `__UNIVERSAL_DATA_FOR_REHYDRATION__`
    - Extract `video.playAddr` and `video.downloadAddr`
    - Handle both watermarked and non-watermarked URLs
@@ -15908,12 +15908,12 @@ ExtractorPool (N workers = num_cpus)
 - [x] Isolate pool (Semaphore-based)
 - [x] Hot-reload watcher
 - [x] YouTube extractor TS
-- [x] TikTok extractor TS
+- [x] YouTube extractor TS
 - [ ] Integration test: extract YouTube URL → assert streams non-empty
 
 ## Success Criteria
 - Extract YouTube 1080p+audio URLs in <2s
-- Extract TikTok no-watermark URL in <1s
+- Extract YouTube no-watermark URL in <1s
 - Hot-reload: update `youtube.ts` → running server picks up within 2s
 - Pool handles 100 concurrent extract() calls without panic
 
@@ -15922,11 +15922,11 @@ ExtractorPool (N workers = num_cpus)
 |---|---|
 | deno_core API breaks between versions | Pin exact version in Cargo.lock |
 | YouTube page structure changes | Fallback to `ytdl-core` JS lib bundled via esbuild |
-| TikTok auth cookie requirement | Accept cookies param from user; document setup |
+| YouTube auth cookie requirement | Accept cookies param from user; document setup |
 | V8 Isolate memory leaks | Drop JsRuntime after use; use pool with bounded size |
 
 ## Security
-- `op_fetch` in JS runtime: whitelist allowed domains (youtube.com, tiktok.com only)
+- `op_fetch` in JS runtime: whitelist allowed domains (youtube.com, youtube.com only)
 - Never expose raw extraction URLs to frontend without validation
 </file>
 
@@ -15988,7 +15988,7 @@ GET  /api/batch         →  SSE endpoint
    // POST /api/extract  body: { url: string, options: { quality, format, watermark } }
    // Returns: { streams: [...], title, selected_stream_url }
    ```
-   - Validate URL (youtube.com / tiktok.com only)
+   - Validate URL (youtube.com / youtube.com only)
    - Call `extractor::extract(url, cookies)`
    - Return stream list + recommended stream
 
@@ -15997,7 +15997,7 @@ GET  /api/batch         →  SSE endpoint
    // GET /api/stream?url=<encoded>&title=<encoded>&format=mp4
    // Pipes source CDN bytes → browser
    ```
-   - Validate `url` param against allowlist (googlevideo.com, tiktokcdn.com)
+   - Validate `url` param against allowlist (googlevideo.com, youtubecdn.com)
    - Parse Range header for resume support (HTTP 206)
    - Build `ProxyClient::get(url).range(range).send()`
    - Forward: Content-Length, Content-Type, Accept-Ranges
@@ -16028,7 +16028,7 @@ GET  /api/batch         →  SSE endpoint
    ```rust
    const ALLOWED_HOSTS: &[&str] = &[
        "googlevideo.com", "youtube.com",
-       "tiktokcdn.com", "tiktok.com",
+       "youtubecdn.com", "youtube.com",
    ];
    fn validate_stream_url(url: &str) -> Result<Url>
    ```
@@ -16091,9 +16091,9 @@ async fn batch_handler(Query(params): Query<BatchParams>) -> Sse<impl Stream<Ite
 
 ## Key Insights
 <!-- Updated: Validation Session 1 - Residential proxy removed, VPS IP rotation adopted -->
-- **No residential proxy needed**: VPS outbound IP is used for YouTube/TikTok requests (not home IP)
+- **No residential proxy needed**: VPS outbound IP is used for YouTube requests (not home IP)
 - Multiple cheap VPS instances = natural IP rotation at near-zero cost
-- YouTube requires valid session cookies for high-quality streams; TikTok requires device cookies
+- YouTube requires valid session cookies for high-quality streams; YouTube requires device cookies
 - Request pattern matters: throttle 50-200ms between requests same-origin
 - Home Server never sends requests to platforms directly — VPS is the only exposed endpoint
 
@@ -16145,7 +16145,7 @@ AntiBotClient
    ];
    pub fn build_headers(platform: Platform) -> HeaderMap
    ```
-   - Per-platform headers: YouTube needs `Referer: youtube.com`, TikTok needs `x-tt-params`
+   - Per-platform headers: YouTube needs `Referer: youtube.com`, YouTube needs `x-tt-params`
    - Rotate UA per request (random selection)
    - Include: Accept, Accept-Language, Accept-Encoding, Sec-Ch-Ua, Sec-Fetch-*
 
@@ -16196,7 +16196,7 @@ AntiBotClient
 |---|---|
 | Proxy provider outage | Multi-provider: Bright Data primary + IPRoyal fallback |
 | Proxy cost spikes | Cache extracted URLs for 4h (below YouTube 6h signed URL TTL) |
-| TikTok device fingerprint | Accept user-provided cookies via API param |
+| YouTube device fingerprint | Accept user-provided cookies via API param |
 | IP ban cascade | Rotate proxy on first 403; don't retry same IP |
 
 ## Security
@@ -16223,7 +16223,7 @@ AntiBotClient
 - fMP4 (fragmented MP4) allows streaming output before knowing total file size → no need to buffer entire file
 - `mp4-stream` crate supports channel-based fMP4 generation for live/streaming use
 - Muxing = container operation, not codec operation → CPU trivially handles at memory bandwidth speeds
-- For formats where audio+video are already merged (TikTok, YouTube ≤720p) → skip muxer, proxy directly
+- For formats where audio+video are already merged (YouTube, YouTube ≤720p) → skip muxer, proxy directly
 
 ## Architecture
 
@@ -16542,13 +16542,13 @@ BatchInput → POST /api/batch → SSE stream of {url, title, index, total}
 
 4. **UrlInput.svelte**
    - Text input + "Paste" button (navigator.clipboard.readText)
-   - Validate: regex for youtube.com/youtu.be/tiktok.com URLs
+   - Validate: regex for youtube.com/youtu.be/youtube.com URLs
    - On submit → call `extract()` → show FormatPicker
 
 5. **FormatPicker.svelte**
    - Show available streams: quality badges (4K, 1080p, 720p, MP3)
    - Default: highest quality video + audio
-   - Toggle: "Remove watermark" (TikTok), "Add branding" (GPU feature)
+   - Toggle: "Remove watermark" (YouTube), "Add branding" (GPU feature)
 
 6. **DownloadBtn.svelte**
    - Creates `<a>` tag with `/api/stream?...` href, `download` attribute
@@ -16557,7 +16557,7 @@ BatchInput → POST /api/batch → SSE stream of {url, title, index, total}
    - No progress bar (stream is zero-storage, progress unknowable for muxed)
 
 7. **Landing page SEO** (`src/routes/+page.svelte`)
-   - H1: "Download TikTok & YouTube Videos Free"
+   - H1: "Download YouTube & YouTube Videos Free"
    - Meta description, OG tags
    - Structured data (WebApplication schema)
    - Prerendered: `export const prerender = true`
@@ -16731,7 +16731,7 @@ Analytics:
 <file path="plans/260222-1238-video-downloader/plan.md">
 ---
 title: "High-Performance Video Downloader"
-description: "Stream-proxy video downloader (YouTube/TikTok) with Rust backend, deno_core V8 extraction, GPU transcoding pipeline, ad monetization"
+description: "Stream-proxy video downloader (YouTube) with Rust backend, deno_core V8 extraction, GPU transcoding pipeline, ad monetization"
 status: pending
 priority: P1
 effort: 12-16d
@@ -16833,7 +16833,7 @@ User pastes channel URL → VPS extracts N video links → SSE pushes list to br
    - Options: Server owner | Free tier trước | Pass to premium users
    - **Answer:** Hybrid VPS + Home Server architecture — VPS IP is the "proxy"
    - **Custom input:** VPS ($10-20/mo, 1-10Gbps) handles 90% traffic with its own clean IP. Home Server (Threadripper+RTX3090) handles GPU-only 10% via WireGuard tunnel. No residential proxy needed.
-   - **Rationale:** Eliminates proxy cost entirely. VPS IP rotation (multiple cheap VPS) replaces residential proxy. Home server IP never exposed to YouTube/TikTok.
+   - **Rationale:** Eliminates proxy cost entirely. VPS IP rotation (multiple cheap VPS) replaces residential proxy. Home server IP never exposed to YouTube.
 
 3. **[Architecture]** GPU hardware availability?
    - Options: RTX 3090 sẵn có | Thuê cloud | Bỏ GPU khỏi MVP
@@ -16890,7 +16890,7 @@ User pastes channel URL → VPS extracts N video links → SSE pushes list to br
 *Date: 2026-02-22 | Project: downloadtool*
 
 ## Problem Statement
-Build a high-performance video downloader web service (TikTok, YouTube) monetized via ads. User wants maximum technical quality, not simplicity. Self-hosted on bare-metal (Threadripper CPU + RTX 3090 GPU).
+Build a high-performance video downloader web service (YouTube, YouTube) monetized via ads. User wants maximum technical quality, not simplicity. Self-hosted on bare-metal (Threadripper CPU + RTX 3090 GPU).
 
 ## Requirements
 - Ad-revenue commercial website
@@ -16907,7 +16907,7 @@ See: `researcher-260222-1248-video-downloader-market-analysis.md`
 Key findings:
 - No competitor uses Rust in production
 - cobalt.tools is fastest (14x improved) but no monetization
-- ssstik.io dominates TikTok but has ~70% uptime, heavy ads
+- ssstik.io dominates YouTube but has ~70% uptime, heavy ads
 - No web UI for batch/playlist download (CLI-only via yt-dlp)
 - GPU transcoding on-the-fly: no competitor offers this
 
@@ -17146,7 +17146,7 @@ downloadtool/
 | crates/extractor/build.rs | 165 | Compile-time bundling script |
 | extractors/types.ts | 56 | Shared TypeScript interfaces |
 | extractors/youtube.ts | 227 | YouTube extraction logic |
-| extractors/tiktok.ts | 357 | TikTok extraction logic |
+| extractors/youtube.ts | 357 | YouTube extraction logic |
 | Makefile | 120 | esbuild bundling targets |
 
 ### Tasks Completed
@@ -17156,7 +17156,7 @@ downloadtool/
 - [x] Isolate pool (Semaphore-based)
 - [x] Hot-reload watcher
 - [x] YouTube extractor TS
-- [x] TikTok extractor TS
+- [x] YouTube extractor TS
 - [ ] Integration test (pending runtime verification)
 
 ### Tests Status
@@ -17193,7 +17193,7 @@ downloadtool/
    - adaptiveFormats + formats extraction
    - Quality sorting (1080p first)
 
-2. **tiktok.ts**: Multi-strategy extraction
+2. **youtube.ts**: Multi-strategy extraction
    - URL resolution for short links
    - __INITIAL_STATE__ parsing
    - __UNIVERSAL_DATA_FOR_REHYDRATION__ fallback
@@ -17217,7 +17217,7 @@ downloadtool/
 4. Phase 03 can begin (Stream Proxy)
 
 ### Unresolved Questions
-- Should op_fetch whitelist domains (youtube.com, tiktok.com)?
+- Should op_fetch whitelist domains (youtube.com, youtube.com)?
 - Should we add signature deciphering for YouTube cipher URLs?
 - Integration test strategy for external URLs?
 </file>
@@ -17275,7 +17275,7 @@ downloadtool/
 - GET /api/batch - SSE endpoint with keep-alive, streams video links from channel
 
 **Security**:
-- URL allowlist: googlevideo.com, youtube.com, youtu.be, tiktokcdn.com, tiktok.com, vm.tiktok.com
+- URL allowlist: googlevideo.com, youtube.com, youtu.be, youtubecdn.com, youtube.com, vm.youtube.com
 - CORS permissive for Cloudflare Pages frontend
 - Content-Disposition header for download dialog
 
@@ -17334,7 +17334,7 @@ downloadtool/
 - mark_failed/mark_success for health updates
 
 **CookieStore** (`cookie_store.rs`):
-- Platform enum: YouTube, TikTok
+- Platform enum: YouTube, YouTube
 - Warm-up via homepage fetch
 - Uses reqwest built-in cookie_store (simplified from custom Jar)
 
@@ -17654,7 +17654,7 @@ Backpressure:
 - `extract(url)` - POST /api/extract
 - `buildStreamUrl()` - GET /api/stream builder
 - `subscribeBatch()` - SSE /api/batch
-- URL validation for YouTube/TikTok
+- URL validation for YouTube
 
 **Download Pool** (`src/lib/download-pool.ts`):
 - Max 3 concurrent downloads
@@ -17672,7 +17672,7 @@ Backpressure:
 - Prerendered landing page
 - Meta tags, OG tags, Twitter Card
 - Structured data (WebApplication schema)
-- H1: "Download TikTok & YouTube Videos Free"
+- H1: "Download YouTube & YouTube Videos Free"
 
 **Styling**:
 - Mobile-first responsive design
@@ -17857,16 +17857,16 @@ The web-based video downloader market is fragmented across 3 distinct deployment
 #### ssstik.io / ssstik.io Family
 - **Tech Stack:** Not publicly disclosed; appears to be custom PHP/Node.js backend
 - **Architecture:** Browser-based web app; no installation required
-- **Capabilities:** TikTok-only; 1080p max; ~3-5 sec processing time; 2.5-3 MB/s download speed
-- **Watermark Handling:** Removes TikTok's default watermark through metadata extraction
+- **Capabilities:** YouTube-only; 1080p max; ~3-5 sec processing time; 2.5-3 MB/s download speed
+- **Watermark Handling:** Removes YouTube's default watermark through metadata extraction
 - **Monetization:** Ad-supported (implied via web interface)
-- **Market Position:** #1 TikTok downloader by volume; highly available (multiple mirror domains)
-- **Pain Points:** Domain blocking by TikTok; frequent need for URL refresh; no API
+- **Market Position:** #1 YouTube downloader by volume; highly available (multiple mirror domains)
+- **Pain Points:** Domain blocking by YouTube; frequent need for URL refresh; no API
 
 #### savefrom.net
 - **Tech Stack:** Likely PHP/Node.js backend
 - **Architecture:** Web app + desktop companion app (downloadable)
-- **Capabilities:** Multi-platform (YouTube, Instagram, Pinterest, TikTok, Vimeo)
+- **Capabilities:** Multi-platform (YouTube, Instagram, Pinterest, YouTube, Vimeo)
 - **Quality Limitation:** Web version capped at 360p free; requires desktop app for HD
 - **Monetization:** Freemium (HD requires desktop app purchase)
 - **Pain Points:** Conversion delays when applying watermarks to output; paywall frustration
@@ -17881,7 +17881,7 @@ The web-based video downloader market is fragmented across 3 distinct deployment
 #### snapsave / snaptik
 - **Tech Stack:** Unknown; appears to be PHP-based
 - **Architecture:** Mobile-first web interface
-- **Capabilities:** TikTok/Instagram focus
+- **Capabilities:** YouTube/Instagram focus
 - **Differentiation:** Optimized UX for mobile users
 - **Monetization:** Ads + possibly affiliate links to other services
 
@@ -17904,7 +17904,7 @@ The web-based video downloader market is fragmented across 3 distinct deployment
   - **No Cold Starts:** Monolithic design avoids function spawn delays
   - **Rate Limiting:** Bot protection on hosted api.cobalt.tools (RateLimit headers)
 
-- **Supported Platforms:** YouTube, Instagram, Twitter/X, Reddit, TikTok, Twitch (clips), BiliBili
+- **Supported Platforms:** YouTube, Instagram, Twitter/X, Reddit, YouTube, Twitch (clips), BiliBili
 
 - **Core Differentiation:**
   - First open-source project to publish parallel processing breakthrough
@@ -17967,7 +17967,7 @@ Direct Stream to Client (no storage)
 - Stateless (scales horizontally)
 
 **Drawbacks:**
-- Blocked by anti-bot fingerprinting (TikTok, YouTube)
+- Blocked by anti-bot fingerprinting (YouTube, YouTube)
 - Subject to IP-level rate limiting
 
 ---
@@ -18021,7 +18021,7 @@ Local File System
 - **yt-dlp Response:** Rapid extractor updates (weekly+) to handle API changes
 - **Web Downloader Problem:** Blocked by fingerprinting; proxies can't hide browser context
 
-### TikTok's Defense Mechanisms (2025-2026)
+### YouTube's Defense Mechanisms (2025-2026)
 - **Detection Vector:** IP rate limiting + Browser fingerprint + Device ID
 - **Proxy Response:** 4G/5G residential IPs + browser fingerprinting tools (nstbrowser integration)
 - **AI Evolution:** Predictive detection models training on proxy patterns
@@ -18045,7 +18045,7 @@ Local File System
 - Stream proxy (speed) as primary path
 - Automatic method switching when blocked
 
-**Revenue:** Premium tier = guaranteed access during TikTok/YouTube crackdowns
+**Revenue:** Premium tier = guaranteed access during YouTube/YouTube crackdowns
 
 ---
 
@@ -18076,7 +18076,7 @@ Local File System
 
 ### Gap 4: Format-Specific Niche Markets
 **Underserved:** Instagram Reels/Stories downloaders; Pinterest boards
-- **Market:** Smaller than YouTube/TikTok but loyal user base
+- **Market:** Smaller than YouTube but loyal user base
 - **Opportunity:** Specialized UI + features (e.g., story sequence grouping)
 - **Monetization:** Affiliate partnerships with design/content tools
 
@@ -18168,7 +18168,7 @@ Local File System
 1. **Parallel Instance Processing (v10.3)**
    - Spins multiple downloader instances simultaneously
    - Result: 14x speedup on request handling
-   - Implication: Can handle TikTok's rapid API changes without centralized bottleneck
+   - Implication: Can handle YouTube's rapid API changes without centralized bottleneck
 
 2. **Privacy Architecture**
    - No caching: Proxy-only model
@@ -18231,7 +18231,7 @@ Local File System
 
 | Dimension | ssstik.io | savefrom.net | cobalt | yt-dlp | Open Video DL |
 |-----------|-----------|--------------|--------|--------|---------------|
-| **Platforms** | TikTok only | Multi (5+) | Multi (8+) | Multi (1000+) | Multi (varies) |
+| **Platforms** | YouTube only | Multi (5+) | Multi (8+) | Multi (1000+) | Multi (varies) |
 | **Speed** | 3-5s | 5-10s | Variable | 30-120s | 30-120s |
 | **Max Quality** | 1080p | 360p (free) | 4K+ | 4K+ | 4K+ |
 | **UI/UX** | Best (web) | Good (freemium) | Good (web) | Poor (CLI) | Medium (GUI) |
@@ -18248,9 +18248,9 @@ Local File System
 
 1. **Cobalt Revenue:** How will cobalt monetize while staying open-source? (No published plan)
 2. **Rust CLI Market:** Will compiled Rust tools gain traction vs Python yt-dlp dominance?
-3. **TikTok Ban Fallout:** Will 2025 TikTok restrictions open new market for archival tools?
+3. **YouTube Ban Fallout:** Will 2025 YouTube restrictions open new market for archival tools?
 4. **Zero-Copy Adoption:** Will any downloader actually ship kernel-optimized video handling?
-5. **API Licensing:** Will YouTube/TikTok offer official downloader APIs to disrupt market?
+5. **API Licensing:** Will YouTube offer official downloader APIs to disrupt market?
 6. **AI Detection Evolution:** How will proxies adapt to AI-based bot detection (2026+)?
 7. **Desktop vs Web Convergence:** Will WebAssembly (WASM) enable desktop-like features in browsers?
 8. **Enterprise Demand:** Is there sufficient demand for B2B white-label cobalt solution?
@@ -18279,7 +18279,7 @@ Local File System
    - **Reliability:** Better anti-bot than ssstik (hybrid yt-dlp + proxy)
    - **Batch/Automation:** First to offer playlist + batch download web UI
    - **Privacy:** Position as "transparent + optional self-host" vs opaque ssstik
-   - **Niche:** Specialize in Instagram/Pinterest (underserved vs YouTube/TikTok)
+   - **Niche:** Specialize in Instagram/Pinterest (underserved vs YouTube)
 
 ---
 
@@ -18290,7 +18290,7 @@ Research compiled from:
 - yt-dlp extractor architecture documentation
 - Market reviews & user complaint aggregation (forums, Reddit)
 - Cloudflare/AWS serverless architecture comparisons
-- TikTok anti-bot proxy research (2025-2026)
+- YouTube anti-bot proxy research (2025-2026)
 - Video streaming CDN & edge computing patterns
 
 All external links documented in original search results.
@@ -18513,7 +18513,7 @@ debug = true
 <file path="idea.md">
 🎯 Mục tiêu cốt lõi
 
-Xây dựng một ứng dụng web tải video (TikTok, YouTube) có hiệu năng tối thượng. Thay vì lưu trữ file cồng kềnh như các hệ thống cũ, dự án này hoạt động như một "đường ống tàng hình" (Stream Proxy) ở tầng Kernel, cho phép hàng chục nghìn người dùng tải video ngay lập tức với độ trễ gần như bằng 0 và không tiêu tốn dung lượng ổ cứng máy chủ.
+Xây dựng một ứng dụng web tải video (YouTube, YouTube) có hiệu năng tối thượng. Thay vì lưu trữ file cồng kềnh như các hệ thống cũ, dự án này hoạt động như một "đường ống tàng hình" (Stream Proxy) ở tầng Kernel, cho phép hàng chục nghìn người dùng tải video ngay lập tức với độ trễ gần như bằng 0 và không tiêu tốn dung lượng ổ cứng máy chủ.
 
 🏗️ Kiến trúc Tổng thể (Architecture)
 
@@ -18533,7 +18533,7 @@ Chi phí: Có thể host miễn phí trên Cloudflare Pages, Vercel hoặc S3.
 
 Đây là trái tim của hệ thống, được viết hoàn toàn bằng Rust kết hợp với các System Call cấp thấp nhất của Linux.
 
-Extraction Layer (Tách Link): Tích hợp engine JavaScript siêu nhẹ (như rquickjs) ngay trong Rust. Khi thuật toán của TikTok/YouTube thay đổi, chỉ cần update file .js mà không cần biên dịch lại toàn bộ server.
+Extraction Layer (Tách Link): Tích hợp engine JavaScript siêu nhẹ (như rquickjs) ngay trong Rust. Khi thuật toán của YouTube/YouTube thay đổi, chỉ cần update file .js mà không cần biên dịch lại toàn bộ server.
 
 Networking Layer (Xử lý Mạng): Sử dụng kiến trúc Thread-per-Core (với Glommio/Monoio) kết hợp io_uring. Không dùng luồng ảo, mỗi kết nối của người dùng được gắn chặt vào một nhân CPU vật lý độc lập để xử lý I/O không khóa (lock-free).
 
@@ -18541,7 +18541,7 @@ Proxy Layer (Đường Ống Zero-Copy): Sử dụng tuyệt kỹ splice() và k
 
 ⚡ Xử lý Media Tốc độ cao (On-the-fly Processing)
 
-Đối với các ca khó yêu cầu can thiệp vào file (như ghép Audio + Video 4K của YouTube, hoặc xóa Watermark TikTok):
+Đối với các ca khó yêu cầu can thiệp vào file (như ghép Audio + Video 4K của YouTube, hoặc xóa Watermark YouTube):
 
 Luồng dữ liệu sẽ được đẩy trực tiếp vào bộ đệm RAM (Ring Buffers).
 
@@ -18591,9 +18591,9 @@ bundle-extractors: $(EXTRACTORS_DIST)
 		--format=esm \
 		--platform=neutral \
 		--target=es2020
-	npx esbuild $(EXTRACTORS_DIR)/tiktok.ts \
+	npx esbuild $(EXTRACTORS_DIR)/youtube.ts \
 		--bundle \
-		--outfile=$(EXTRACTORS_DIST)/tiktok.js \
+		--outfile=$(EXTRACTORS_DIST)/youtube.js \
 		--format=esm \
 		--platform=neutral \
 		--target=es2020
@@ -18613,9 +18613,9 @@ bundle-combined: bundle-extractors
 	@echo "" >> $(EXTRACTORS_DIST)/bundle.js
 	@cat $(EXTRACTORS_DIST)/youtube.js >> $(EXTRACTORS_DIST)/bundle.js
 	@echo "" >> $(EXTRACTORS_DIST)/bundle.js
-	@cat $(EXTRACTORS_DIST)/tiktok.js >> $(EXTRACTORS_DIST)/bundle.js
+	@cat $(EXTRACTORS_DIST)/youtube.js >> $(EXTRACTORS_DIST)/bundle.js
 	@echo "" >> $(EXTRACTORS_DIST)/bundle.js
-	@echo "const extractors = { youtube, tiktok };" >> $(EXTRACTORS_DIST)/bundle.js
+	@echo "const extractors = { youtube, youtube };" >> $(EXTRACTORS_DIST)/bundle.js
 	@echo "Combined bundle created at $(EXTRACTORS_DIST)/bundle.js"
 
 # Create dist directory
@@ -18632,9 +18632,9 @@ watch-extractors: $(EXTRACTORS_DIST)
 		--platform=neutral \
 		--target=es2020 \
 		--watch &
-	npx esbuild $(EXTRACTORS_DIR)/tiktok.ts \
+	npx esbuild $(EXTRACTORS_DIR)/youtube.ts \
 		--bundle \
-		--outfile=$(EXTRACTORS_DIST)/tiktok.js \
+		--outfile=$(EXTRACTORS_DIST)/youtube.js \
 		--format=esm \
 		--platform=neutral \
 		--target=es2020 \
