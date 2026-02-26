@@ -29,10 +29,6 @@ serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# gRPC for GPU worker communication
-tonic = "0.12"
-prost = "0.13"
-
 # Error handling
 thiserror = "1"
 anyhow = "1"

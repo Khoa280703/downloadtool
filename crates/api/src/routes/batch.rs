@@ -4,11 +4,11 @@
 
 use axum::extract::Query;
 use axum::response::{sse::Event, IntoResponse, Sse};
-use futures::stream::{self, BoxStream, Stream, StreamExt};
+use futures::stream::{self, BoxStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::time::Duration;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Query parameters for batch extraction.
 #[derive(Debug, Deserialize)]

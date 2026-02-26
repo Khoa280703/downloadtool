@@ -47,14 +47,6 @@ extractor = { path = "../extractor" }
 proxy = { path = "../proxy" }
 muxer = { path = "../muxer" }
 
-# GPU support (optional)
-gpu-pipeline = { path = "../gpu-pipeline", optional = true }
-tonic = { workspace = true, optional = true }
-
-[features]
-default = []
-gpu = ["dep:gpu-pipeline", "dep:tonic"]
-
 [[bin]]
 name = "api-server"
 path = "src/main.rs"

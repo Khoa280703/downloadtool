@@ -212,12 +212,6 @@
 		</div>
 	{/if}
 
-	<label class="toggle-option">
-		<input type="checkbox" disabled />
-		<span class="toggle-slider"></span>
-		<span class="toggle-label">Add branding (GPU)</span>
-		<span class="coming-soon">Soon</span>
-	</label>
 </div>
 
 <style>
@@ -297,63 +291,6 @@
 	.mux-badge {
 		font-size: 0.65rem;
 		opacity: 0.7;
-	}
-
-	.toggle-option {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		cursor: pointer;
-		padding: 0.5rem 0;
-	}
-
-	.toggle-option input {
-		display: none;
-	}
-
-	.toggle-slider {
-		width: 44px;
-		height: 24px;
-		background: var(--border-color, #e5e7eb);
-		border-radius: 12px;
-		position: relative;
-		flex-shrink: 0;
-		opacity: 0.5;
-	}
-
-	.toggle-slider::after {
-		content: '';
-		position: absolute;
-		width: 20px;
-		height: 20px;
-		background: white;
-		border-radius: 50%;
-		top: 2px;
-		left: 2px;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-	}
-
-	.toggle-option input:checked + .toggle-slider {
-		background: var(--primary-color, #3b82f6);
-		opacity: 1;
-	}
-
-	.toggle-option input:checked + .toggle-slider::after {
-		transform: translateX(20px);
-	}
-
-	.toggle-label {
-		font-size: 0.875rem;
-		color: var(--text-color, #111827);
-	}
-
-	.coming-soon {
-		font-size: 0.625rem;
-		padding: 0.125rem 0.375rem;
-		background: var(--border-color, #e5e7eb);
-		color: var(--text-secondary, #6b7280);
-		border-radius: 0.25rem;
-		margin-left: auto;
 	}
 
 	@media (prefers-color-scheme: dark) {

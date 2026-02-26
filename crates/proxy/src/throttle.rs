@@ -38,8 +38,6 @@ impl DomainThrottle {
     /// This method checks when the last request was made to the given domain
     /// and sleeps if the minimum delay hasn't passed yet.
     pub async fn wait(&self, domain: &str) {
-        let now = Instant::now();
-
         // Check when the last request was made to this domain
         let should_wait = if let Some(last) = self.last_request.get(domain) {
             let elapsed = last.elapsed();

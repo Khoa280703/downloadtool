@@ -36,7 +36,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
-    protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace configuration
@@ -45,9 +44,6 @@ COPY Cargo.lock ./
 
 # Copy all crates
 COPY crates/ ./crates/
-
-# Copy proto files
-COPY proto/ ./proto/
 
 # Copy injector dist (required by include_str! in crates/api/src/routes/static_files.rs)
 COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
@@ -86,7 +82,6 @@ USER appuser
 # Environment variables
 ENV PORT=3068
 ENV EXTRACTOR_DIR=/app/extractors
-ENV GPU_ENABLED=false
 ENV RUST_LOG=info
 
 # Expose port

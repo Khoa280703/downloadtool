@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_patch_mvhd_next_track_id() {
-        let mut moov = build_simple_moov(1);
+        let moov = build_simple_moov(1);
         // mvhd is first box in moov content (after 8-byte moov header)
         let mvhd_start = 8;
         let mvhd_end = mvhd_start + 108;
