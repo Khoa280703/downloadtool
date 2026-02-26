@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FetchTube - Vibrant Video Downloader</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&amp;family=Nunito:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FF4D8C", // Hot Pink
+                        "secondary": "#FFB938", // Marigold
+                        "accent": "#6C5CE7", // Periwinkle
+                        "plum": "#2D1B36", // Deep Plum
+                        "muted": "#8B7E96",
+                        "bg-page": "#FFF5F9", // Pale Pink White
+                        "bg-surface": "#FFFFFF",
+                    },
+                    fontFamily: {
+                        "heading": ["Fredoka", "sans-serif"],
+                        "body": ["Nunito", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "xl": "24px",
+                        "2xl": "32px", // radius-xl
+                        "3xl": "48px",
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        "float": "0 20px 40px -10px rgba(255, 77, 140, 0.3)",
+                        "candy": "0 10px 25px -5px rgba(255, 77, 140, 0.4), 0 8px 10px -6px rgba(255, 77, 140, 0.1)",
+                        "input-focus": "0 0 0 4px rgba(255, 77, 140, 0.2)"
+                    },
+                    animation: {
+                        'bob': 'bob 3s ease-in-out infinite',
+                        'bob-delayed': 'bob 3s ease-in-out infinite 1.5s',
+                        'wiggle': 'wiggle 1s ease-in-out infinite',
+                        'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        bob: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-15px)' },
+                        },
+                        wiggle: {
+                            '0%, 100%': { transform: 'rotate(-3deg)' },
+                            '50%': { transform: 'rotate(3deg)' },
+                        },
+                        'pulse-glow': {
+                            '0%, 100%': { opacity: 1, boxShadow: '0 0 0 0 rgba(255, 77, 140, 0.7)' },
+                            '50%': { opacity: .5, boxShadow: '0 0 0 10px rgba(255, 77, 140, 0)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #FFF5F9;
+            color: #2D1B36;
+        }
+        h1, h2, h3, h4, h5, h6, button {
+            font-family: 'Fredoka', sans-serif;
+        }
+        .glass-header {
+            background: rgba(255, 245, 249, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #FF4D8C 0%, #FFB938 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #FF4D8C 0%, #FFB938 100%);
+        }
+        .dashed-border-anim {
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='32' ry='32' stroke='%23FF4D8CFF' stroke-width='3' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e");
+        }html { scroll-behavior: smooth; }
+        .bento-card {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+        }
+        .bento-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px -12px rgba(255, 77, 140, 0.25);
+        }
+    </style>
+</head>
+<body class="bg-bg-page min-h-screen flex flex-col overflow-x-hidden text-plum selection:bg-primary/20">
+<header class="glass-header sticky top-0 z-50 border-b border-white/50 px-6 py-3 lg:px-20 transition-all duration-300">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-3 group cursor-pointer">
+<div class="flex size-10 items-center justify-center rounded-full bg-gradient-primary text-white shadow-candy group-hover:rotate-12 transition-transform">
+<span class="material-symbols-outlined text-2xl">smart_toy</span>
+</div>
+<h2 class="text-plum text-2xl font-bold tracking-tight">FetchTube</h2>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<nav class="flex gap-6">
+<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#home">Home</a>
+<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#tools">Tools</a>
+<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#how-it-works">How it Works</a>
+</nav>
+<button class="flex h-10 px-6 items-center justify-center rounded-full bg-plum text-white text-sm font-bold shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 tracking-wide uppercase">
+                Login
+            </button>
+</div>
+<button class="md:hidden text-plum p-2 rounded-xl hover:bg-white/50 transition-colors">
+<span class="material-symbols-outlined text-3xl">menu_open</span>
+</button>
+</div>
+</header>
+<main class="flex-1 w-full">
+<section class="relative min-h-[50vh] flex flex-col items-center justify-center px-6 pt-12 pb-6 overflow-hidden" id="home">
+<div class="absolute top-[10%] left-[5%] w-24 h-24 rounded-full bg-accent/20 blur-xl animate-bob"></div>
+<div class="absolute bottom-[20%] right-[10%] w-32 h-32 rounded-3xl rotate-12 bg-primary/10 blur-xl animate-bob-delayed"></div>
+<div class="absolute top-[20%] right-[15%] w-16 h-16 rounded-full bg-secondary/30 blur-lg animate-bob"></div>
+<div class="relative z-10 w-full max-w-4xl mx-auto text-center">
+<div class="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm mb-4 animate-fade-in-up">
+<span class="text-lg">✨</span>
+<span class="text-xs font-bold text-plum/80 uppercase tracking-wide">The friendliest downloader ever</span>
+</div>
+<h1 class="text-4xl md:text-6xl lg:text-7xl font-bold text-plum mb-4 leading-[0.9] tracking-tight">
+                Save videos in a <br/>
+<span class="text-gradient inline-block hover:scale-105 transition-transform cursor-default">snap.</span>
+</h1>
+<p class="text-lg md:text-xl text-plum/70 max-w-xl mx-auto font-semibold mb-6">
+                Paste a link, click the button, and get back to your life. No ads, no malware, just pure joy.
+            </p>
+<div class="relative w-full max-w-[700px] mx-auto group">
+<div class="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
+<div class="relative flex items-center bg-white rounded-full shadow-float p-2 h-[64px] transition-all duration-300 group-focus-within:ring-4 group-focus-within:ring-primary/20">
+<div class="pl-6 text-plum/30">
+<span class="material-symbols-outlined text-2xl">link</span>
+</div>
+<input class="w-full h-full bg-transparent border-none focus:ring-0 text-lg md:text-xl font-semibold placeholder:text-muted/50 text-plum px-4" placeholder="Paste that YouTube link here..." type="text"/>
+<button class="absolute right-1.5 top-1.5 bottom-1.5 bg-gradient-primary hover:brightness-110 text-white font-bold rounded-full px-6 md:px-10 text-base md:text-lg shadow-candy transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+<span>FETCH IT!</span>
+<span class="material-symbols-outlined font-bold text-lg">bolt</span>
+</button>
+</div>
+</div>
+<div class="mt-8 flex flex-wrap justify-center gap-3 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+<div class="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>
+<span class="font-bold text-xs">Ad-Free Forever</span>
+</div>
+<div class="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-blue-500 text-lg">verified_user</span>
+<span class="font-bold text-xs">Safe &amp; Secure</span>
+</div>
+<div class="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-purple-500 text-lg">rocket_launch</span>
+<span class="font-bold text-xs">Super Fast</span>
+</div>
+</div>
+</div>
+</section>
+<section class="py-12 px-6 lg:px-20 relative bg-white/30" id="tools">
+<div class="max-w-7xl mx-auto">
+<div class="text-center mb-8">
+<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">
+                    Tired of <span class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">Copy-Pasting?</span>
+<span class="inline-block animate-bounce" style="animation-duration: 3s;">😴</span>
+</h2>
+<p class="text-base text-plum/70 max-w-lg mx-auto">
+                    We built some shiny tools to make your life easier. Choose your fighter below.
+                </p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+<div class="bento-card group relative flex flex-col bg-white rounded-2xl p-6 border border-pink-50 shadow-float overflow-hidden h-full min-h-[360px]">
+<div class="absolute top-4 right-4 bg-secondary text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm z-10 tracking-widest uppercase">
+                        Recommended
+                    </div>
+<div class="flex-1 flex flex-col items-center text-center z-10 mt-2">
+<div class="size-24 mb-4 relative flex items-center justify-center">
+<div class="absolute inset-0 bg-blue-100 rounded-full scale-110 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
+<span class="material-symbols-outlined text-[60px] text-[#4285F4] drop-shadow-xl group-hover:scale-110 transition-transform duration-300">extension</span>
+</div>
+<h3 class="text-xl font-bold text-plum mb-2">FetchTube Extension</h3>
+<p class="text-plum/60 font-medium mb-6 text-base">
+                            The easiest way. Adds a cute "Fetch" button right under every video player.
+                        </p>
+</div>
+<div class="mt-auto z-10">
+<button class="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold rounded-full shadow-candy flex items-center justify-center gap-2 transition-all group-hover:scale-[1.02] tracking-wide uppercase text-xs">
+<span class="material-symbols-outlined text-lg">add_to_queue</span>
+                            Add to Chrome
+                        </button>
+</div>
+<div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-pink-50 to-transparent opacity-50 pointer-events-none"></div>
+</div>
+<div class="bento-card group relative flex flex-col bg-white/50 rounded-2xl p-1.5 border-4 border-transparent h-full min-h-[360px]">
+<div class="absolute inset-0 rounded-2xl dashed-border-anim pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity"></div>
+<div class="relative h-full flex flex-col p-5 bg-white/60 rounded-[18px] backdrop-blur-sm">
+<div class="flex-1 flex flex-col items-center text-center">
+<div class="w-16 h-16 bg-secondary/20 text-secondary rounded-2xl flex items-center justify-center mb-4 rotate-3 group-hover:rotate-12 transition-transform shadow-sm">
+<span class="material-symbols-outlined text-4xl">bookmarks</span>
+</div>
+<h3 class="text-xl font-bold text-plum mb-2">The Magic Button</h3>
+<p class="text-plum/60 font-medium mb-6 text-base">
+                                No installation needed. Just drag this pill to your browser's bookmarks bar!
+                            </p>
+<div class="w-full py-6 px-3 bg-pink-50/50 rounded-xl border border-pink-100 border-dashed mb-3 flex justify-center items-center relative overflow-hidden">
+<div class="absolute inset-0 bg-stripes opacity-5"></div>
+<a class="cursor-grab active:cursor-grabbing inline-flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white font-bold py-2.5 px-6 rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 transition-all select-none z-10 text-sm" href="javascript:(function(){alert('FetchTube Bookmarklet Activated!')})();" onclick="event.preventDefault();">
+<span class="material-symbols-outlined text-lg">touch_app</span>
+                                    FETCH IT!
+                                </a>
+</div>
+<div class="flex items-center gap-2 text-xs text-plum/50 font-bold bg-white px-3 py-1.5 rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-base animate-bounce">arrow_upward</span>
+                                Drag up to bookmarks
+                            </div>
+</div>
+</div>
+</div>
+<div class="bento-card group relative flex flex-col bg-plum rounded-2xl p-6 shadow-2xl h-full min-h-[360px] text-white overflow-hidden">
+<div class="absolute top-0 right-0 w-48 h-48 bg-accent/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+<div class="flex-1 flex flex-col items-start z-10 relative">
+<div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-lg mb-4 border border-white/10">
+<span class="material-symbols-outlined text-accent text-xs">terminal</span>
+<span class="text-[10px] font-bold tracking-wide uppercase">For Pros</span>
+</div>
+<h3 class="text-xl font-bold mb-2">Power User Script</h3>
+<p class="text-white/70 font-medium mb-6 text-base">
+                            Already use Tampermonkey? Get the raw script for maximum control.
+                        </p>
+<div class="w-full bg-black/30 rounded-xl p-4 font-mono text-xs text-accent mb-4 border border-white/10 shadow-inner">
+<div class="flex gap-1.5 mb-2">
+<div class="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+</div>
+<p class="opacity-60">// install.js</p>
+<p class="text-secondary">const</p> <span class="text-white">quality</span> = <span class="text-primary">'4k'</span>;
+                            <p><span class="text-secondary">await</span> fetch.init();</p>
+</div>
+</div>
+<div class="mt-auto z-10 relative">
+<button class="w-full h-12 bg-accent hover:bg-accent/90 text-white font-bold rounded-full shadow-lg hover:shadow-accent/50 flex items-center justify-center gap-2 transition-all group-hover:translate-x-1 uppercase text-xs tracking-wide">
+<span class="material-symbols-outlined text-lg">download</span>
+                            Install Script
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 px-6 lg:px-20 relative overflow-hidden bg-white/40" id="how-it-works">
+<div class="absolute -top-40 -right-40 w-[500px] h-[500px] bg-secondary/10 rounded-full blur-[100px] opacity-60"></div>
+<div class="absolute top-1/2 -left-20 w-[300px] h-[300px] bg-primary/10 rounded-full blur-[80px] opacity-60"></div>
+<div class="max-w-6xl mx-auto">
+<div class="text-center mb-20">
+<span class="inline-block py-2 px-4 rounded-full bg-white/80 border border-primary/10 text-primary font-bold text-xs uppercase mb-4 tracking-wider shadow-sm">
+                    ✨ Super Easy Process
+                </span>
+<h2 class="text-4xl md:text-5xl font-bold text-plum mb-4">How the magic happens</h2>
+<p class="text-lg text-plum/60 font-semibold max-w-2xl mx-auto">Three simple steps to offline happiness. No tech degree required.</p>
+</div>
+<div class="space-y-24 mb-32">
+<div class="flex flex-col md:flex-row items-center gap-12 lg:gap-24">
+<div class="flex-1 text-center md:text-left order-2 md:order-1">
+<div class="inline-flex size-14 rounded-2xl bg-gradient-to-br from-primary to-rose-400 text-white font-bold text-2xl items-center justify-center mb-6 shadow-candy rotate-3">1</div>
+<h3 class="text-3xl md:text-4xl font-bold text-plum mb-4 leading-tight">Find Your <span class="text-primary">Spark</span></h3>
+<p class="text-xl text-plum/70 font-medium leading-relaxed mb-6">
+                            Surf your favorite sites like YouTube, TikTok, or Instagram. When you spot that video you just can't live without, simply copy the link from the address bar.
+                        </p>
+<div class="flex items-center gap-3 justify-center md:justify-start">
+<span class="px-3 py-1 bg-white rounded-lg text-sm font-bold text-plum/50 border border-plum/5">youtube.com</span>
+<span class="px-3 py-1 bg-white rounded-lg text-sm font-bold text-plum/50 border border-plum/5">tiktok.com</span>
+<span class="px-3 py-1 bg-white rounded-lg text-sm font-bold text-plum/50 border border-plum/5">instagram.com</span>
+</div>
+</div>
+<div class="flex-1 w-full order-1 md:order-2">
+<div class="relative group perspective-1000">
+<div class="absolute -inset-4 bg-gradient-to-tr from-primary/20 to-transparent rounded-[2.5rem] blur-xl group-hover:blur-2xl transition-all duration-500"></div>
+<div class="relative bg-white rounded-[2.5rem] p-4 shadow-float transform transition-transform duration-500 group-hover:rotate-y-6 group-hover:rotate-x-6">
+<img alt="Copy link interface" class="w-full aspect-[4/3] object-cover rounded-[2rem] shadow-inner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKrlYuukk6P8_20sSMT9fvY_Uphc4oPaiL6mABa8ocypXPOEG44jF1VaJPZiUv4bALYAPzPtUwAU7uWf8C5tkFB-XmEym6RNXFmj2bNanynRQXb78lXlFYbcqPj_KdJuaHLXMThmUgkonqYgki8RiJPUUOr5-kKXtzPvDLEkZznXqcpHmR4q2o0SvotgnwLfRdW8t7RcM7KluGPfNWqrH_pIt71UNalqjloOfgRdNk3PdwWBTADxnd-kCV-WogVeVFrLUvA0wGk1M"/>
+<div class="absolute -bottom-6 -right-6 bg-white p-4 rounded-2xl shadow-xl flex items-center gap-3 animate-bob">
+<div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+<span class="material-symbols-outlined">link</span>
+</div>
+<span class="font-bold text-plum text-sm">Link Copied!</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-center gap-12 lg:gap-24">
+<div class="flex-1 w-full order-1">
+<div class="relative group perspective-1000">
+<div class="absolute -inset-4 bg-gradient-to-tl from-secondary/20 to-transparent rounded-[2.5rem] blur-xl group-hover:blur-2xl transition-all duration-500"></div>
+<div class="relative bg-white rounded-[2.5rem] p-4 shadow-float transform transition-transform duration-500 group-hover:-rotate-y-6 group-hover:rotate-x-6">
+<img alt="Paste and click" class="w-full aspect-[4/3] object-cover rounded-[2rem] shadow-inner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBByl4vcQeLGAWrZptXgQ4c3WHwIWg5Q70wJ6BLvqJY8q44JnGnJcG4Uqfpn4hzYUd_EOa1jiCzIbmTXDOlEx5qIMYKgpJ4Aq8NSgAz3vmEPzwWntncjknEfkuUJwHFJgE0O7P9XEjPjSrsJjDlfV9G8glPPOv-9dbgCHuUq_NnKDP7hmPiOgBlUnIKaWGRvTZHFvqc_M-mvbZWeEwgKSbVpobRid7Cp8OcrR3iHnfD3V5jme-ejR3QKzc4GihTh6zdwxXU8OikTM"/>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-md p-4 rounded-full shadow-2xl animate-pulse-glow">
+<span class="material-symbols-outlined text-4xl text-secondary">touch_app</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex-1 text-center md:text-left order-2">
+<div class="inline-flex size-14 rounded-2xl bg-gradient-to-br from-secondary to-orange-400 text-white font-bold text-2xl items-center justify-center mb-6 shadow-candy -rotate-3">2</div>
+<h3 class="text-3xl md:text-4xl font-bold text-plum mb-4 leading-tight">Paste &amp; Let Go</h3>
+<p class="text-xl text-plum/70 font-medium leading-relaxed mb-6">
+                            Drop that link into our magic box at the top of the page. Hit the glowing "Fetch It" button and watch our smart robots instantly prepare your video.
+                        </p>
+<div class="flex items-center justify-center md:justify-start gap-2 text-sm font-bold text-plum/60">
+<span class="material-symbols-outlined text-secondary">bolt</span>
+<span>Processed in milliseconds</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-center gap-12 lg:gap-24">
+<div class="flex-1 text-center md:text-left order-2 md:order-1">
+<div class="inline-flex size-14 rounded-2xl bg-gradient-to-br from-accent to-purple-600 text-white font-bold text-2xl items-center justify-center mb-6 shadow-candy rotate-3">3</div>
+<h3 class="text-3xl md:text-4xl font-bold text-plum mb-4 leading-tight">Keep It <span class="text-accent">Forever</span></h3>
+<p class="text-xl text-plum/70 font-medium leading-relaxed mb-6">
+                            Select your quality—HD, 4K, or just audio—and save it to your device. It's yours now! Watch offline, on the plane, or in a submarine.
+                        </p>
+<div class="inline-flex items-center gap-2 px-4 py-2 bg-accent/10 rounded-full text-accent font-bold text-sm">
+<span class="material-symbols-outlined text-lg">download_done</span>
+<span>No watermarks attached</span>
+</div>
+</div>
+<div class="flex-1 w-full order-1 md:order-2">
+<div class="relative group perspective-1000">
+<div class="absolute -inset-4 bg-gradient-to-tr from-accent/20 to-transparent rounded-[2.5rem] blur-xl group-hover:blur-2xl transition-all duration-500"></div>
+<div class="relative bg-white rounded-[2.5rem] p-4 shadow-float transform transition-transform duration-500 group-hover:rotate-y-6 group-hover:rotate-x-6">
+<img alt="Download success" class="w-full aspect-[4/3] object-cover rounded-[2rem] shadow-inner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAv-Ke9er-viyA-UNjD5NSNtl_FDH3cBNYC3FJSt9Bl7i1MO7sMC0j4bkQ5pKCMSUc28AF13RoQA2uRfZjnuKawfC7dN1pseTzz9PjBN4PcOLRCY1m-4slu22rR496XFjKNCCsRIdp9x-j69prajhP909CKXleYWnL-zfkv5zNJFDnmURKLD1F5ar-z3NuTdvS6-Mc8en71QMapNf9tvjVl2w0EELJaYU0dSDD8AqQSPO-7fjV11znkWc5DT1XRXCDuFKExE5XJ7c"/>
+<div class="absolute bottom-8 left-8 right-8 bg-black/80 backdrop-blur-md p-4 rounded-xl shadow-2xl">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-gray-700 animate-pulse"></div>
+<div class="flex-1">
+<div class="h-2 w-2/3 bg-gray-600 rounded mb-2"></div>
+<div class="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+<div class="h-full bg-accent w-[85%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="relative mt-32">
+<div class="text-center mb-16">
+<h2 class="text-3xl md:text-4xl font-bold text-plum mb-4">Loved by Humans</h2>
+<p class="text-base text-plum/60 font-semibold">Join thousands of happy fetchers.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="bg-white p-8 rounded-[2rem] shadow-sm border border-pink-100 hover:shadow-float transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-pink-50 to-transparent rounded-bl-[100px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-4 mb-6">
+<img alt="Sarah" class="w-14 h-14 rounded-full object-cover shadow-md border-2 border-white" src="https://lh3.googleusercontent.com/aida-public/AB6AXuARF5304RvojNoSFITuK7YWW4zJdUaS7YaZ8M2czPwXZg8Fem_ZYz98bTgf95M82SjRGwdZEK4EeYbutX_QyEwRV0SDBvisvu-vvLQfwGA-bz2L4hyImIJutlCE_--a3VktGJYvhzagpRgVILW5H9-ozrKljuVOmwMuMbU4nHVM4vt-3o6n6dxnypir9B0QyY6CiQdZquEX-aLT9TyjmBRLWTaDmTghDlXVlbaW2cbtcl68VaBjGJIZI6TERVg_Fv1iP1zMgYiVNkw"/>
+<div>
+<h4 class="font-bold text-plum text-lg">Sarah Jenkins</h4>
+<div class="flex text-yellow-400 text-sm gap-0.5">
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+</div>
+</div>
+</div>
+<p class="text-plum/70 font-medium text-lg leading-relaxed">
+                                "My grandma uses this! It's literally the only downloader she doesn't call me for help with. The interface is so friendly!"
+                            </p>
+</div>
+</div>
+<div class="bg-white p-8 rounded-[2rem] shadow-sm border border-blue-100 hover:shadow-float transition-all duration-300 transform md:-translate-y-6 hover:-translate-y-8 relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-[100px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-4 mb-6">
+<img alt="Mike" class="w-14 h-14 rounded-full object-cover shadow-md border-2 border-white" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlN4zNF5GB68WaO9nY4dZgh1JxUcnugL8ainZYsBqqoqpMn1Ane6kQAd2MOlqCyv0FW0ylmr2ntusQ9fjsOXB0V3rYAtHZpDilhegaQEau_po8jJVecsNwezJk79yYipVTbUVkHnJOFub8m0vddjpBwnu0ERSfjKh-ksB0AJEK_pWOj4jNhV_8M2CzkJqpavvnSzWsxjXML6qGxSko0c1_yHBIBqlJXVs6slgYYvP3XT0Mk3Uoh-6lbx8zLcdfhQoYHep16dPttuw"/>
+<div>
+<h4 class="font-bold text-plum text-lg">Chef Mike</h4>
+<div class="flex text-yellow-400 text-sm gap-0.5">
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+</div>
+</div>
+</div>
+<p class="text-plum/70 font-medium text-lg leading-relaxed">
+                                "I save recipe videos for the kitchen where the WiFi doesn't reach. A literal lifesaver for dinner preparations. Love the speed!"
+                            </p>
+</div>
+</div>
+<div class="bg-white p-8 rounded-[2rem] shadow-sm border border-purple-100 hover:shadow-float transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-50 to-transparent rounded-bl-[100px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-4 mb-6">
+<img alt="Alex" class="w-14 h-14 rounded-full object-cover shadow-md border-2 border-white" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6JNLt35_9vIVOzU7AiY15oUPCHWjx5sDnQSApbwP3zz_3t0R0Me_yYVRrdWtS7A_-dLw2CnmX96KSqSNc0gtuov2OwhWAPCGuu4rN-nwdPg9h3xQHWjVNh-BObMCeIuPaOjv8j3wUeNVnfWKkFlRNsis1b4OnBzSuKsEzfmzT09Quh5_U9pLNu8dHtWQ2T97JkBEDoMUpju6fAUadohec3Zi-TE0JdDlVjwBu_yb13U2Tt8Sk9aW7f4EzpkuHp-aiijY_voU9jj8"/>
+<div>
+<h4 class="font-bold text-plum text-lg">Alex T.</h4>
+<div class="flex text-yellow-400 text-sm gap-0.5">
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+<span class="material-symbols-outlined text-sm fill-current">star</span>
+</div>
+</div>
+</div>
+<p class="text-plum/70 font-medium text-lg leading-relaxed">
+                                "Finally, a tool that doesn't look like it was made in 1998 by a hacker in a basement. So cute, fast, and actually works!"
+                            </p>
+</div>
+</div>
+</div>
+<div class="text-center mt-16">
+<button class="bg-gradient-primary text-white font-bold text-xl md:text-2xl px-12 py-5 rounded-full shadow-candy hover:scale-105 active:scale-95 transition-transform duration-300 flex items-center gap-3 mx-auto animate-pulse-glow">
+<span>Start Fetching Now</span>
+<span class="material-symbols-outlined text-3xl">arrow_forward</span>
+</button>
+<p class="mt-4 text-xs text-plum/40 font-bold uppercase tracking-widest">No registration required</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<footer class="bg-white border-t border-pink-100 py-6 px-6 mt-6">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all">
+<span class="material-symbols-outlined text-xl">smart_toy</span>
+<span class="font-bold text-sm">FetchTube © 2023</span>
+</div>
+<div class="flex gap-4 text-plum/60 font-semibold text-xs">
+<a class="hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="hover:text-primary transition-colors" href="#">Contact</a>
+</div>
+</div>
+</footer>
+
+</body></html>

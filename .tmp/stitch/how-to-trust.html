@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FetchTube - How it Works</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&amp;family=Nunito:ital,wght@0,200..1000;1,200..1000&amp;family=Spline+Sans:wght@300..700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FF4D8C",
+                        "secondary": "#FFB938",
+                        "accent": "#6C5CE7",
+                        "background-light": "#FFF5F9",
+                        "surface": "#FFFFFF",
+                        "text-main": "#2D1B36",
+                        "muted": "#8B7E96",
+                    },
+                    fontFamily: {
+                        "heading": ["Fredoka", "sans-serif"],
+                        "body": ["Nunito", "sans-serif"],
+                        "display": ["Spline Sans", "sans-serif"] 
+                    },
+                    borderRadius: {
+                        "xl": "2rem",
+                        "2xl": "2.5rem",
+                        "3xl": "3rem",
+                        "blob": "40% 60% 70% 30% / 40% 50% 60% 50%"
+                    },
+                    boxShadow: {
+                        "float": "0 20px 40px -10px rgba(255, 77, 140, 0.3)",
+                        "card": "0 10px 30px -5px rgba(45, 27, 54, 0.05)",
+                        "glow": "0 0 20px rgba(255, 77, 140, 0.4)"
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .zig-zag-container > div:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+        
+        /* Custom scrollbar for horizontal scrolling areas */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .blob-bg {
+            background-size: cover;
+            background-position: center;
+            animation: blob-bounce 8s infinite ease-in-out;
+        }
+
+        @keyframes blob-bounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.02); }
+        }
+    </style>
+</head>
+<body class="bg-background-light font-body text-text-main overflow-x-hidden">
+<!-- Navbar (Simplified version based on provided component style) -->
+<nav class="sticky top-0 z-50 w-full bg-background-light/90 backdrop-blur-md border-b border-primary/10">
+<div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shadow-glow">
+<span class="material-symbols-outlined text-2xl">pets</span>
+</div>
+<h1 class="font-heading text-2xl font-bold text-text-main tracking-tight">FetchTube</h1>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="font-heading font-semibold text-text-main hover:text-primary transition-colors" href="#">How it works</a>
+<a class="font-heading font-semibold text-text-main hover:text-primary transition-colors" href="#">Extensions</a>
+<a class="font-heading font-semibold text-text-main hover:text-primary transition-colors" href="#">FAQs</a>
+<button class="bg-primary hover:bg-primary/90 text-white font-heading font-bold py-3 px-6 rounded-full shadow-float transition-transform hover:scale-105 active:scale-95">
+                    Download App
+                </button>
+</div>
+<button class="md:hidden text-text-main">
+<span class="material-symbols-outlined text-3xl">menu</span>
+</button>
+</div>
+</nav>
+<main class="w-full flex flex-col items-center pb-20">
+<!-- Section Header -->
+<section class="w-full max-w-4xl px-6 pt-20 pb-12 text-center">
+<span class="inline-block py-2 px-4 rounded-full bg-secondary/20 text-secondary font-heading font-bold text-sm mb-4 tracking-wider uppercase">Simple as 1-2-3</span>
+<h2 class="font-heading text-4xl md:text-6xl font-bold text-text-main leading-tight mb-6">
+                How the <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">magic</span> happens
+            </h2>
+<p class="text-lg md:text-xl text-muted font-semibold max-w-2xl mx-auto">
+                Saving your favorite videos shouldn't require a computer science degree. We made it as easy as fetching a stick!
+            </p>
+</section>
+<!-- Zig Zag Steps Container -->
+<div class="w-full max-w-7xl px-6 flex flex-col gap-24 md:gap-32 zig-zag-container mb-32">
+<!-- Step 1 -->
+<div class="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
+<!-- Text Content -->
+<div class="flex-1 text-center md:text-left space-y-6">
+<div class="size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-heading text-3xl font-bold mx-auto md:mx-0 shadow-sm">
+                        01
+                    </div>
+<h3 class="font-heading text-3xl md:text-4xl font-bold text-text-main">
+                        Find a video you love
+                    </h3>
+<p class="text-lg text-muted font-medium leading-relaxed">
+                        Spot a cooking recipe you need for dinner or a music video that hits just right? Simply copy the URL from your browser address bar. That's all the technical skill you need!
+                    </p>
+<div class="pt-4 flex justify-center md:justify-start gap-4">
+<div class="flex items-center gap-2 text-sm font-bold text-accent bg-accent/10 px-4 py-2 rounded-full">
+<span class="material-symbols-outlined text-lg">youtube_activity</span> YouTube
+                        </div>
+<div class="flex items-center gap-2 text-sm font-bold text-primary bg-primary/10 px-4 py-2 rounded-full">
+<span class="material-symbols-outlined text-lg">music_note</span> TikTok
+                        </div>
+</div>
+</div>
+<!-- Visual -->
+<div class="flex-1 w-full flex justify-center">
+<div class="relative w-full max-w-md aspect-square">
+<div class="absolute inset-0 bg-gradient-to-tr from-accent/20 to-primary/20 rounded-blob blur-2xl transform rotate-6"></div>
+<div class="relative h-full w-full bg-surface rounded-3xl shadow-float overflow-hidden border-4 border-white flex flex-col transform hover:-rotate-2 transition-transform duration-500">
+<!-- Fake Browser UI -->
+<div class="bg-background-light p-4 border-b border-primary/5 flex gap-2">
+<div class="size-3 rounded-full bg-primary/40"></div>
+<div class="size-3 rounded-full bg-secondary/40"></div>
+<div class="flex-1 bg-white rounded-full h-3 ml-2"></div>
+</div>
+<!-- Image Content -->
+<div class="flex-1 relative overflow-hidden bg-background-light">
+<img alt="Abstract 3D illustration of a character watching a colorful screen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUE52gefPx9GfaaiAVYCx9c75IjqlqTyvWaZ1XNQPkXQ2XPkECWD8XY4Z31Tjlya5CkEBBq6o98gEsW7TdGXVwWJ8LJOkmaH87xlhH95XVVAS1juqrAsIAP4_gn5ulok4TGsxJKMowAwd4zjZ9F9smdj9BcaaxGotZMo4sCEq1dtTAYhg3lbTfRHxkRGL2Emxt7wszmO70pYq_nxIobSLDzB-64rRmPzT9ybjNH6Vj4ogYsa-Q-3LlEAXIpGgpNIYb5nkP4VDKXFc"/>
+<div class="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg flex items-center gap-3 animate-pulse">
+<span class="material-symbols-outlined text-primary">link</span>
+<div class="h-2 w-2/3 bg-gray-200 rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
+<!-- Text Content -->
+<div class="flex-1 text-center md:text-left space-y-6">
+<div class="size-16 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center font-heading text-3xl font-bold mx-auto md:mx-0 shadow-sm">
+                        02
+                    </div>
+<h3 class="font-heading text-3xl md:text-4xl font-bold text-text-main">
+                        Paste &amp; Pop it in
+                    </h3>
+<p class="text-lg text-muted font-medium leading-relaxed">
+                        Head over to our massive input bar and drop that link like it's hot. Our fetching engine analyzes the video instantly—no waiting around for spinning wheels.
+                    </p>
+<ul class="space-y-3 pt-2 inline-block text-left">
+<li class="flex items-center gap-3 text-text-main font-bold">
+<span class="material-symbols-outlined text-green-500">check_circle</span>
+                            Instant analysis
+                        </li>
+<li class="flex items-center gap-3 text-text-main font-bold">
+<span class="material-symbols-outlined text-green-500">check_circle</span>
+                            100% Ad-free zone
+                        </li>
+</ul>
+</div>
+<!-- Visual -->
+<div class="flex-1 w-full flex justify-center">
+<div class="relative w-full max-w-md aspect-square">
+<div class="absolute inset-0 bg-gradient-to-bl from-secondary/30 to-primary/10 rounded-full blur-3xl -z-10"></div>
+<div class="relative h-full w-full rounded-3xl flex items-center justify-center">
+<!-- Simulated 3D Element Composition -->
+<div class="relative w-64 h-20 bg-white rounded-full shadow-float flex items-center px-4 border-2 border-primary/10 z-20">
+<div class="text-gray-300 text-sm font-bold truncate">https://youtube.com/watch...</div>
+<div class="ml-auto bg-primary text-white rounded-full p-2 shadow-lg">
+<span class="material-symbols-outlined text-sm">download</span>
+</div>
+<!-- Floating Hand (Image) -->
+<img alt="3D stylized hand interacting with a digital interface element" class="absolute -top-24 -right-12 w-48 h-48 object-cover rounded-full border-4 border-white shadow-xl z-30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSiB2lQRivL_3C8SHYi3mXfiOG-SxLgKM-SB1ywVm8Et0-lZ5KhNtf1xEVtGI53bX8HHOcwqwN-DmNoRm_V7HSr3gIcb3ggiLkvozwClXDX56-Y0lKSeSXCdmqT17Bk-ir8nJWtuROT3YRCjgeh3mAfiE-Hr2_80jm-1VrsBBn6dnyLHr5w7xehIGRFqMxu9yuDHgZFwfSnAphrXCeR4lht9tofH5e-gN0vawA_YNcG_XsTTRLE9DuD4mztrFvAEGe3UpM5C9pOQk"/>
+</div>
+<!-- Background Circles -->
+<div class="absolute w-48 h-48 bg-secondary rounded-full -bottom-4 -left-4 z-10 opacity-20"></div>
+<div class="absolute w-32 h-32 bg-primary rounded-full top-0 right-10 z-0 opacity-10"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
+<!-- Text Content -->
+<div class="flex-1 text-center md:text-left space-y-6">
+<div class="size-16 rounded-2xl bg-accent/10 text-accent flex items-center justify-center font-heading text-3xl font-bold mx-auto md:mx-0 shadow-sm">
+                        03
+                    </div>
+<h3 class="font-heading text-3xl md:text-4xl font-bold text-text-main">
+                        Watch offline, anywhere
+                    </h3>
+<p class="text-lg text-muted font-medium leading-relaxed">
+                        Download the file to your device and enjoy your content on a plane, in a submarine, or in your secret fortress of solitude. No internet? No problem.
+                    </p>
+<div class="pt-4 flex flex-wrap justify-center md:justify-start gap-3">
+<span class="px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl font-bold text-sm text-gray-600">MP4 4K</span>
+<span class="px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl font-bold text-sm text-gray-600">MP3 Audio</span>
+<span class="px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl font-bold text-sm text-gray-600">GIF Maker</span>
+</div>
+</div>
+<!-- Visual -->
+<div class="flex-1 w-full flex justify-center">
+<div class="relative w-full max-w-md aspect-square">
+<div class="absolute inset-0 bg-gradient-to-r from-accent/20 to-secondary/20 rounded-blob blur-2xl transform -rotate-12"></div>
+<div class="relative h-full w-full bg-surface rounded-[3rem] shadow-float overflow-hidden border-8 border-white group">
+<img alt="Person relaxing by a pool looking at a tablet screen" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeEqX7ATwqRX3iw85ORD_oO7ZvZSNsaKjYmel3GwH8W7eemo3nMQPyZ7M4D3f0vNiu9g2-ejMvoBWTcN4NDcX_uCQyCIZAP3Y830M9s9IjtyIAMqcDq6WA5mT5p7kYpDvdyRzxw4gWYo6xZjHNR2SJPNUePHiCOVsFNRU4tA5jQ7zL4v1yQfV_EExDvoxc1z9tLBp1MzG0zXLD4MIbV8ZpzcbvaAwt9iYtpDQlSDKyVXliqf5JOE9uEb62ggrYxcLdbyRHKGpGEB0"/>
+<!-- Floating UI Badge -->
+<div class="absolute top-8 right-8 bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+<span class="text-xs font-bold text-text-main">Offline Mode</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Trust & Testimonials Section -->
+<section class="w-full bg-surface rounded-t-[4rem] pt-20 pb-24 px-6 shadow-card overflow-hidden relative">
+<!-- Decorative Background Blobs -->
+<div class="absolute top-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+<div class="absolute bottom-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3"></div>
+<div class="max-w-7xl mx-auto relative z-10">
+<div class="text-center mb-16">
+<h2 class="font-heading text-3xl md:text-5xl font-bold text-text-main mb-6">Loved by Humans <br class="hidden md:block"/>(and some robots)</h2>
+<!-- Trust Badges -->
+<div class="flex flex-wrap justify-center gap-6 md:gap-12 mb-12">
+<div class="flex items-center gap-2 text-muted font-bold">
+<span class="material-symbols-outlined text-primary">shield_lock</span>
+                            Privacy Safe
+                        </div>
+<div class="flex items-center gap-2 text-muted font-bold">
+<span class="material-symbols-outlined text-secondary">block</span>
+                            No Pop-up Ads
+                        </div>
+<div class="flex items-center gap-2 text-muted font-bold">
+<span class="material-symbols-outlined text-accent">bolt</span>
+                            Lightning Fast
+                        </div>
+</div>
+</div>
+<!-- Testimonial Carousel -->
+<div class="flex overflow-x-auto gap-6 pb-8 hide-scrollbar snap-x snap-mandatory px-4 md:justify-center">
+<!-- Card 1 -->
+<div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
+<div class="flex items-center gap-4 mb-4">
+<div class="size-12 rounded-full overflow-hidden border-2 border-primary">
+<img alt="Portrait of Sarah" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Y3A-H3EGvPU8zmqaikjguZFx0MdWCuAVz4FZ7BL-f0S8kmzaaMnFNde8chh1kdoCn-oaSF7Lx0F15djvpv4EZlhnDenwAcl9oNmyhvAOxw03HXO5cFt4IG723uHTi1UIUN9uktuYRDVdOXr8JjjLdFFN5gGE-32PYiKwFSkgcsVcKEaJR3x_yt1wi4120_C8xmqTy2i7x2mmdJnmwEXRiLCVJsjUu6gik5exKPKpfI-zjLRXtnc7JV0qMZDWoRqSOjJW_SmzdI4"/>
+</div>
+<div>
+<h4 class="font-heading font-bold text-text-main">Sarah Jenkins</h4>
+<div class="flex text-secondary text-sm">
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+</div>
+</div>
+</div>
+<p class="text-text-main font-medium leading-relaxed italic">
+                            "My grandma uses this! It's so pink and easy to understand. Finally, a downloader that doesn't feel like I'm installing a virus."
+                        </p>
+</div>
+<!-- Card 2 (Featured) -->
+<div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-primary text-white p-8 rounded-3xl shadow-float transform md:scale-105 hover:-translate-y-2 transition-transform duration-300">
+<div class="flex items-center gap-4 mb-4">
+<div class="size-12 rounded-full overflow-hidden border-2 border-white">
+<img alt="Portrait of Mike" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC76jOxNNtx3Aysjd69Cxad7WEobtismgpD69h9FpOcD1oiwzQceZ8WnbAj7C0bIaV81x5YTNd7SzKorY0qKRd-QSTX44ds-jTUPzRaipVGnena-HEv8HoJFHEf-FnevgwaEcSEpy3aVWTB-X9GRLmAzWdXdfsKcYZuPd2dfoMLSYzccApsUCgo82fU-ZqSBZir02kNcmHE46EBnwy5-BRnbdSrI6_htYogzzZ8WZv4de8syjsAdKQ1-EpRQ-ZQEN0BhqHXoAMaBuY"/>
+</div>
+<div>
+<h4 class="font-heading font-bold text-white">Mike Chen</h4>
+<div class="flex text-secondary text-sm">
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+</div>
+</div>
+</div>
+<p class="text-white font-medium leading-relaxed italic">
+                            "I use this for all my study lectures when the uni wifi is down. The MP3 converter is a lifesaver for my commute!"
+                        </p>
+</div>
+<!-- Card 3 -->
+<div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
+<div class="flex items-center gap-4 mb-4">
+<div class="size-12 rounded-full overflow-hidden border-2 border-accent">
+<img alt="Portrait of Jen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwRQbiiA6Y7bXK-6WZaKAwVf8k_zWHvy8Pmmk5DenO-jb0SrMgLBAJZ17iHWyn2gLlPspECc-fMFAMcR10e0yhJUVehY5SekEFrX4dE3RMZaDtPHyCqddQhEuOGuehKsGIrgY-F3aq6YJa15QkQGLvLVfyGgoBtoAKhGbVPMCYdjL1GV_Wl6Te7H7fnEEM4j4b08BO2MEx9rF8wFYjiL-9gHhf4b6bTfBfF39i5zB_PMhLy1VHKrt7Hby-vKVm7-Mfk0EsIKw9NM4"/>
+</div>
+<div>
+<h4 class="font-heading font-bold text-text-main">Jen Alston</h4>
+<div class="flex text-secondary text-sm">
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star_half</span>
+</div>
+</div>
+</div>
+<p class="text-text-main font-medium leading-relaxed italic">
+                            "The design is just so cute. It makes a boring task actually kind of fun. Plus, no weird popups!"
+                        </p>
+</div>
+</div>
+<!-- Final CTA -->
+<div class="mt-16 flex justify-center">
+<button class="group relative inline-flex items-center justify-center px-12 py-4 font-heading font-bold text-white transition-all duration-200 bg-gradient-to-r from-primary to-secondary rounded-full shadow-float hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-4 focus:ring-primary/30 text-lg">
+<span class="mr-2">Start Fetching Now</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+</body></html>
