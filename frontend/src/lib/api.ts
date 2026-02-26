@@ -5,7 +5,32 @@
 
 import type { ExtractResult, BatchMessage } from './types';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const RAW_API_BASE = import.meta.env.VITE_API_URL || '';
+
+function normalizeApiBase(base: string): string {
+	const trimmed = base.trim().replace(/\/+$/, '');
+	if (!trimmed) {
+		// Browser fallback: keep API calls on current origin if env is missing.
+		if (typeof window !== 'undefined') return window.location.origin;
+		return '';
+	}
+
+	// If app is loaded on HTTPS, force API endpoint to HTTPS as well.
+	if (
+		typeof window !== 'undefined' &&
+		window.location.protocol === 'https:' &&
+		trimmed.startsWith('http://')
+	) {
+		return `https://${trimmed.slice('http://'.length)}`;
+	}
+
+	return trimmed;
+}
+
+function buildApiUrl(path: string): string {
+	const base = normalizeApiBase(RAW_API_BASE);
+	return `${base}${path}`;
+}
 
 /**
  * Extract video information from URL
@@ -14,7 +39,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
  * @throws Error if extraction fails
  */
 export async function extract(url: string): Promise<ExtractResult> {
-	const response = await fetch(`${API_BASE}/api/extract`, {
+	const response = await fetch(buildApiUrl('/api/extract'), {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json'
@@ -71,7 +96,7 @@ export function buildStreamUrl(
 		title,
 		format
 	});
-	return `${API_BASE}/api/stream?${params.toString()}`;
+	return `${buildApiUrl('/api/stream')}?${params.toString()}`;
 }
 
 /**
@@ -91,7 +116,7 @@ export function buildMuxedStreamUrl(
 		audio_url: audioUrl,
 		title
 	});
-	return `${API_BASE}/api/stream/muxed?${params.toString()}`;
+	return `${buildApiUrl('/api/stream/muxed')}?${params.toString()}`;
 }
 
 /**
@@ -107,7 +132,7 @@ export function subscribeBatch(
 	onError?: (error: Event) => void
 ): EventSource {
 	const encodedUrl = encodeURIComponent(url);
-	const es = new EventSource(`${API_BASE}/api/batch?url=${encodedUrl}`);
+	const es = new EventSource(`${buildApiUrl('/api/batch')}?url=${encodedUrl}`);
 
 	es.onmessage = (event) => {
 		try {

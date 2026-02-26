@@ -16,6 +16,17 @@
 
 	let isLoading = $state(false);
 
+	function enforceHttps(url: string): string {
+		if (
+			typeof window !== 'undefined' &&
+			window.location.protocol === 'https:' &&
+			url.startsWith('http://')
+		) {
+			return `https://${url.slice('http://'.length)}`;
+		}
+		return url;
+	}
+
 	/** Trigger browser download */
 	async function handleDownload(): Promise<void> {
 		if (!stream) return;
@@ -33,10 +44,11 @@
 			const downloadUrl = useMux
 				? buildMuxedStreamUrl(stream.url, audioStream!.url, title)
 				: buildStreamUrl(stream.url, title, stream.format);
+			const secureDownloadUrl = enforceHttps(downloadUrl);
 
 			// Create anchor element for download
 			const anchor = document.createElement('a');
-			anchor.href = downloadUrl;
+			anchor.href = secureDownloadUrl;
 			anchor.download = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
 			anchor.style.display = 'none';
 

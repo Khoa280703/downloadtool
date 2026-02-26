@@ -13,7 +13,13 @@
 		trackFormatSelected
 	} from '$lib/analytics';
 
-	const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+	const rawApiBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+	const API_BASE =
+		typeof window !== 'undefined' &&
+		window.location.protocol === 'https:' &&
+		rawApiBase.startsWith('http://')
+			? `https://${rawApiBase.slice('http://'.length)}`
+			: rawApiBase;
 	const USERSCRIPT_INSTALL_URL =
 		(API_BASE ? `${API_BASE}/userscript` : 'https://api-download.khoadangbui.online/userscript');
 
