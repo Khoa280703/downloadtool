@@ -461,12 +461,12 @@ Enable creators and power users to reliably download video content at maximum sp
 
 ### Development
 ```bash
-docker-compose -f docker/docker-compose.homeserver.yml up
+docker-compose -f docker/docker-compose.server.yml up
 ```
 
-### Production (VPS)
+### Production (Home Server)
 ```bash
-docker-compose -f docker/docker-compose.vps.yml up -d
+docker-compose -f docker/docker-compose.server.yml up -d
 ```
 
 ### Monitoring

@@ -1,6 +1,6 @@
 //! API Server - Axum HTTP server for video downloader
 //!
-//! This is the main entry point for the VPS deployment.
+//! This is the main entry point for the API deployment.
 //! It provides HTTP endpoints for video extraction and download.
 
 use axum::{

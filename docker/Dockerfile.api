@@ -1,4 +1,4 @@
-# Dockerfile for VPS deployment
+# Dockerfile for API service deployment
 # Builds the API server and related components without GPU support
 
 # Stage 0: Build injector JS (embedded into api crate via include_str! at compile time)
@@ -57,7 +57,7 @@ COPY extractors/ ./extractors/
 COPY --from=js-builder /app/extractors/dist ./extractors/dist/
 
 # Build the release binary
-RUN cargo build --release --bin vps-gateway
+RUN cargo build --release --bin api-server
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim AS runtime
@@ -74,7 +74,7 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 -s /bin/bash appuser
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/vps-gateway /usr/local/bin/
+COPY --from=builder /app/target/release/api-server /usr/local/bin/
 
 
 # Create directories
@@ -97,4 +97,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3068/health || exit 1
 
 # Run the server
-CMD ["vps-gateway"]
+CMD ["api-server"]

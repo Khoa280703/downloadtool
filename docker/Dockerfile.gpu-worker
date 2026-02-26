@@ -1,4 +1,4 @@
-# Dockerfile for Home Server deployment
+# Dockerfile for GPU worker deployment
 # Builds the GPU worker with CUDA support for hardware transcoding
 
 FROM nvidia/cuda:12.3.2-devel-ubuntu22.04 AS builder

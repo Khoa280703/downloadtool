@@ -174,18 +174,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build VPS Docker image
+      - name: Build API Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/Dockerfile.vps
+          file: ./docker/Dockerfile.api
           push: false
-          tags: downloadtool:vps
+          tags: downloadtool:api
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       # Note: GPU worker Docker build requires CUDA which is not available in GitHub Actions
       # This step validates the Dockerfile syntax only
-      - name: Validate Home Server Dockerfile
-        run: docker build --file docker/Dockerfile.homeserver --target builder .
+      - name: Validate GPU Worker Dockerfile
+        run: docker build --file docker/Dockerfile.gpu-worker --target builder .
         continue-on-error: true

@@ -128,10 +128,9 @@ downloadtool/
 │       └── README.md
 │
 ├── docker/                          # Container images & composition
-│   ├── Dockerfile.homeserver        # Home server image
-│   ├── Dockerfile.vps               # VPS image
-│   ├── docker-compose.homeserver.yml
-│   ├── docker-compose.vps.yml
+│   ├── Dockerfile.gpu-worker        # GPU worker image
+│   ├── Dockerfile.api               # API image
+│   ├── docker-compose.server.yml
 │   └── .dockerignore
 │
 ├── proto/                           # Protocol Buffer definitions
