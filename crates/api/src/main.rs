@@ -29,11 +29,20 @@ async fn main() -> anyhow::Result<()> {
 
     // Load configuration
     let config = Config::from_env()?;
-    info!(
-        "Initializing extractor pool from {}",
-        config.extractor_dir
-    );
-    extractor::init(Some(Path::new(&config.extractor_dir))).await?;
+    let extractor_path = Path::new(&config.extractor_dir);
+    if extractor_path.is_file() {
+        info!(
+            "Initializing extractor pool from external bundle {}",
+            config.extractor_dir
+        );
+        extractor::init(Some(extractor_path)).await?;
+    } else {
+        info!(
+            "Extractor path '{}' is not a file; using embedded extractor bundle",
+            config.extractor_dir
+        );
+        extractor::init(None).await?;
+    }
 
     info!("Starting API server on port {}", config.port);
 
