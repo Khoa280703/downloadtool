@@ -7,7 +7,7 @@ use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::watch;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// File watcher that monitors extractor scripts for changes
 pub struct HotReloader {
@@ -139,7 +139,7 @@ impl ReloadableBundle {
             match std::fs::read_to_string(&self.bundle_path) {
                 Ok(new_content) => {
                     let mut bundle = self.bundle.write().map_err(|e| {
-                        std::io::Error::other(e.to_string())
+                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
                     })?;
                     *bundle = new_content;
                     info!("Bundle reloaded successfully");
@@ -164,6 +164,8 @@ impl ReloadableBundle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::Duration;
     use tempfile::TempDir;
 
     #[tokio::test]

@@ -5,6 +5,7 @@
 
 use reqwest::Url;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Video platforms supported by the downloader
@@ -29,7 +30,7 @@ impl Platform {
     }
 
     /// Parse platform from string
-    pub fn parse(s: &str) -> Option<Self> {
+    pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "youtube" | "yt" => Some(Platform::YouTube),
             _ => None,
@@ -174,9 +175,9 @@ mod tests {
 
     #[test]
     fn test_platform_from_str() {
-        assert_eq!(Platform::parse("youtube"), Some(Platform::YouTube));
-        assert_eq!(Platform::parse("YT"), Some(Platform::YouTube));
-        assert_eq!(Platform::parse("unknown"), None);
+        assert_eq!(Platform::from_str("youtube"), Some(Platform::YouTube));
+        assert_eq!(Platform::from_str("YT"), Some(Platform::YouTube));
+        assert_eq!(Platform::from_str("unknown"), None);
     }
 
     #[test]

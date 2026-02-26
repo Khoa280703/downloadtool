@@ -8,6 +8,7 @@ use crate::cookie_store::Platform;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use reqwest::header::HeaderMap;
+use std::time::Duration;
 use tracing::{debug, error, info};
 
 /// HTTP range specification for partial content requests.

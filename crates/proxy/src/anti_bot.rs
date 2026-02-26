@@ -14,7 +14,7 @@ use reqwest::{Client, Proxy, StatusCode};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 /// Maximum number of retries on 403/429 errors
 const MAX_RETRIES: u32 = 3;
@@ -160,6 +160,7 @@ impl AntiBotClient {
             .ok_or_else(|| AntiBotError::InvalidUrl("Missing host".to_string()))?;
 
         let mut last_error = None;
+        let mut last_proxy: Option<String> = None;
 
         for attempt in 0..MAX_RETRIES {
             // Wait for throttle
@@ -212,6 +213,7 @@ impl AntiBotClient {
                         last_error = Some(AntiBotError::RequestFailed(
                             response.error_for_status().unwrap_err(),
                         ));
+                        last_proxy = current_proxy;
 
                         // Wait before retry
                         sleep(RETRY_DELAY).await;
@@ -234,6 +236,7 @@ impl AntiBotClient {
                     }
 
                     last_error = Some(AntiBotError::RequestFailed(e));
+                    last_proxy = current_proxy;
 
                     // Wait before retry
                     sleep(RETRY_DELAY).await;

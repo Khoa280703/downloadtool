@@ -1,0 +1,35 @@
+[package]
+name = "gpu-pipeline"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = []
+gpu-support = ["ffmpeg-next"]
+nvenc = []
+nvdec = []
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Bytes handling
+bytes = { workspace = true }
+
+# Streaming
+futures = { workspace = true }
+
+# FFmpeg bindings (optional, for GPU support)
+ffmpeg-next = { version = "7", optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"

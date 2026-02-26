@@ -6,8 +6,8 @@
 use crate::runtime::ExtractorRuntime;
 use crate::types::{ExtractionError, VideoInfo};
 use std::sync::Arc;
-use tokio::sync::Semaphore;
-use tracing::{debug, info};
+use tokio::sync::{Semaphore, SemaphorePermit};
+use tracing::{debug, error, info, warn};
 
 /// Pool of V8 isolates for running extractors concurrently
 pub struct ExtractorPool {

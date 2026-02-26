@@ -17,6 +17,7 @@ use proxy::client::{parse_range_header, validate_stream_url, ProxyClient, Range}
 use proxy::cookie_store::Platform;
 use proxy::stream::forward_stream_headers;
 
+use muxer::mux_router::{MuxRouter, StreamSource};
 use muxer::stream_fetcher::StreamFetcher;
 use muxer::{remux_streams, MuxerError};
 
@@ -219,10 +220,10 @@ fn chunked_stream(
             Ok(c) => c,
             Err(e) => {
                 let _ = tx
-                    .send(Err(std::io::Error::other(format!(
-                        "Failed to create proxy client: {}",
-                        e
-                    ))))
+                    .send(Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to create proxy client: {}", e),
+                    )))
                     .await;
                 return;
             }
@@ -240,8 +241,9 @@ fn chunked_stream(
             match client.fetch_stream_with_headers(&url, Some(range)).await {
                 Ok((_, mut chunk_stream)) => {
                     while let Some(item) = chunk_stream.next().await {
-                        let result =
-                            item.map_err(|e| std::io::Error::other(e.to_string()));
+                        let result = item.map_err(|e| {
+                            std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                        });
                         if tx.send(result).await.is_err() {
                             return; // Client disconnected — abort silently
                         }
@@ -250,10 +252,10 @@ fn chunked_stream(
                 Err(e) => {
                     error!("Chunk fetch failed bytes={}-{}: {}", offset, end, e);
                     let _ = tx
-                        .send(Err(std::io::Error::other(format!(
-                            "Chunk fetch failed: {}",
-                            e
-                        ))))
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("Chunk fetch failed: {}", e),
+                        )))
                         .await;
                     return;
                 }
@@ -278,12 +280,6 @@ pub async fn muxed_stream_handler(
     info!("Muxed stream request");
     debug!("Video URL: {}", params.video_url);
     debug!("Audio URL: {}", params.audio_url);
-    if let Some(video_codec) = params.video_codec.as_deref() {
-        debug!("Requested video codec: {}", video_codec);
-    }
-    if let Some(audio_codec) = params.audio_codec.as_deref() {
-        debug!("Requested audio codec: {}", audio_codec);
-    }
 
     let _ = validate_stream_url(&params.video_url).map_err(|e| ApiError {
         message: format!("Video URL validation failed: {}", e),
@@ -349,7 +345,7 @@ fn stream_with_muxer_error(
         match stream.next().await {
             Some(Ok(bytes)) => Some((Ok(bytes), stream)),
             Some(Err(e)) => Some((
-                Err(std::io::Error::other(e.to_string())),
+                Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())),
                 stream,
             )),
             None => None,

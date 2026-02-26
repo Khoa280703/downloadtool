@@ -18,7 +18,7 @@
 
 use std::path::Path;
 use std::sync::OnceLock;
-use tracing::{debug, info};
+use tracing::{debug, error, info, warn};
 
 pub mod hot_reload;
 pub mod pool;

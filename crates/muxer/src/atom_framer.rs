@@ -194,7 +194,7 @@ where
             .map(|r| r.map_err(|e| MuxerError::StreamFetchError(e.to_string())));
 
         // Chain: first yield leftover buffer, then continue with original stream
-        Box::pin(futures::stream::iter(remainder).chain(mapped_stream))
+        Box::pin(futures::stream::iter(remainder.into_iter()).chain(mapped_stream))
             as std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, MuxerError>> + Send>>
     }
 }

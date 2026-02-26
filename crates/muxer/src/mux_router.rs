@@ -6,7 +6,6 @@ use extractor::types::{VideoFormat, VideoInfo};
 
 /// Source type for stream delivery.
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
 pub enum StreamSource {
     /// Direct single-stream proxy (audio+video already muxed).
     Direct {

@@ -197,6 +197,8 @@ async fn fetch_stream_chunked(
 pub struct CombinedStream {
     video: ByteStream,
     audio: ByteStream,
+    video_buffer: Option<Bytes>,
+    audio_buffer: Option<Bytes>,
     video_done: bool,
     audio_done: bool,
 }
@@ -207,6 +209,8 @@ impl CombinedStream {
         Self {
             video,
             audio,
+            video_buffer: None,
+            audio_buffer: None,
             video_done: false,
             audio_done: false,
         }

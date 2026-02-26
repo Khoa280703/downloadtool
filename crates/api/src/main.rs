@@ -8,7 +8,6 @@ use axum::{
     Router,
 };
 use std::net::SocketAddr;
-use std::path::Path;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, Level};
@@ -27,14 +26,12 @@ async fn main() -> anyhow::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
+    // Initialize extractor pool
+    info!("Initializing extractor pool...");
+    extractor::init(None).await?;
+
     // Load configuration
     let config = Config::from_env()?;
-    info!(
-        "Initializing extractor pool from {}",
-        config.extractor_dir
-    );
-    extractor::init(Some(Path::new(&config.extractor_dir))).await?;
-
     info!("Starting API server on port {}", config.port);
 
     // Build router with all routes
@@ -47,6 +44,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/stream", get(routes::stream_handler))
         .route("/api/stream/muxed", get(routes::muxed_stream_handler))
         .route("/api/batch", get(routes::batch_handler))
+        .route("/api/transcode", post(routes::transcode_handler))
+        .route("/api/transcode/health", get(routes::transcode_health_check))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 

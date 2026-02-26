@@ -112,7 +112,7 @@ fn run_esbuild(extractors_dir: &Path, file: &str, dist_dir: &Path, npx: &str) ->
 
     match result {
         Ok(output) if output.status.success() => {
-            fs::read_to_string(dist_dir.join(file.replace(".ts", ".js"))).unwrap_or_else(|_| create_inline_fallback(file))
+            fs::read_to_string(&dist_dir.join(file.replace(".ts", ".js"))).unwrap_or_else(|_| create_inline_fallback(file))
         }
         Ok(output) => {
             eprintln!(
