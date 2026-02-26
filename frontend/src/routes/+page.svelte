@@ -1,481 +1,495 @@
-<script lang="ts">
-	import { onMount } from 'svelte';
-	import UrlInput from '$components/UrlInput.svelte';
-	import BatchInput from '$components/BatchInput.svelte';
-	import FormatPicker from '$components/FormatPicker.svelte';
-	import DownloadBtn from '$components/DownloadBtn.svelte';
-	import BatchProgress from '$components/BatchProgress.svelte';
-	import { isValidVideoUrl } from '$lib/api';
-	import { currentDownload } from '$stores/download';
-	import type { ExtractResult, Stream } from '$lib/types';
-	import {
-		trackExtractSuccess,
-		trackFormatSelected
-	} from '$lib/analytics';
-
-	const rawApiBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
-	const API_BASE =
-		typeof window !== 'undefined' &&
-		window.location.protocol === 'https:' &&
-		rawApiBase.startsWith('http://')
-			? `https://${rawApiBase.slice('http://'.length)}`
-			: rawApiBase;
-	const USERSCRIPT_INSTALL_URL =
-		(API_BASE ? `${API_BASE}/userscript` : 'https://api-download.khoadangbui.online/userscript');
-
-	let extractResult = $state<ExtractResult | null>(null);
-	let isExtracting = $state(false);
-	/** Audio stream to pair with video-only stream for transparent muxing */
-	let selectedAudioStream = $state<Stream | null>(null);
-	/** URL prefilled from share-target or clipboard detection */
-	let prefilledUrl = $state('');
-	/** Bookmarklet loader link generated from current origin */
-	let bookmarkletHref = $state('javascript:void(0)');
-
-	/**
-	 * Handle extract completion from UrlInput
-	 */
-	function handleExtract(result: ExtractResult): void {
-		isExtracting = false;
-
-		// Track successful extraction
-		trackExtractSuccess(result.platform, 0, result.streams.length);
-
-		extractResult = result;
-	}
-
-	/**
-	 * Handle format selection from FormatPicker (video stream + optional audio for muxing)
-	 */
-	function handleFormatSelect(videoStream: Stream, audioStream: Stream | null): void {
-		if (extractResult) {
-			currentDownload.update(s => ({ ...s, selectedStream: videoStream }));
-			selectedAudioStream = audioStream;
-
-			// Track format selection
-			trackFormatSelected(
-				extractResult.platform,
-				videoStream.quality,
-				videoStream.format,
-				videoStream.hasAudio
-			);
-		}
-	}
-
-	function applyPrefilledUrl(candidate: string): void {
-		const value = candidate.trim();
-		if (!value || !isValidVideoUrl(value)) return;
-		prefilledUrl = value;
-	}
-
-	onMount(() => {
-		const queryUrl = new URLSearchParams(window.location.search).get('url') ?? '';
-		applyPrefilledUrl(queryUrl);
-
-		const onUrlDetected: EventListener = (event) => {
-			const customEvent = event as CustomEvent<{ url?: string }>;
-			applyPrefilledUrl(customEvent.detail?.url ?? '');
-		};
-		window.addEventListener('yturl-detected', onUrlDetected);
-
-		const bookmarkletScriptBase = API_BASE || window.location.origin;
-		bookmarkletHref =
-			`javascript:(function(){var s=document.createElement("script");` +
-			`s.src="${bookmarkletScriptBase}/bm.js?t="+Date.now();` +
-			`document.body.appendChild(s);})()`;
-
-		return () => {
-			window.removeEventListener('yturl-detected', onUrlDetected);
-		};
-	});
-
-</script>
-
 <svelte:head>
-	<title>Download YouTube Videos Free | VideoDL</title>
-	<meta name="description" content="Free online YouTube video downloader. No registration required. Download videos in high quality instantly." />
-	<meta name="keywords" content="video downloader, youtube downloader, free download, youtube video download" />
-
-	<!-- Open Graph -->
-	<meta property="og:title" content="Download YouTube Videos Free" />
-	<meta property="og:description" content="Free online video downloader. No registration required." />
-	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://videodl.app" />
-	<meta property="og:image" content="https://videodl.app/og-image.jpg" />
-
-	<!-- Twitter Card -->
-	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="Download YouTube Videos Free" />
-	<meta name="twitter:description" content="Free online video downloader. No registration required." />
-
-	<!-- Structured Data -->
-	<script type="application/ld+json">
-		{
-			"@context": "https://schema.org",
-			"@type": "WebApplication",
-			"name": "VideoDL",
-			"description": "Free online video downloader for YouTube",
-			"applicationCategory": "UtilityApplication",
-			"operatingSystem": "Any",
-			"offers": {
-				"@type": "Offer",
-				"price": "0",
-				"priceCurrency": "USD"
-			}
-		}
-	</script>
-</svelte:head>
-
-<div class="hero">
-	<h1>Download YouTube Videos Free</h1>
-	<p class="subtitle">
-		Fast, free, no registration required. Paste a link and download instantly.
-	</p>
-</div>
-
-<section class="download-section" aria-label="Video download">
-	<UrlInput onExtract={handleExtract} prefilledUrl={prefilledUrl} />
-
-	{#if isExtracting}
-		<div class="loading-state">
-			<div class="spinner"></div>
-			<p>Extracting video information...</p>
-		</div>
-	{/if}
-
-	{#if extractResult}
-		<div class="result-card">
-			<div class="video-info">
-				{#if extractResult.thumbnail}
-					<img
-						src={extractResult.thumbnail}
-						alt={extractResult.title}
-						class="thumbnail"
-						loading="lazy"
-					/>
-				{/if}
-				<h3 class="video-title">{extractResult.title}</h3>
-			</div>
-
-			<FormatPicker
-				streams={extractResult.streams}
-				onSelect={handleFormatSelect}
-			/>
-
-			<DownloadBtn
-				stream={$currentDownload.selectedStream}
-				audioStream={selectedAudioStream}
-				title={extractResult.title}
-			/>
-		</div>
-	{/if}
-
-	{#if $currentDownload.error}
-		<div class="error-message" role="alert">
-			<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-				<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-			</svg>
-			<span>{$currentDownload.error}</span>
-		</div>
-	{/if}
-</section>
-
-<section class="batch-section" aria-label="Batch download">
-	<BatchInput />
-	<BatchProgress />
-</section>
-
-<section class="install-section" aria-label="Omnichannel install options">
-	<h2>Install Tools</h2>
-	<div class="install-grid">
-		<article class="install-card">
-			<h3>Bookmarklet</h3>
-			<p>Drag this button to your bookmarks bar for one-click downloads on YouTube pages.</p>
-			<a class="install-link bookmarklet-link" href={bookmarkletHref}>
-				Drag VideoDL Bookmarklet
-			</a>
-			<p class="install-note">If drag-and-drop is unavailable, create a bookmark and paste the link URL.</p>
-		</article>
-
-		<article class="install-card">
-			<h3>UserScript</h3>
-			<p>Install the userscript for Tampermonkey or Violentmonkey.</p>
-			<a
-				class="install-link userscript-link"
-				href={USERSCRIPT_INSTALL_URL}
-				target="_blank"
-				rel="external noopener noreferrer"
-			>
-				Install UserScript
-			</a>
-			<p class="install-note">Requires Tampermonkey or Violentmonkey extension.</p>
-		</article>
-	</div>
-</section>
-
-<section class="features" aria-label="Features">
-	<h2>Why Choose VideoDL?</h2>
-	<div class="feature-grid">
-		<div class="feature">
-			<div class="feature-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-				<path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-			</svg></div>
-			<h3>Instant Download</h3>
-			<p>No waiting, no processing delays. Your download starts immediately.</p>
-		</div>
-		<div class="feature">
-			<div class="feature-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-				<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-			</svg></div>
-			<h3>Smart Muxing</h3>
-			<p>Automatically combines video and audio streams for high-quality YouTube downloads.</p>
-		</div>
-		<div class="feature">
-			<div class="feature-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-				<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
-			</svg></div>
-			<h3>100% Free</h3>
-			<p>No registration, no hidden fees. Completely free to use.</p>
-		</div>
-		<div class="feature">
-			<div class="feature-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-				<path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/>
-			</svg></div>
-			<h3>Mobile Friendly</h3>
-			<p>Works perfectly on iPhone, Android, and all devices.</p>
-		</div>
-	</div>
-</section>
-
+<title>FetchTube - Vibrant Video Downloader</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&amp;family=Nunito:ital,wght@0,200..1000;1,200..1000&amp;family=Spline+Sans:wght@300..700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FF4D8C", // Hot Pink
+                        "secondary": "#FFB938", // Marigold
+                        "accent": "#6C5CE7", // Periwinkle
+                        "plum": "#2D1B36", // Deep Plum
+                        "muted": "#8B7E96",
+                        "bg-page": "#FFF5F9", // Pale Pink White
+                        "bg-surface": "#FFFFFF",
+                        "background-light": "#FFF5F9",
+                        "surface": "#FFFFFF",
+                        "text-main": "#2D1B36",
+                    },
+                    fontFamily: {
+                        "heading": ["Fredoka", "sans-serif"],
+                        "body": ["Nunito", "sans-serif"],
+                        "display": ["Spline Sans", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "xl": "24px",
+                        "2xl": "32px", // radius-xl
+                        "3xl": "48px",
+                        "full": "9999px",
+                        "blob": "40% 60% 70% 30% / 40% 50% 60% 50%"
+                    },
+                    boxShadow: {
+                        "float": "0 20px 40px -10px rgba(255, 77, 140, 0.3)",
+                        "candy": "0 10px 25px -5px rgba(255, 77, 140, 0.4), 0 8px 10px -6px rgba(255, 77, 140, 0.1)",
+                        "input-focus": "0 0 0 4px rgba(255, 77, 140, 0.2)",
+                        "card": "0 10px 30px -5px rgba(45, 27, 54, 0.05)",
+                        "glow": "0 0 20px rgba(255, 77, 140, 0.4)"
+                    },
+                    animation: {
+                        'bob': 'bob 3s ease-in-out infinite',
+                        'bob-delayed': 'bob 3s ease-in-out infinite 1.5s',
+                        'wiggle': 'wiggle 1s ease-in-out infinite',
+                        'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        bob: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-15px)' },
+                        },
+                        wiggle: {
+                            '0%, 100%': { transform: 'rotate(-3deg)' },
+                            '50%': { transform: 'rotate(3deg)' },
+                        },
+                        'pulse-glow': {
+                            '0%, 100%': { opacity: 1, boxShadow: '0 0 0 0 rgba(255, 77, 140, 0.7)' },
+                            '50%': { opacity: .5, boxShadow: '0 0 0 10px rgba(255, 77, 140, 0)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
 <style>
-	.hero {
-		text-align: center;
-		margin-bottom: 2rem;
-	}
-
-	h1 {
-		font-size: clamp(1.75rem, 5vw, 2.5rem);
-		font-weight: 800;
-		color: var(--text-color);
-		margin-bottom: 0.75rem;
-		line-height: 1.2;
-	}
-
-	.subtitle {
-		font-size: 1.125rem;
-		color: var(--text-secondary);
-		max-width: 500px;
-		margin: 0 auto;
-	}
-
-	.loading-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 1rem;
-		padding: 2rem;
-		color: var(--text-secondary);
-	}
-
-	.spinner {
-		width: 40px;
-		height: 40px;
-		border: 3px solid var(--border-color);
-		border-top-color: var(--primary-color);
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
-	.download-section {
-		margin-bottom: 2rem;
-	}
-
-	.result-card {
-		margin-top: 1.5rem;
-		padding: 1.5rem;
-		background: var(--card-bg);
-		border-radius: 1rem;
-		border: 1px solid var(--border-color);
-		display: flex;
-		flex-direction: column;
-		gap: 1.25rem;
-	}
-
-	.video-info {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.thumbnail {
-		width: 120px;
-		height: 68px;
-		object-fit: cover;
-		border-radius: 0.5rem;
-	}
-
-	.video-title {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text-color);
-		margin: 0;
-		display: -webkit-box;
-		line-clamp: 2;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-
-	.error-message {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 1rem;
-		background: var(--error-bg);
-		color: var(--error-color);
-		border-radius: 0.75rem;
-		margin-top: 1rem;
-	}
-
-	.batch-section {
-		margin-bottom: 2rem;
-	}
-
-	.install-section {
-		margin-bottom: 2rem;
-		padding-top: 2rem;
-		border-top: 1px solid var(--border-color);
-	}
-
-	.install-section h2 {
-		text-align: center;
-		font-size: 1.5rem;
-		margin-bottom: 1rem;
-		color: var(--text-color);
-	}
-
-	.install-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 1rem;
-	}
-
-	.install-card {
-		padding: 1.25rem;
-		background: var(--card-bg);
-		border-radius: 1rem;
-		border: 1px solid var(--border-color);
-	}
-
-	.install-card h3 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text-color);
-		margin-bottom: 0.5rem;
-	}
-
-	.install-card p {
-		font-size: 0.875rem;
-		color: var(--text-secondary);
-		margin: 0 0 0.75rem;
-	}
-
-	.install-link {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 100%;
-		padding: 0.75rem;
-		border-radius: 0.75rem;
-		text-decoration: none;
-		font-weight: 600;
-		color: #fff;
-	}
-
-	.bookmarklet-link {
-		background: var(--primary-color);
-	}
-
-	.bookmarklet-link:hover {
-		background: var(--primary-hover);
-	}
-
-	.userscript-link {
-		background: var(--secondary-color);
-	}
-
-	.userscript-link:hover {
-		background: var(--secondary-hover);
-	}
-
-	.install-note {
-		margin-top: 0.75rem;
-		font-size: 0.8125rem;
-	}
-
-	.features {
-		padding-top: 2rem;
-		border-top: 1px solid var(--border-color);
-	}
-
-	.features h2 {
-		text-align: center;
-		font-size: 1.5rem;
-		margin-bottom: 1.5rem;
-		color: var(--text-color);
-	}
-
-	.feature-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1.5rem;
-	}
-
-	.feature {
-		text-align: center;
-		padding: 1.5rem;
-		background: var(--card-bg);
-		border-radius: 1rem;
-		border: 1px solid var(--border-color);
-	}
-
-	.feature-icon {
-		width: 48px;
-		height: 48px;
-		margin: 0 auto 1rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--primary-alpha);
-		color: var(--primary-color);
-		border-radius: 12px;
-	}
-
-	.feature h3 {
-		font-size: 1rem;
-		font-weight: 600;
-		margin-bottom: 0.5rem;
-		color: var(--text-color);
-	}
-
-	.feature p {
-		font-size: 0.875rem;
-		color: var(--text-secondary);
-		margin: 0;
-	}
-
-	@media (max-width: 640px) {
-		.thumbnail {
-			width: 80px;
-			height: 45px;
-		}
-
-		.feature-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-</style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #FFF5F9;
+            color: #2D1B36;
+        }
+        h1, h2, h3, h4, h5, h6, button {
+            font-family: 'Fredoka', sans-serif;
+        }
+        .glass-header {
+            background: rgba(255, 245, 249, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #FF4D8C 0%, #FFB938 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #FF4D8C 0%, #FFB938 100%);
+        }
+        .dashed-border-anim {
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='32' ry='32' stroke='%23FF4D8CFF' stroke-width='3' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e");
+        }html { scroll-behavior: smooth; }
+        .bento-card {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+        }
+        .bento-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px -12px rgba(255, 77, 140, 0.25);
+        }
+        .zig-zag-container > div:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</svelte:head>
+<div class="bg-bg-page min-h-screen flex flex-col overflow-x-hidden text-plum selection:bg-primary/20">
+<header class="glass-header sticky top-0 z-50 border-b border-white/50 px-6 py-3 lg:px-20 transition-all duration-300">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-3 group cursor-pointer">
+<div class="flex size-10 items-center justify-center rounded-full bg-gradient-primary text-white shadow-candy group-hover:rotate-12 transition-transform">
+<span class="material-symbols-outlined text-2xl">smart_toy</span>
+</div>
+<h2 class="text-plum text-2xl font-bold tracking-tight">FetchTube</h2>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<nav class="flex gap-6">
+<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#home">Home</a>
+<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#tools">Tools</a>
+<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#how-it-works">How it Works</a>
+</nav>
+<button class="flex h-10 px-6 items-center justify-center rounded-full bg-plum text-white text-sm font-bold shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 tracking-wide uppercase">
+                Login
+            </button>
+</div>
+<button class="md:hidden text-plum p-2 rounded-xl hover:bg-white/50 transition-colors">
+<span class="material-symbols-outlined text-3xl">menu_open</span>
+</button>
+</div>
+</header>
+<main class="flex-1 w-full">
+<section class="relative min-h-[50vh] flex flex-col items-center justify-center px-6 pt-12 pb-6 overflow-hidden" id="home">
+<div class="absolute top-[10%] left-[5%] w-24 h-24 rounded-full bg-accent/20 blur-xl animate-bob"></div>
+<div class="absolute bottom-[20%] right-[10%] w-32 h-32 rounded-3xl rotate-12 bg-primary/10 blur-xl animate-bob-delayed"></div>
+<div class="absolute top-[20%] right-[15%] w-16 h-16 rounded-full bg-secondary/30 blur-lg animate-bob"></div>
+<div class="relative z-10 w-full max-w-4xl mx-auto text-center">
+<div class="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm mb-4 animate-fade-in-up">
+<span class="text-lg">✨</span>
+<span class="text-xs font-bold text-plum/80 uppercase tracking-wide">The friendliest downloader ever</span>
+</div>
+<h1 class="text-4xl md:text-6xl lg:text-7xl font-bold text-plum mb-4 leading-[0.9] tracking-tight">
+                Save videos in a <br/>
+<span class="text-gradient inline-block hover:scale-105 transition-transform cursor-default">snap.</span>
+</h1>
+<p class="text-lg md:text-xl text-plum/70 max-w-xl mx-auto font-semibold mb-6">
+                Paste a link, click the button, and get back to your life. No ads, no malware, just pure joy.
+            </p>
+<div class="relative w-full max-w-[700px] mx-auto group">
+<div class="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
+<div class="relative flex items-center bg-white rounded-full shadow-float p-2 h-[64px] transition-all duration-300 group-focus-within:ring-4 group-focus-within:ring-primary/20">
+<div class="pl-6 text-plum/30">
+<span class="material-symbols-outlined text-2xl">link</span>
+</div>
+<input class="w-full h-full bg-transparent border-none focus:ring-0 text-lg md:text-xl font-semibold placeholder:text-muted/50 text-plum px-4" placeholder="Paste that YouTube link here..." type="text"/>
+<button class="absolute right-1.5 top-1.5 bottom-1.5 bg-gradient-primary hover:brightness-110 text-white font-bold rounded-full px-6 md:px-10 text-base md:text-lg shadow-candy transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+<span>FETCH IT!</span>
+<span class="material-symbols-outlined font-bold text-lg">bolt</span>
+</button>
+</div>
+</div>
+<div class="mt-8 flex flex-wrap justify-center gap-3 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+<div class="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>
+<span class="font-bold text-xs">Ad-Free Forever</span>
+</div>
+<div class="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-blue-500 text-lg">verified_user</span>
+<span class="font-bold text-xs">Safe &amp; Secure</span>
+</div>
+<div class="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-purple-500 text-lg">rocket_launch</span>
+<span class="font-bold text-xs">Super Fast</span>
+</div>
+</div>
+</div>
+</section>
+<section class="py-12 px-6 lg:px-20 relative bg-white/30" id="tools">
+<div class="max-w-7xl mx-auto">
+<div class="text-center mb-8">
+<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">
+                    Tired of <span class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">Copy-Pasting?</span>
+<span class="inline-block animate-bounce" style="animation-duration: 3s;">😴</span>
+</h2>
+<p class="text-base text-plum/70 max-w-lg mx-auto">
+                    We built some shiny tools to make your life easier. Choose your fighter below.
+                </p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+<div class="bento-card group relative flex flex-col bg-white rounded-2xl p-6 border border-pink-50 shadow-float overflow-hidden h-full min-h-[360px]">
+<div class="absolute top-4 right-4 bg-secondary text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm z-10 tracking-widest uppercase">
+                        Recommended
+                    </div>
+<div class="flex-1 flex flex-col items-center text-center z-10 mt-2">
+<div class="size-24 mb-4 relative flex items-center justify-center">
+<div class="absolute inset-0 bg-blue-100 rounded-full scale-110 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
+<span class="material-symbols-outlined text-[60px] text-[#4285F4] drop-shadow-xl group-hover:scale-110 transition-transform duration-300">extension</span>
+</div>
+<h3 class="text-xl font-bold text-plum mb-2">FetchTube Extension</h3>
+<p class="text-plum/60 font-medium mb-6 text-base">
+                            The easiest way. Adds a cute "Fetch" button right under every video player.
+                        </p>
+</div>
+<div class="mt-auto z-10">
+<button class="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold rounded-full shadow-candy flex items-center justify-center gap-2 transition-all group-hover:scale-[1.02] tracking-wide uppercase text-xs">
+<span class="material-symbols-outlined text-lg">add_to_queue</span>
+                            Add to Chrome
+                        </button>
+</div>
+<div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-pink-50 to-transparent opacity-50 pointer-events-none"></div>
+</div>
+<div class="bento-card group relative flex flex-col bg-white/50 rounded-2xl p-1.5 border-4 border-transparent h-full min-h-[360px]">
+<div class="absolute inset-0 rounded-2xl dashed-border-anim pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity"></div>
+<div class="relative h-full flex flex-col p-5 bg-white/60 rounded-[18px] backdrop-blur-sm">
+<div class="flex-1 flex flex-col items-center text-center">
+<div class="w-16 h-16 bg-secondary/20 text-secondary rounded-2xl flex items-center justify-center mb-4 rotate-3 group-hover:rotate-12 transition-transform shadow-sm">
+<span class="material-symbols-outlined text-4xl">bookmarks</span>
+</div>
+<h3 class="text-xl font-bold text-plum mb-2">The Magic Button</h3>
+<p class="text-plum/60 font-medium mb-6 text-base">
+                                No installation needed. Just drag this pill to your browser's bookmarks bar!
+                            </p>
+<div class="w-full py-6 px-3 bg-pink-50/50 rounded-xl border border-pink-100 border-dashed mb-3 flex justify-center items-center relative overflow-hidden">
+<div class="absolute inset-0 bg-stripes opacity-5"></div>
+<a class="cursor-grab active:cursor-grabbing inline-flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white font-bold py-2.5 px-6 rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 transition-all select-none z-10 text-sm" href="https://download.khoadangbui.online">
+<span class="material-symbols-outlined text-lg">touch_app</span>
+                                    FETCH IT!
+                                </a>
+</div>
+<div class="flex items-center gap-2 text-xs text-plum/50 font-bold bg-white px-3 py-1.5 rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-base animate-bounce">arrow_upward</span>
+                                Drag up to bookmarks
+                            </div>
+</div>
+</div>
+</div>
+<div class="bento-card group relative flex flex-col bg-plum rounded-2xl p-6 shadow-2xl h-full min-h-[360px] text-white overflow-hidden">
+<div class="absolute top-0 right-0 w-48 h-48 bg-accent/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+<div class="flex-1 flex flex-col items-start z-10 relative">
+<div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-lg mb-4 border border-white/10">
+<span class="material-symbols-outlined text-accent text-xs">terminal</span>
+<span class="text-[10px] font-bold tracking-wide uppercase">For Pros</span>
+</div>
+<h3 class="text-xl font-bold mb-2">Power User Script</h3>
+<p class="text-white/70 font-medium mb-6 text-base">
+                            Already use Tampermonkey? Get the raw script for maximum control.
+                        </p>
+<div class="w-full bg-black/30 rounded-xl p-4 font-mono text-xs text-accent mb-4 border border-white/10 shadow-inner">
+<div class="flex gap-1.5 mb-2">
+<div class="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+</div>
+<p class="opacity-60">// install.js</p>
+<p class="text-secondary">const</p> <span class="text-white">quality</span> = <span class="text-primary">'4k'</span>;
+                            <p><span class="text-secondary">await</span> fetch.init();</p>
+</div>
+</div>
+<div class="mt-auto z-10 relative">
+<button class="w-full h-12 bg-accent hover:bg-accent/90 text-white font-bold rounded-full shadow-lg hover:shadow-accent/50 flex items-center justify-center gap-2 transition-all group-hover:translate-x-1 uppercase text-xs tracking-wide">
+<span class="material-symbols-outlined text-lg">download</span>
+                            Install Script
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full max-w-4xl px-6 pt-20 pb-12 text-center mx-auto" id="how-it-works">
+<span class="inline-block py-2 px-4 rounded-full bg-secondary/20 text-secondary font-heading font-bold text-sm mb-4 tracking-wider uppercase">Simple as 1-2-3</span>
+<h2 class="font-heading text-4xl md:text-6xl font-bold text-text-main leading-tight mb-6">
+                How the <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">magic</span> happens
+            </h2>
+<p class="text-lg md:text-xl text-muted font-semibold max-w-2xl mx-auto">
+                Saving your favorite videos shouldn't require a computer science degree. We made it as easy as fetching a stick!
+            </p>
+</section>
+<div class="w-full max-w-7xl px-6 flex flex-col gap-24 md:gap-32 zig-zag-container mb-32 mx-auto">
+<div class="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
+<div class="flex-1 text-center md:text-left space-y-6">
+<div class="size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-heading text-3xl font-bold mx-auto md:mx-0 shadow-sm">
+                        01
+                    </div>
+<h3 class="font-heading text-3xl md:text-4xl font-bold text-text-main">
+                        Find a video you love
+                    </h3>
+<p class="text-lg text-muted font-medium leading-relaxed">
+                        Spot a cooking recipe you need for dinner or a music video that hits just right? Simply copy the URL from your browser address bar. That's all the technical skill you need!
+                    </p>
+<div class="pt-4 flex justify-center md:justify-start gap-4">
+<div class="flex items-center gap-2 text-sm font-bold text-accent bg-accent/10 px-4 py-2 rounded-full">
+<span class="material-symbols-outlined text-lg">youtube_activity</span> YouTube
+                        </div>
+<div class="flex items-center gap-2 text-sm font-bold text-primary bg-primary/10 px-4 py-2 rounded-full">
+<span class="material-symbols-outlined text-lg">music_note</span> TikTok
+                        </div>
+</div>
+</div>
+<div class="flex-1 w-full flex justify-center">
+<div class="relative w-full max-w-md aspect-square">
+<div class="absolute inset-0 bg-gradient-to-tr from-accent/20 to-primary/20 rounded-blob blur-2xl transform rotate-6"></div>
+<div class="relative h-full w-full bg-surface rounded-3xl shadow-float overflow-hidden border-4 border-white flex flex-col transform hover:-rotate-2 transition-transform duration-500">
+<div class="bg-background-light p-4 border-b border-primary/5 flex gap-2">
+<div class="size-3 rounded-full bg-primary/40"></div>
+<div class="size-3 rounded-full bg-secondary/40"></div>
+<div class="flex-1 bg-white rounded-full h-3 ml-2"></div>
+</div>
+<div class="flex-1 relative overflow-hidden bg-background-light">
+<img alt="Abstract 3D illustration of a character watching a colorful screen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUE52gefPx9GfaaiAVYCx9c75IjqlqTyvWaZ1XNQPkXQ2XPkECWD8XY4Z31Tjlya5CkEBBq6o98gEsW7TdGXVwWJ8LJOkmaH87xlhH95XVVAS1juqrAsIAP4_gn5ulok4TGsxJKMowAwd4zjZ9F9smdj9BcaaxGotZMo4sCEq1dtTAYhg3lbTfRHxkRGL2Emxt7wszmO70pYq_nxIobSLDzB-64rRmPzT9ybjNH6Vj4ogYsa-Q-3LlEAXIpGgpNIYb5nkP4VDKXFc"/>
+<div class="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg flex items-center gap-3 animate-pulse">
+<span class="material-symbols-outlined text-primary">link</span>
+<div class="h-2 w-2/3 bg-gray-200 rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
+<div class="flex-1 text-center md:text-left space-y-6">
+<div class="size-16 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center font-heading text-3xl font-bold mx-auto md:mx-0 shadow-sm">
+                        02
+                    </div>
+<h3 class="font-heading text-3xl md:text-4xl font-bold text-text-main">
+                        Paste &amp; Pop it in
+                    </h3>
+<p class="text-lg text-muted font-medium leading-relaxed">
+                        Head over to our massive input bar and drop that link like it's hot. Our fetching engine analyzes the video instantly—no waiting around for spinning wheels.
+                    </p>
+<ul class="space-y-3 pt-2 inline-block text-left">
+<li class="flex items-center gap-3 text-text-main font-bold">
+<span class="material-symbols-outlined text-green-500">check_circle</span>
+                            Instant analysis
+                        </li>
+<li class="flex items-center gap-3 text-text-main font-bold">
+<span class="material-symbols-outlined text-green-500">check_circle</span>
+                            100% Ad-free zone
+                        </li>
+</ul>
+</div>
+<div class="flex-1 w-full flex justify-center">
+<div class="relative w-full max-w-md aspect-square">
+<div class="absolute inset-0 bg-gradient-to-bl from-secondary/30 to-primary/10 rounded-full blur-3xl -z-10"></div>
+<div class="relative h-full w-full rounded-3xl flex items-center justify-center">
+<div class="relative w-64 h-20 bg-white rounded-full shadow-float flex items-center px-4 border-2 border-primary/10 z-20">
+<div class="text-gray-300 text-sm font-bold truncate">https://youtube.com/watch...</div>
+<div class="ml-auto bg-primary text-white rounded-full p-2 shadow-lg">
+<span class="material-symbols-outlined text-sm">download</span>
+</div>
+<img alt="3D stylized hand interacting with a digital interface element" class="absolute -top-24 -right-12 w-48 h-48 object-cover rounded-full border-4 border-white shadow-xl z-30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSiB2lQRivL_3C8SHYi3mXfiOG-SxLgKM-SB1ywVm8Et0-lZ5KhNtf1xEVtGI53bX8HHOcwqwN-DmNoRm_V7HSr3gIcb3ggiLkvozwClXDX56-Y0lKSeSXCdmqT17Bk-ir8nJWtuROT3YRCjgeh3mAfiE-Hr2_80jm-1VrsBBn6dnyLHr5w7xehIGRFqMxu9yuDHgZFwfSnAphrXCeR4lht9tofH5e-gN0vawA_YNcG_XsTTRLE9DuD4mztrFvAEGe3UpM5C9pOQk"/>
+</div>
+<div class="absolute w-48 h-48 bg-secondary rounded-full -bottom-4 -left-4 z-10 opacity-20"></div>
+<div class="absolute w-32 h-32 bg-primary rounded-full top-0 right-10 z-0 opacity-10"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
+<div class="flex-1 text-center md:text-left space-y-6">
+<div class="size-16 rounded-2xl bg-accent/10 text-accent flex items-center justify-center font-heading text-3xl font-bold mx-auto md:mx-0 shadow-sm">
+                        03
+                    </div>
+<h3 class="font-heading text-3xl md:text-4xl font-bold text-text-main">
+                        Watch offline, anywhere
+                    </h3>
+<p class="text-lg text-muted font-medium leading-relaxed">
+                        Download the file to your device and enjoy your content on a plane, in a submarine, or in your secret fortress of solitude. No internet? No problem.
+                    </p>
+<div class="pt-4 flex flex-wrap justify-center md:justify-start gap-3">
+<span class="px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl font-bold text-sm text-gray-600">MP4 4K</span>
+<span class="px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl font-bold text-sm text-gray-600">MP3 Audio</span>
+<span class="px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl font-bold text-sm text-gray-600">GIF Maker</span>
+</div>
+</div>
+<div class="flex-1 w-full flex justify-center">
+<div class="relative w-full max-w-md aspect-square">
+<div class="absolute inset-0 bg-gradient-to-r from-accent/20 to-secondary/20 rounded-blob blur-2xl transform -rotate-12"></div>
+<div class="relative h-full w-full bg-surface rounded-[3rem] shadow-float overflow-hidden border-8 border-white group">
+<img alt="Person relaxing by a pool looking at a tablet screen" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeEqX7ATwqRX3iw85ORD_oO7ZvZSNsaKjYmel3GwH8W7eemo3nMQPyZ7M4D3f0vNiu9g2-ejMvoBWTcN4NDcX_uCQyCIZAP3Y830M9s9IjtyIAMqcDq6WA5mT5p7kYpDvdyRzxw4gWYo6xZjHNR2SJPNUePHiCOVsFNRU4tA5jQ7zL4v1yQfV_EExDvoxc1z9tLBp1MzG0zXLD4MIbV8ZpzcbvaAwt9iYtpDQlSDKyVXliqf5JOE9uEb62ggrYxcLdbyRHKGpGEB0"/>
+<div class="absolute top-8 right-8 bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+<span class="text-xs font-bold text-text-main">Offline Mode</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<section class="w-full bg-surface rounded-t-[4rem] pt-20 pb-24 px-6 shadow-card overflow-hidden relative">
+<div class="absolute top-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+<div class="absolute bottom-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3"></div>
+<div class="max-w-7xl mx-auto relative z-10">
+<div class="text-center mb-16">
+<h2 class="font-heading text-3xl md:text-5xl font-bold text-text-main mb-6">Loved by Humans <br class="hidden md:block"/>(and some robots)</h2>
+<div class="flex flex-wrap justify-center gap-6 md:gap-12 mb-12">
+<div class="flex items-center gap-2 text-muted font-bold">
+<span class="material-symbols-outlined text-primary">shield_lock</span>
+                            Privacy Safe
+                        </div>
+<div class="flex items-center gap-2 text-muted font-bold">
+<span class="material-symbols-outlined text-secondary">block</span>
+                            No Pop-up Ads
+                        </div>
+<div class="flex items-center gap-2 text-muted font-bold">
+<span class="material-symbols-outlined text-accent">bolt</span>
+                            Lightning Fast
+                        </div>
+</div>
+</div>
+<div class="flex overflow-x-auto gap-6 pb-8 hide-scrollbar snap-x snap-mandatory px-4 md:justify-center">
+<div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
+<div class="flex items-center gap-4 mb-4">
+<div class="size-12 rounded-full overflow-hidden border-2 border-primary">
+<img alt="Portrait of Sarah" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Y3A-H3EGvPU8zmqaikjguZFx0MdWCuAVz4FZ7BL-f0S8kmzaaMnFNde8chh1kdoCn-oaSF7Lx0F15djvpv4EZlhnDenwAcl9oNmyhvAOxw03HXO5cFt4IG723uHTi1UIUN9uktuYRDVdOXr8JjjLdFFN5gGE-32PYiKwFSkgcsVcKEaJR3x_yt1wi4120_C8xmqTy2i7x2mmdJnmwEXRiLCVJsjUu6gik5exKPKpfI-zjLRXtnc7JV0qMZDWoRqSOjJW_SmzdI4"/>
+</div>
+<div>
+<h4 class="font-heading font-bold text-text-main">Sarah Jenkins</h4>
+<div class="flex text-secondary text-sm">
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+</div>
+</div>
+</div>
+<p class="text-text-main font-medium leading-relaxed italic">
+                            "My grandma uses this! It's so pink and easy to understand. Finally, a downloader that doesn't feel like I'm installing a virus."
+                        </p>
+</div>
+<div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-primary text-white p-8 rounded-3xl shadow-float transform md:scale-105 hover:-translate-y-2 transition-transform duration-300">
+<div class="flex items-center gap-4 mb-4">
+<div class="size-12 rounded-full overflow-hidden border-2 border-white">
+<img alt="Portrait of Mike" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC76jOxNNtx3Aysjd69Cxad7WEobtismgpD69h9FpOcD1oiwzQceZ8WnbAj7C0bIaV81x5YTNd7SzKorY0qKRd-QSTX44ds-jTUPzRaipVGnena-HEv8HoJFHEf-FnevgwaEcSEpy3aVWTB-X9GRLmAzWdXdfsKcYZuPd2dfoMLSYzccApsUCgo82fU-ZqSBZir02kNcmHE46EBnwy5-BRnbdSrI6_htYogzzZ8WZv4de8syjsAdKQ1-EpRQ-ZQEN0BhqHXoAMaBuY"/>
+</div>
+<div>
+<h4 class="font-heading font-bold text-white">Mike Chen</h4>
+<div class="flex text-secondary text-sm">
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+<span class="material-symbols-outlined text-[18px] text-white">star</span>
+</div>
+</div>
+</div>
+<p class="text-white font-medium leading-relaxed italic">
+                            "I use this for all my study lectures when the uni wifi is down. The MP3 converter is a lifesaver for my commute!"
+                        </p>
+</div>
+<div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
+<div class="flex items-center gap-4 mb-4">
+<div class="size-12 rounded-full overflow-hidden border-2 border-accent">
+<img alt="Portrait of Jen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwRQbiiA6Y7bXK-6WZaKAwVf8k_zWHvy8Pmmk5DenO-jb0SrMgLBAJZ17iHWyn2gLlPspECc-fMFAMcR10e0yhJUVehY5SekEFrX4dE3RMZaDtPHyCqddQhEuOGuehKsGIrgY-F3aq6YJa15QkQGLvLVfyGgoBtoAKhGbVPMCYdjL1GV_Wl6Te7H7fnEEM4j4b08BO2MEx9rF8wFYjiL-9gHhf4b6bTfBfF39i5zB_PMhLy1VHKrt7Hby-vKVm7-Mfk0EsIKw9NM4"/>
+</div>
+<div>
+<h4 class="font-heading font-bold text-text-main">Jen Alston</h4>
+<div class="flex text-secondary text-sm">
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span class="material-symbols-outlined text-[18px]">star_half</span>
+</div>
+</div>
+</div>
+<p class="text-text-main font-medium leading-relaxed italic">
+                            "The design is just so cute. It makes a boring task actually kind of fun. Plus, no weird popups!"
+                        </p>
+</div>
+</div>
+<div class="mt-16 flex justify-center">
+<button class="group relative inline-flex items-center justify-center px-12 py-4 font-heading font-bold text-white transition-all duration-200 bg-gradient-to-r from-primary to-secondary rounded-full shadow-float hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-4 focus:ring-primary/30 text-lg">
+<span class="mr-2">Start Fetching Now</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<footer class="bg-white border-t border-pink-100 py-6 px-6 mt-6">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all">
+<span class="material-symbols-outlined text-xl">smart_toy</span>
+<span class="font-bold text-sm">FetchTube © 2023</span>
+</div>
+<div class="flex gap-4 text-plum/60 font-semibold text-xs">
+<a class="hover:text-primary transition-colors" href="/privacy">Privacy Policy</a>
+<a class="hover:text-primary transition-colors" href="/privacy">Terms of Service</a>
+<a class="hover:text-primary transition-colors" href="/privacy">Contact</a>
+</div>
+</div>
+</footer>
+</div>

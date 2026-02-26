@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import favicon from '$lib/assets/favicon.svg';
 	import CookieConsent from '$components/CookieConsent.svelte';
 	import { initGA } from '$lib/analytics';
@@ -89,31 +90,35 @@
 </svelte:head>
 
 <div class="app">
-	<header class="header">
-		<nav class="nav">
-			<a href="/" class="logo">
-				<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-				</svg>
-				<span>VideoDL</span>
-			</a>
-			{#if showInstallBtn}
-				<button class="install-btn" onclick={handleInstall}>⬇ Install App</button>
-			{/if}
-		</nav>
-	</header>
+	{#if $page.url.pathname !== '/'}
+		<header class="header">
+			<nav class="nav">
+				<a href="/" class="logo">
+					<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+						<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+					</svg>
+					<span>VideoDL</span>
+				</a>
+				{#if showInstallBtn}
+					<button class="install-btn" onclick={handleInstall}>⬇ Install App</button>
+				{/if}
+			</nav>
+		</header>
+	{/if}
 
-	<main class="main">
+	<main class={$page.url.pathname === '/' ? 'main-home' : 'main'}>
 		{@render children()}
 	</main>
 
-	<footer class="footer">
-		<p>&copy; {new Date().getFullYear()} VideoDL. Free video downloader.</p>
-		<div class="footer-links">
-			<a href="/privacy">Privacy Policy</a>
-			<a href="#terms">Terms</a>
-		</div>
-	</footer>
+	{#if $page.url.pathname !== '/'}
+		<footer class="footer">
+			<p>&copy; {new Date().getFullYear()} VideoDL. Free video downloader.</p>
+			<div class="footer-links">
+				<a href="/privacy">Privacy Policy</a>
+				<a href="#terms">Terms</a>
+			</div>
+		</footer>
+	{/if}
 </div>
 
 <!-- Cookie Consent Banner -->
@@ -204,6 +209,13 @@
 		width: 100%;
 		margin: 0 auto;
 		padding: 2rem 1.5rem;
+	}
+
+	.main-home {
+		flex: 1;
+		width: 100%;
+		margin: 0;
+		padding: 0;
 	}
 
 	.footer {
