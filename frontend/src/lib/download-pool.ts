@@ -1,4 +1,4 @@
-import type { BatchMessage, DownloadTask } from './types';
+import type { DownloadTask } from './types';
 
 /**
  * Browser download pool manager - maintains max 3 concurrent downloads
@@ -93,38 +93,3 @@ export class DownloadPool {
  * Global download pool instance
  */
 export const downloadPool = new DownloadPool();
-
-/**
- * Subscribe to batch SSE stream and add downloads to pool
- * @param url - Batch API URL
- * @param onMessage - Callback for each message
- * @returns EventSource for cleanup
- */
-export function subscribeBatch(
-	url: string,
-	onMessage: (msg: BatchMessage) => void
-): EventSource {
-	const es = new EventSource(url);
-
-	es.onmessage = (event) => {
-		try {
-			const data: BatchMessage = JSON.parse(event.data);
-			onMessage(data);
-
-			if (data.type === 'progress' && data.url) {
-				const title = data.title ?? 'video';
-				const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
-				downloadPool.add(data.url, filename);
-			}
-		} catch (err) {
-			console.error('Failed to parse SSE message:', err);
-		}
-	};
-
-	es.onerror = (err) => {
-		console.error('SSE error:', err);
-		es.close();
-	};
-
-	return es;
-}
