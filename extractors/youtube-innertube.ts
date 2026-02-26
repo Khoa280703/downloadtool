@@ -121,6 +121,38 @@ function extractUrl(format: any): string | null {
   return null;
 }
 
+/** Extract file size in bytes from contentLength or URL `clen` param */
+function extractFileSize(format: any, url: string): number | undefined {
+  const raw = format?.contentLength;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return raw;
+  if (typeof raw === "string") {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    const clen = parsedUrl.searchParams.get("clen");
+    if (!clen) return undefined;
+    const parsed = Number.parseInt(clen, 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  } catch {
+    // ignore invalid URL parsing
+  }
+
+  return undefined;
+}
+
+/** Parse a YouTube count string like "1,234,567" to number */
+function parseCount(raw: unknown): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw !== "string") return undefined;
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return undefined;
+  const parsed = Number.parseInt(digits, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 /** Map codec string to human-readable label */
 function getCodecLabel(codecs: string, mediaType: string): string {
   const c = codecs.toLowerCase();
@@ -175,12 +207,14 @@ function parseFormat(format: any): Stream | null {
   }
 
   const codecLabel = codecs ? getCodecLabel(codecs, mediaType) : undefined;
+  const filesize = extractFileSize(format, url);
 
   return {
     url, quality, format: ext, mime: mimeType,
     bitrate, codec: codecs, codecLabel,
     hasAudio, isAudioOnly,
     width, height,
+    filesize,
   };
 }
 
@@ -244,6 +278,9 @@ export async function extractViaInnerTube(
   return {
     streams,
     title: vd?.title ?? "Unknown",
+    description: vd?.shortDescription ?? undefined,
+    channel: vd?.author ?? undefined,
+    viewCount: parseCount(vd?.viewCount),
     thumbnail: vd?.thumbnail?.thumbnails?.pop()?.url,
     duration: vd?.lengthSeconds ? parseInt(vd.lengthSeconds, 10) : undefined,
     platform: "youtube",

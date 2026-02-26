@@ -1,8 +1,106 @@
+<script lang="ts">
+	import DownloadBtn from '$components/DownloadBtn.svelte';
+	import FormatPicker from '$components/FormatPicker.svelte';
+	import { extract, isValidVideoUrl } from '$lib/api';
+	import type { ExtractResult, Stream } from '$lib/types';
+	import { currentDownload } from '$stores/download';
+
+	let inputUrl = $state('');
+	let extractResult = $state<ExtractResult | null>(null);
+	let selectedAudioStream = $state<Stream | null>(null);
+	let isExtracting = $state(false);
+	let extractError = $state('');
+
+	function handleFormatSelect(videoStream: Stream, audioStream: Stream | null): void {
+		currentDownload.update((state) => ({ ...state, selectedStream: videoStream }));
+		selectedAudioStream = audioStream;
+	}
+
+	async function handleFetch(event?: SubmitEvent): Promise<void> {
+		event?.preventDefault();
+		const url = inputUrl.trim();
+
+		if (!url) {
+			extractError = 'Please paste a YouTube URL.';
+			return;
+		}
+
+		if (!isValidVideoUrl(url)) {
+			extractError = 'Please enter a valid YouTube URL.';
+			return;
+		}
+
+		isExtracting = true;
+		extractError = '';
+		extractResult = null;
+		selectedAudioStream = null;
+		currentDownload.update((state) => ({ ...state, selectedStream: null, error: null }));
+		requestAnimationFrame(() => {
+			document
+				.getElementById('download-options')
+				?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		});
+
+		try {
+			const result = await extract(url);
+			if (!result.streams.length) {
+				extractError = 'No downloadable streams were found for this video.';
+				return;
+			}
+
+			extractResult = result;
+			queueMicrotask(() => {
+				document
+					.getElementById('download-options')
+					?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			});
+		} catch (error) {
+			extractError = error instanceof Error ? error.message : 'Failed to fetch this URL.';
+		} finally {
+			isExtracting = false;
+		}
+	}
+
+	function formatDuration(seconds?: number): string {
+		if (!seconds || seconds <= 0) return 'N/A';
+		const total = Math.floor(seconds);
+		const h = Math.floor(total / 3600);
+		const m = Math.floor((total % 3600) / 60);
+		const s = total % 60;
+		if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+		return `${m}:${String(s).padStart(2, '0')}`;
+	}
+
+	function formatViews(views?: number): string {
+		if (!views || views <= 0) return 'N/A';
+		if (views >= 1_000_000_000) return `${(views / 1_000_000_000).toFixed(1)}B`;
+		if (views >= 1_000_000) return `${(views / 1_000_000).toFixed(1)}M`;
+		if (views >= 1_000) return `${(views / 1_000).toFixed(1)}K`;
+		return `${views}`;
+	}
+
+	function shortDescription(text?: string, maxLength = 180): string {
+		if (!text) return '';
+		const normalized = text.replace(/\s+/g, ' ').trim();
+		if (normalized.length <= maxLength) return normalized;
+		return `${normalized.slice(0, maxLength).trimEnd()}...`;
+	}
+
+	function scrollToFetcher(): void {
+		document.getElementById('home')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		queueMicrotask(() => {
+			const input = document.getElementById('video-url-input') as HTMLInputElement | null;
+			input?.focus();
+		});
+	}
+</script>
+
 <svelte:head>
 <title>FetchTube - Vibrant Video Downloader</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&amp;family=Nunito:ital,wght@0,200..1000;1,200..1000&amp;family=Spline+Sans:wght@300..700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
         tailwind.config = {
             theme: {
@@ -104,6 +202,30 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+		.defer-section {
+			content-visibility: auto;
+			contain-intrinsic-size: 1px 900px;
+		}
+		@media (max-width: 768px) {
+			.hero-orb {
+				display: none;
+			}
+		}
+		@media (prefers-reduced-motion: reduce) {
+			html {
+				scroll-behavior: auto !important;
+			}
+			[class*="animate-"] {
+				animation: none !important;
+			}
+			.bento-card,
+			.bento-card:hover,
+			button,
+			a {
+				transition: none !important;
+				transform: none !important;
+			}
+		}
     </style>
 </svelte:head>
 <div class="bg-bg-page min-h-screen flex flex-col overflow-x-hidden text-plum selection:bg-primary/20">
@@ -132,9 +254,9 @@
 </header>
 <main class="flex-1 w-full">
 <section class="relative min-h-[50vh] flex flex-col items-center justify-center px-6 pt-12 pb-6 overflow-hidden" id="home">
-<div class="absolute top-[10%] left-[5%] w-24 h-24 rounded-full bg-accent/20 blur-xl animate-bob"></div>
-<div class="absolute bottom-[20%] right-[10%] w-32 h-32 rounded-3xl rotate-12 bg-primary/10 blur-xl animate-bob-delayed"></div>
-<div class="absolute top-[20%] right-[15%] w-16 h-16 rounded-full bg-secondary/30 blur-lg animate-bob"></div>
+<div class="hero-orb absolute top-[10%] left-[5%] w-24 h-24 rounded-full bg-accent/20 blur-xl animate-bob"></div>
+<div class="hero-orb absolute bottom-[20%] right-[10%] w-32 h-32 rounded-3xl rotate-12 bg-primary/10 blur-xl animate-bob-delayed"></div>
+<div class="hero-orb absolute top-[20%] right-[15%] w-16 h-16 rounded-full bg-secondary/30 blur-lg animate-bob"></div>
 <div class="relative z-10 w-full max-w-4xl mx-auto text-center">
 <div class="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm mb-4 animate-fade-in-up">
 <span class="text-lg">✨</span>
@@ -147,19 +269,28 @@
 <p class="text-lg md:text-xl text-plum/70 max-w-xl mx-auto font-semibold mb-6">
                 Paste a link, click the button, and get back to your life. No ads, no malware, just pure joy.
             </p>
-<div class="relative w-full max-w-[700px] mx-auto group">
+<form class="relative w-full max-w-[700px] mx-auto group" onsubmit={handleFetch}>
 <div class="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
 <div class="relative flex items-center bg-white rounded-full shadow-float p-2 h-[64px] transition-all duration-300 group-focus-within:ring-4 group-focus-within:ring-primary/20">
 <div class="pl-6 text-plum/30">
 <span class="material-symbols-outlined text-2xl">link</span>
 </div>
-<input class="w-full h-full bg-transparent border-none focus:ring-0 text-lg md:text-xl font-semibold placeholder:text-muted/50 text-plum px-4" placeholder="Paste that YouTube link here..." type="text"/>
-<button class="absolute right-1.5 top-1.5 bottom-1.5 bg-gradient-primary hover:brightness-110 text-white font-bold rounded-full px-6 md:px-10 text-base md:text-lg shadow-candy transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
-<span>FETCH IT!</span>
-<span class="material-symbols-outlined font-bold text-lg">bolt</span>
+<input id="video-url-input" class="w-full h-full bg-transparent border-none focus:ring-0 text-lg md:text-xl font-semibold placeholder:text-muted/50 text-plum px-4" placeholder="Paste that YouTube link here..." type="text" bind:value={inputUrl} disabled={isExtracting}/>
+<button class="absolute right-1.5 top-1.5 bottom-1.5 bg-gradient-primary hover:brightness-110 text-white font-bold rounded-full px-6 md:px-10 text-base md:text-lg shadow-candy transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100" type="submit" disabled={isExtracting}>
+<span>{isExtracting ? 'FETCHING...' : 'FETCH IT!'}</span>
+<span class="material-symbols-outlined font-bold text-lg">{isExtracting ? 'progress_activity' : 'bolt'}</span>
 </button>
 </div>
-</div>
+</form>
+{#if extractError}
+<p class="mt-4 text-sm font-bold text-red-500">{extractError}</p>
+{/if}
+{#if isExtracting}
+<p class="mt-4 inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-bold text-primary shadow-sm">
+<span class="material-symbols-outlined animate-spin text-base">progress_activity</span>
+Analyzing your video link...
+</p>
+{/if}
 <div class="mt-8 flex flex-wrap justify-center gap-3 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
 <div class="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl">
 <span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>
@@ -176,7 +307,91 @@
 </div>
 </div>
 </section>
-<section class="py-12 px-6 lg:px-20 relative bg-white/30" id="tools">
+{#if isExtracting}
+<section class="py-8 px-6 lg:px-20" id="download-options">
+<div class="max-w-7xl mx-auto">
+<div class="bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row animate-pulse">
+<div class="w-full lg:w-[42%] p-6 md:p-8 flex flex-col gap-5 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
+<div class="w-full aspect-video rounded-3xl bg-slate-200"></div>
+<div class="h-7 w-11/12 rounded-xl bg-slate-200"></div>
+<div class="flex gap-2">
+<div class="h-8 w-24 rounded-full bg-slate-200"></div>
+<div class="h-8 w-24 rounded-full bg-slate-200"></div>
+<div class="h-8 w-28 rounded-full bg-slate-200"></div>
+</div>
+<div class="h-20 rounded-2xl bg-slate-100"></div>
+</div>
+<div class="flex-1 flex flex-col bg-white">
+<div class="p-6 md:p-8 flex flex-col gap-3">
+<div class="h-11 rounded-2xl bg-slate-200"></div>
+<div class="h-20 rounded-2xl bg-slate-100"></div>
+<div class="h-20 rounded-2xl bg-slate-100"></div>
+<div class="h-20 rounded-2xl bg-slate-100"></div>
+</div>
+<div class="p-6 md:p-8 border-t border-indigo-50 bg-indigo-50/20">
+<div class="h-14 rounded-full bg-slate-200"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+{:else if extractResult}
+<section class="py-8 px-6 lg:px-20" id="download-options">
+<div class="max-w-7xl mx-auto">
+<div class="bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row">
+<div class="w-full lg:w-[42%] p-6 md:p-8 flex flex-col gap-5 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
+<div class="relative w-full aspect-video rounded-3xl overflow-hidden shadow-lg border-4 border-white bg-slate-100">
+{#if extractResult.thumbnail}
+<img class="absolute inset-0 w-full h-full object-cover" src={extractResult.thumbnail} alt={extractResult.title}/>
+{:else}
+<div class="absolute inset-0 grid place-items-center text-slate-400">
+<span class="material-symbols-outlined text-6xl">movie</span>
+</div>
+{/if}
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/20">
+Available
+</div>
+</div>
+<h3 class="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{extractResult.title}</h3>
+<div class="flex flex-wrap items-center gap-3">
+<div class="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-600 text-sm font-bold">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+{formatDuration(extractResult.duration)}
+</div>
+{#if extractResult.viewCount}
+<div class="flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full text-pink-600 text-sm font-bold">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+{formatViews(extractResult.viewCount)}
+</div>
+{/if}
+{#if extractResult.channel}
+<div class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-slate-600 text-sm font-bold">
+<span class="material-symbols-outlined text-[18px]">person</span>
+{extractResult.channel}
+</div>
+{/if}
+</div>
+{#if extractResult.description}
+<div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-600 leading-relaxed">
+<span class="font-bold text-slate-800">Description:</span> {shortDescription(extractResult.description)}
+</div>
+{/if}
+<p class="text-slate-500 font-semibold">Choose format and quality, then download directly.</p>
+</div>
+<div class="flex-1 flex flex-col bg-white">
+<div class="p-6 md:p-8">
+<FormatPicker streams={extractResult.streams} onSelect={handleFormatSelect}/>
+</div>
+<div class="p-6 md:p-8 border-t border-indigo-50 bg-indigo-50/20">
+<DownloadBtn stream={$currentDownload.selectedStream} audioStream={selectedAudioStream} title={extractResult.title}/>
+</div>
+</div>
+</div>
+</div>
+</section>
+{/if}
+<section class="defer-section py-12 px-6 lg:px-20 relative bg-white/30" id="tools">
 <div class="max-w-7xl mx-auto">
 <div class="text-center mb-8">
 <h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">
@@ -267,7 +482,7 @@
 </div>
 </div>
 </section>
-<section class="w-full max-w-4xl px-6 pt-20 pb-12 text-center mx-auto" id="how-it-works">
+<section class="defer-section w-full max-w-4xl px-6 pt-20 pb-12 text-center mx-auto" id="how-it-works">
 <span class="inline-block py-2 px-4 rounded-full bg-secondary/20 text-secondary font-heading font-bold text-sm mb-4 tracking-wider uppercase">Simple as 1-2-3</span>
 <h2 class="font-heading text-4xl md:text-6xl font-bold text-text-main leading-tight mb-6">
                 How the <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">magic</span> happens
@@ -307,7 +522,7 @@
 <div class="flex-1 bg-white rounded-full h-3 ml-2"></div>
 </div>
 <div class="flex-1 relative overflow-hidden bg-background-light">
-<img alt="Abstract 3D illustration of a character watching a colorful screen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUE52gefPx9GfaaiAVYCx9c75IjqlqTyvWaZ1XNQPkXQ2XPkECWD8XY4Z31Tjlya5CkEBBq6o98gEsW7TdGXVwWJ8LJOkmaH87xlhH95XVVAS1juqrAsIAP4_gn5ulok4TGsxJKMowAwd4zjZ9F9smdj9BcaaxGotZMo4sCEq1dtTAYhg3lbTfRHxkRGL2Emxt7wszmO70pYq_nxIobSLDzB-64rRmPzT9ybjNH6Vj4ogYsa-Q-3LlEAXIpGgpNIYb5nkP4VDKXFc"/>
+<img alt="Abstract 3D illustration of a character watching a colorful screen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUE52gefPx9GfaaiAVYCx9c75IjqlqTyvWaZ1XNQPkXQ2XPkECWD8XY4Z31Tjlya5CkEBBq6o98gEsW7TdGXVwWJ8LJOkmaH87xlhH95XVVAS1juqrAsIAP4_gn5ulok4TGsxJKMowAwd4zjZ9F9smdj9BcaaxGotZMo4sCEq1dtTAYhg3lbTfRHxkRGL2Emxt7wszmO70pYq_nxIobSLDzB-64rRmPzT9ybjNH6Vj4ogYsa-Q-3LlEAXIpGgpNIYb5nkP4VDKXFc" loading="lazy" decoding="async"/>
 <div class="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg flex items-center gap-3 animate-pulse">
 <span class="material-symbols-outlined text-primary">link</span>
 <div class="h-2 w-2/3 bg-gray-200 rounded-full"></div>
@@ -348,7 +563,7 @@
 <div class="ml-auto bg-primary text-white rounded-full p-2 shadow-lg">
 <span class="material-symbols-outlined text-sm">download</span>
 </div>
-<img alt="3D stylized hand interacting with a digital interface element" class="absolute -top-24 -right-12 w-48 h-48 object-cover rounded-full border-4 border-white shadow-xl z-30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSiB2lQRivL_3C8SHYi3mXfiOG-SxLgKM-SB1ywVm8Et0-lZ5KhNtf1xEVtGI53bX8HHOcwqwN-DmNoRm_V7HSr3gIcb3ggiLkvozwClXDX56-Y0lKSeSXCdmqT17Bk-ir8nJWtuROT3YRCjgeh3mAfiE-Hr2_80jm-1VrsBBn6dnyLHr5w7xehIGRFqMxu9yuDHgZFwfSnAphrXCeR4lht9tofH5e-gN0vawA_YNcG_XsTTRLE9DuD4mztrFvAEGe3UpM5C9pOQk"/>
+<img alt="3D stylized hand interacting with a digital interface element" class="absolute -top-24 -right-12 w-48 h-48 object-cover rounded-full border-4 border-white shadow-xl z-30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSiB2lQRivL_3C8SHYi3mXfiOG-SxLgKM-SB1ywVm8Et0-lZ5KhNtf1xEVtGI53bX8HHOcwqwN-DmNoRm_V7HSr3gIcb3ggiLkvozwClXDX56-Y0lKSeSXCdmqT17Bk-ir8nJWtuROT3YRCjgeh3mAfiE-Hr2_80jm-1VrsBBn6dnyLHr5w7xehIGRFqMxu9yuDHgZFwfSnAphrXCeR4lht9tofH5e-gN0vawA_YNcG_XsTTRLE9DuD4mztrFvAEGe3UpM5C9pOQk" loading="lazy" decoding="async"/>
 </div>
 <div class="absolute w-48 h-48 bg-secondary rounded-full -bottom-4 -left-4 z-10 opacity-20"></div>
 <div class="absolute w-32 h-32 bg-primary rounded-full top-0 right-10 z-0 opacity-10"></div>
@@ -377,7 +592,7 @@
 <div class="relative w-full max-w-md aspect-square">
 <div class="absolute inset-0 bg-gradient-to-r from-accent/20 to-secondary/20 rounded-blob blur-2xl transform -rotate-12"></div>
 <div class="relative h-full w-full bg-surface rounded-[3rem] shadow-float overflow-hidden border-8 border-white group">
-<img alt="Person relaxing by a pool looking at a tablet screen" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeEqX7ATwqRX3iw85ORD_oO7ZvZSNsaKjYmel3GwH8W7eemo3nMQPyZ7M4D3f0vNiu9g2-ejMvoBWTcN4NDcX_uCQyCIZAP3Y830M9s9IjtyIAMqcDq6WA5mT5p7kYpDvdyRzxw4gWYo6xZjHNR2SJPNUePHiCOVsFNRU4tA5jQ7zL4v1yQfV_EExDvoxc1z9tLBp1MzG0zXLD4MIbV8ZpzcbvaAwt9iYtpDQlSDKyVXliqf5JOE9uEb62ggrYxcLdbyRHKGpGEB0"/>
+<img alt="Person relaxing by a pool looking at a tablet screen" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeEqX7ATwqRX3iw85ORD_oO7ZvZSNsaKjYmel3GwH8W7eemo3nMQPyZ7M4D3f0vNiu9g2-ejMvoBWTcN4NDcX_uCQyCIZAP3Y830M9s9IjtyIAMqcDq6WA5mT5p7kYpDvdyRzxw4gWYo6xZjHNR2SJPNUePHiCOVsFNRU4tA5jQ7zL4v1yQfV_EExDvoxc1z9tLBp1MzG0zXLD4MIbV8ZpzcbvaAwt9iYtpDQlSDKyVXliqf5JOE9uEb62ggrYxcLdbyRHKGpGEB0" loading="lazy" decoding="async"/>
 <div class="absolute top-8 right-8 bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg flex items-center gap-2">
 <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
 <span class="text-xs font-bold text-text-main">Offline Mode</span>
@@ -387,7 +602,7 @@
 </div>
 </div>
 </div>
-<section class="w-full bg-surface rounded-t-[4rem] pt-20 pb-24 px-6 shadow-card overflow-hidden relative">
+<section class="defer-section w-full bg-surface rounded-t-[4rem] pt-20 pb-24 px-6 shadow-card overflow-hidden relative">
 <div class="absolute top-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
 <div class="absolute bottom-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3"></div>
 <div class="max-w-7xl mx-auto relative z-10">
@@ -412,7 +627,7 @@
 <div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
 <div class="flex items-center gap-4 mb-4">
 <div class="size-12 rounded-full overflow-hidden border-2 border-primary">
-<img alt="Portrait of Sarah" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Y3A-H3EGvPU8zmqaikjguZFx0MdWCuAVz4FZ7BL-f0S8kmzaaMnFNde8chh1kdoCn-oaSF7Lx0F15djvpv4EZlhnDenwAcl9oNmyhvAOxw03HXO5cFt4IG723uHTi1UIUN9uktuYRDVdOXr8JjjLdFFN5gGE-32PYiKwFSkgcsVcKEaJR3x_yt1wi4120_C8xmqTy2i7x2mmdJnmwEXRiLCVJsjUu6gik5exKPKpfI-zjLRXtnc7JV0qMZDWoRqSOjJW_SmzdI4"/>
+<img alt="Portrait of Sarah" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Y3A-H3EGvPU8zmqaikjguZFx0MdWCuAVz4FZ7BL-f0S8kmzaaMnFNde8chh1kdoCn-oaSF7Lx0F15djvpv4EZlhnDenwAcl9oNmyhvAOxw03HXO5cFt4IG723uHTi1UIUN9uktuYRDVdOXr8JjjLdFFN5gGE-32PYiKwFSkgcsVcKEaJR3x_yt1wi4120_C8xmqTy2i7x2mmdJnmwEXRiLCVJsjUu6gik5exKPKpfI-zjLRXtnc7JV0qMZDWoRqSOjJW_SmzdI4" loading="lazy" decoding="async"/>
 </div>
 <div>
 <h4 class="font-heading font-bold text-text-main">Sarah Jenkins</h4>
@@ -432,7 +647,7 @@
 <div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-primary text-white p-8 rounded-3xl shadow-float transform md:scale-105 hover:-translate-y-2 transition-transform duration-300">
 <div class="flex items-center gap-4 mb-4">
 <div class="size-12 rounded-full overflow-hidden border-2 border-white">
-<img alt="Portrait of Mike" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC76jOxNNtx3Aysjd69Cxad7WEobtismgpD69h9FpOcD1oiwzQceZ8WnbAj7C0bIaV81x5YTNd7SzKorY0qKRd-QSTX44ds-jTUPzRaipVGnena-HEv8HoJFHEf-FnevgwaEcSEpy3aVWTB-X9GRLmAzWdXdfsKcYZuPd2dfoMLSYzccApsUCgo82fU-ZqSBZir02kNcmHE46EBnwy5-BRnbdSrI6_htYogzzZ8WZv4de8syjsAdKQ1-EpRQ-ZQEN0BhqHXoAMaBuY"/>
+<img alt="Portrait of Mike" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC76jOxNNtx3Aysjd69Cxad7WEobtismgpD69h9FpOcD1oiwzQceZ8WnbAj7C0bIaV81x5YTNd7SzKorY0qKRd-QSTX44ds-jTUPzRaipVGnena-HEv8HoJFHEf-FnevgwaEcSEpy3aVWTB-X9GRLmAzWdXdfsKcYZuPd2dfoMLSYzccApsUCgo82fU-ZqSBZir02kNcmHE46EBnwy5-BRnbdSrI6_htYogzzZ8WZv4de8syjsAdKQ1-EpRQ-ZQEN0BhqHXoAMaBuY" loading="lazy" decoding="async"/>
 </div>
 <div>
 <h4 class="font-heading font-bold text-white">Mike Chen</h4>
@@ -452,7 +667,7 @@
 <div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
 <div class="flex items-center gap-4 mb-4">
 <div class="size-12 rounded-full overflow-hidden border-2 border-accent">
-<img alt="Portrait of Jen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwRQbiiA6Y7bXK-6WZaKAwVf8k_zWHvy8Pmmk5DenO-jb0SrMgLBAJZ17iHWyn2gLlPspECc-fMFAMcR10e0yhJUVehY5SekEFrX4dE3RMZaDtPHyCqddQhEuOGuehKsGIrgY-F3aq6YJa15QkQGLvLVfyGgoBtoAKhGbVPMCYdjL1GV_Wl6Te7H7fnEEM4j4b08BO2MEx9rF8wFYjiL-9gHhf4b6bTfBfF39i5zB_PMhLy1VHKrt7Hby-vKVm7-Mfk0EsIKw9NM4"/>
+<img alt="Portrait of Jen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwRQbiiA6Y7bXK-6WZaKAwVf8k_zWHvy8Pmmk5DenO-jb0SrMgLBAJZ17iHWyn2gLlPspECc-fMFAMcR10e0yhJUVehY5SekEFrX4dE3RMZaDtPHyCqddQhEuOGuehKsGIrgY-F3aq6YJa15QkQGLvLVfyGgoBtoAKhGbVPMCYdjL1GV_Wl6Te7H7fnEEM4j4b08BO2MEx9rF8wFYjiL-9gHhf4b6bTfBfF39i5zB_PMhLy1VHKrt7Hby-vKVm7-Mfk0EsIKw9NM4" loading="lazy" decoding="async"/>
 </div>
 <div>
 <h4 class="font-heading font-bold text-text-main">Jen Alston</h4>
@@ -471,7 +686,7 @@
 </div>
 </div>
 <div class="mt-16 flex justify-center">
-<button class="group relative inline-flex items-center justify-center px-12 py-4 font-heading font-bold text-white transition-all duration-200 bg-gradient-to-r from-primary to-secondary rounded-full shadow-float hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-4 focus:ring-primary/30 text-lg">
+<button class="group relative inline-flex items-center justify-center px-12 py-4 font-heading font-bold text-white transition-all duration-200 bg-gradient-to-r from-primary to-secondary rounded-full shadow-float hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-4 focus:ring-primary/30 text-lg" type="button" onclick={scrollToFetcher}>
 <span class="mr-2">Start Fetching Now</span>
 <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
 </button>

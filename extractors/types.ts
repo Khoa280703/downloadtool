@@ -28,6 +28,8 @@ export interface Stream {
   width?: number;
   /** Height in pixels */
   height?: number;
+  /** File size in bytes if known */
+  filesize?: number;
 }
 
 /**
@@ -38,6 +40,10 @@ export interface ExtractionResult {
   streams: Stream[];
   /** Video title */
   title: string;
+  /** Channel/author name */
+  channel?: string;
+  /** View count */
+  viewCount?: number;
   /** Platform identifier */
   platform: string;
   /** Thumbnail URL */

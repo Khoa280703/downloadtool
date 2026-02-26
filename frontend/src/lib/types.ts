@@ -30,6 +30,12 @@ export interface Stream {
 export interface ExtractResult {
 	/** Video title */
 	title: string;
+	/** Channel/author name */
+	channel?: string;
+	/** View count */
+	viewCount?: number;
+	/** Video description */
+	description?: string;
 	/** Available streams */
 	streams: Stream[];
 	/** Detected platform */

@@ -160,9 +160,21 @@ function parsePlayerResponse(
 
   streams.sort((a, b) => (b.height || 0) - (a.height || 0));
 
+  const parseCount = (raw: unknown): number | undefined => {
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    if (typeof raw !== "string") return undefined;
+    const digits = raw.replace(/[^\d]/g, "");
+    if (!digits) return undefined;
+    const parsed = Number.parseInt(digits, 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
   return {
     streams,
     title: videoDetails.title || "Unknown Title",
+    description: videoDetails.shortDescription || undefined,
+    channel: videoDetails.author || undefined,
+    viewCount: parseCount(videoDetails.viewCount),
     thumbnail: videoDetails.thumbnail?.thumbnails?.pop()?.url,
     duration: videoDetails.lengthSeconds
       ? parseInt(videoDetails.lengthSeconds, 10)

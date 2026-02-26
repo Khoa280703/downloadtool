@@ -167,6 +167,8 @@ mod tests {
     fn create_video_info(formats: Vec<VideoFormat>) -> VideoInfo {
         VideoInfo {
             title: "Test Video".to_string(),
+            channel: None,
+            view_count: None,
             description: None,
             duration: Some(120),
             thumbnail: None,

@@ -8,6 +8,7 @@ use futures::{Stream, StreamExt};
 use proxy::anti_bot::{AntiBotClient, AntiBotError};
 use proxy::cookie_store::Platform;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::{debug, error, info, warn};
 
@@ -20,6 +21,13 @@ const YOUTUBE_CHUNK_SIZE: u64 = 9_500_000;
 /// Maximum retries per chunk on request failure or mid-stream interruption.
 /// Uses exponential backoff: 1s, 2s, 4s.
 const CHUNK_MAX_RETRIES: u32 = 3;
+/// Timeout for establishing a chunk range stream request.
+const CHUNK_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+/// Max idle time waiting for the next bytes from a chunk stream.
+const CHUNK_READ_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+/// Upper bound for waiting a prefetch task after current chunk completes.
+/// If exceeded, abort prefetch and fall back to normal fetch path.
+const PREFETCH_AWAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Type alias for a pinned byte stream with AntiBotError.
 pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, AntiBotError>> + Send>>;
@@ -113,6 +121,8 @@ async fn fetch_stream_chunked(
     let url_owned = url.to_string();
 
     tokio::spawn(async move {
+        type PrefetchHandle = tokio::task::JoinHandle<Result<ByteStream, AntiBotError>>;
+
         // Create new client inside spawned task
         let task_client = match AntiBotClient::new(platform) {
             Ok(c) => c,
@@ -121,10 +131,39 @@ async fn fetch_stream_chunked(
                 return;
             }
         };
+        let task_client = Arc::new(task_client);
 
         let mut offset = 0u64;
+        let mut prefetch: Option<PrefetchHandle> = None;
+        let mut next_stream: Option<ByteStream> = None;
+
         while offset < total_size {
             let chunk_end = (offset + YOUTUBE_CHUNK_SIZE - 1).min(total_size - 1);
+            let next_offset = chunk_end + 1;
+            let has_next_chunk = next_offset < total_size;
+
+            // Sliding window prefetch: while streaming chunk N, keep chunk N+1 request in flight.
+            // This overlaps connection/setup RTT with current chunk transfer.
+            if has_next_chunk && prefetch.is_none() {
+                let next_end = (next_offset + YOUTUBE_CHUNK_SIZE - 1).min(total_size - 1);
+                let next_range = format!("bytes={}-{}", next_offset, next_end);
+                let pf_url = url_owned.clone();
+                let pf_client = Arc::clone(&task_client);
+                prefetch = Some(tokio::spawn(async move {
+                    let pf_stream = tokio::time::timeout(
+                        CHUNK_REQUEST_TIMEOUT,
+                        pf_client.fetch_stream(&pf_url, Some(next_range)),
+                    )
+                    .await
+                    .map_err(|_| {
+                        AntiBotError::MaxRetriesExceeded(format!(
+                            "Prefetch request timed out for range bytes={}-{}",
+                            next_offset, next_end
+                        ))
+                    })??;
+                    Ok::<ByteStream, AntiBotError>(Box::pin(pf_stream))
+                }));
+            }
 
             // Retry loop per chunk: tracks fetch_start to resume mid-stream
             let mut retry_count = 0u32;
@@ -134,37 +173,140 @@ async fn fetch_stream_chunked(
                 let range = format!("bytes={}-{}", fetch_start, chunk_end);
                 debug!("Chunk fetch: bytes={}-{} / {} (attempt {})", fetch_start, chunk_end, total_size, retry_count + 1);
 
-                let stream_result = task_client.fetch_stream(&url_owned, Some(range)).await;
-                let mut chunk_stream = match stream_result {
-                    Ok(s) => s,
-                    Err(e) => {
-                        retry_count += 1;
-                        if retry_count > CHUNK_MAX_RETRIES {
-                            error!("Chunk fetch failed after {} retries bytes={}-{}: {}", CHUNK_MAX_RETRIES, fetch_start, chunk_end, e);
-                            let _ = tx.send(Err(e)).await;
-                            return;
+                let mut chunk_stream: ByteStream = if retry_count == 0 {
+                    if let Some(stream) = next_stream.take() {
+                        stream
+                    } else {
+                        let stream_result = tokio::time::timeout(
+                            CHUNK_REQUEST_TIMEOUT,
+                            task_client.fetch_stream(&url_owned, Some(range)),
+                        )
+                        .await;
+                        match stream_result {
+                            Ok(Ok(s)) => Box::pin(s),
+                            Ok(Err(e)) => {
+                                retry_count += 1;
+                                if retry_count > CHUNK_MAX_RETRIES {
+                                    error!("Chunk fetch failed after {} retries bytes={}-{}: {}", CHUNK_MAX_RETRIES, fetch_start, chunk_end, e);
+                                    if let Some(handle) = prefetch.take() {
+                                        handle.abort();
+                                    }
+                                    let _ = tx.send(Err(e)).await;
+                                    return;
+                                }
+                                let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                                warn!("Chunk request failed (retry {}/{}): {} — retrying in {}s", retry_count, CHUNK_MAX_RETRIES, e, delay.as_secs());
+                                tokio::time::sleep(delay).await;
+                                continue 'retry;
+                            }
+                            Err(_) => {
+                                retry_count += 1;
+                                if retry_count > CHUNK_MAX_RETRIES {
+                                    let err = AntiBotError::MaxRetriesExceeded(format!(
+                                        "Chunk request timed out for range bytes={}-{}",
+                                        fetch_start, chunk_end
+                                    ));
+                                    error!(
+                                        "Chunk request timeout after {} retries bytes={}-{}",
+                                        CHUNK_MAX_RETRIES, fetch_start, chunk_end
+                                    );
+                                    if let Some(handle) = prefetch.take() {
+                                        handle.abort();
+                                    }
+                                    let _ = tx.send(Err(err)).await;
+                                    return;
+                                }
+                                let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                                warn!(
+                                    "Chunk request timeout (retry {}/{}), bytes={}-{}, retrying in {}s",
+                                    retry_count,
+                                    CHUNK_MAX_RETRIES,
+                                    fetch_start,
+                                    chunk_end,
+                                    delay.as_secs()
+                                );
+                                tokio::time::sleep(delay).await;
+                                continue 'retry;
+                            }
                         }
-                        let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
-                        warn!("Chunk request failed (retry {}/{}): {} — retrying in {}s", retry_count, CHUNK_MAX_RETRIES, e, delay.as_secs());
-                        tokio::time::sleep(delay).await;
-                        continue 'retry;
+                    }
+                } else {
+                    let stream_result = tokio::time::timeout(
+                        CHUNK_REQUEST_TIMEOUT,
+                        task_client.fetch_stream(&url_owned, Some(range)),
+                    )
+                    .await;
+                    match stream_result {
+                        Ok(Ok(s)) => Box::pin(s),
+                        Ok(Err(e)) => {
+                            retry_count += 1;
+                            if retry_count > CHUNK_MAX_RETRIES {
+                                error!("Chunk fetch failed after {} retries bytes={}-{}: {}", CHUNK_MAX_RETRIES, fetch_start, chunk_end, e);
+                                if let Some(handle) = prefetch.take() {
+                                    handle.abort();
+                                }
+                                let _ = tx.send(Err(e)).await;
+                                return;
+                            }
+                            let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                            warn!("Chunk request failed (retry {}/{}): {} — retrying in {}s", retry_count, CHUNK_MAX_RETRIES, e, delay.as_secs());
+                            tokio::time::sleep(delay).await;
+                            continue 'retry;
+                        }
+                        Err(_) => {
+                            retry_count += 1;
+                            if retry_count > CHUNK_MAX_RETRIES {
+                                let err = AntiBotError::MaxRetriesExceeded(format!(
+                                    "Chunk request timed out for range bytes={}-{}",
+                                    fetch_start, chunk_end
+                                ));
+                                error!(
+                                    "Chunk request timeout after {} retries bytes={}-{}",
+                                    CHUNK_MAX_RETRIES, fetch_start, chunk_end
+                                );
+                                if let Some(handle) = prefetch.take() {
+                                    handle.abort();
+                                }
+                                let _ = tx.send(Err(err)).await;
+                                return;
+                            }
+                            let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                            warn!(
+                                "Chunk request timeout (retry {}/{}), bytes={}-{}, retrying in {}s",
+                                retry_count,
+                                CHUNK_MAX_RETRIES,
+                                fetch_start,
+                                chunk_end,
+                                delay.as_secs()
+                            );
+                            tokio::time::sleep(delay).await;
+                            continue 'retry;
+                        }
                     }
                 };
 
                 // Stream bytes from this range, tracking position for mid-stream retry
                 let mut stream_ok = true;
-                while let Some(item) = chunk_stream.next().await {
-                    match item {
-                        Ok(bytes) => {
+                loop {
+                    let next_item =
+                        tokio::time::timeout(CHUNK_READ_IDLE_TIMEOUT, chunk_stream.next()).await;
+                    match next_item {
+                        Ok(Some(Ok(bytes))) => {
                             fetch_start += bytes.len() as u64;
                             if tx.send(Ok(bytes)).await.is_err() {
+                                if let Some(handle) = prefetch.take() {
+                                    handle.abort();
+                                }
                                 return; // Receiver dropped — abort
                             }
                         }
-                        Err(e) => {
+                        Ok(Some(Err(e))) => {
                             retry_count += 1;
                             if retry_count > CHUNK_MAX_RETRIES {
                                 error!("Stream interrupted after {} retries at byte {}: {}", CHUNK_MAX_RETRIES, fetch_start, e);
+                                if let Some(handle) = prefetch.take() {
+                                    handle.abort();
+                                }
                                 let _ = tx.send(Err(e)).await;
                                 return;
                             }
@@ -174,7 +316,75 @@ async fn fetch_stream_chunked(
                             stream_ok = false;
                             break;
                         }
+                        Ok(None) => break,
+                        Err(_) => {
+                            retry_count += 1;
+                            if retry_count > CHUNK_MAX_RETRIES {
+                                let err = AntiBotError::MaxRetriesExceeded(format!(
+                                    "Idle timeout while reading range bytes={}-{}",
+                                    fetch_start, chunk_end
+                                ));
+                                error!(
+                                    "Chunk idle-read timeout after {} retries bytes={}-{}",
+                                    CHUNK_MAX_RETRIES, fetch_start, chunk_end
+                                );
+                                if let Some(handle) = prefetch.take() {
+                                    handle.abort();
+                                }
+                                let _ = tx.send(Err(err)).await;
+                                return;
+                            }
+                            let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                            warn!(
+                                "Chunk idle-read timeout (retry {}/{}), bytes={}-{}, retrying in {}s",
+                                retry_count,
+                                CHUNK_MAX_RETRIES,
+                                fetch_start,
+                                chunk_end,
+                                delay.as_secs()
+                            );
+                            tokio::time::sleep(delay).await;
+                            stream_ok = false;
+                            break;
+                        }
                     }
+                }
+
+                // Some servers can terminate the body early without surfacing an explicit error.
+                // If we did not reach the expected byte boundary for this chunk, treat as retryable.
+                let expected_next = chunk_end.saturating_add(1);
+                if stream_ok && fetch_start < expected_next {
+                    retry_count += 1;
+                    if retry_count > CHUNK_MAX_RETRIES {
+                        let err = AntiBotError::MaxRetriesExceeded(format!(
+                            "Premature EOF for range bytes={}-{} (received until byte {})",
+                            offset,
+                            chunk_end,
+                            fetch_start.saturating_sub(1)
+                        ));
+                        error!(
+                            "Premature EOF after {} retries for bytes={}-{} (fetch_start={})",
+                            CHUNK_MAX_RETRIES, offset, chunk_end, fetch_start
+                        );
+                        if let Some(handle) = prefetch.take() {
+                            handle.abort();
+                        }
+                        let _ = tx.send(Err(err)).await;
+                        return;
+                    }
+
+                    let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
+                    warn!(
+                        "Premature EOF at byte {} for bytes={}-{} (retry {}/{}), retrying in {}s",
+                        fetch_start,
+                        offset,
+                        chunk_end,
+                        retry_count,
+                        CHUNK_MAX_RETRIES,
+                        delay.as_secs()
+                    );
+                    tokio::time::sleep(delay).await;
+                    continue 'retry;
                 }
 
                 if stream_ok {
@@ -184,6 +394,56 @@ async fn fetch_stream_chunked(
             }
 
             offset = chunk_end + 1;
+
+            // If a prefetch for the next chunk exists, consume it now.
+            // On failure, fall back to normal fetch path in the next retry loop.
+            if let Some(handle) = prefetch.take() {
+                let mut handle = handle;
+                let timeout = tokio::time::sleep(PREFETCH_AWAIT_TIMEOUT);
+                tokio::pin!(timeout);
+
+                let prefetch_result = tokio::select! {
+                    _ = tx.closed() => {
+                        // Receiver dropped while waiting prefetch completion.
+                        handle.abort();
+                        return;
+                    }
+                    _ = &mut timeout => {
+                        handle.abort();
+                        warn!(
+                            "Prefetch timed out after {:?} at offset {} (fallback to normal fetch)",
+                            PREFETCH_AWAIT_TIMEOUT, offset
+                        );
+                        None
+                    }
+                    result = &mut handle => Some(result),
+                };
+
+                if let Some(result) = prefetch_result {
+                    match result {
+                        Ok(Ok(stream)) => {
+                            next_stream = Some(stream);
+                        }
+                        Ok(Err(e)) => {
+                            warn!(
+                                "Prefetch failed for next chunk at offset {}: {} (fallback to normal fetch)",
+                                offset, e
+                            );
+                        }
+                        Err(join_err) => {
+                            warn!(
+                                "Prefetch task join error at offset {}: {} (fallback to normal fetch)",
+                                offset, join_err
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Defensive cleanup in case loop exits with an in-flight prefetch task.
+        if let Some(handle) = prefetch.take() {
+            handle.abort();
         }
     });
 

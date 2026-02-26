@@ -36,6 +36,10 @@ pub enum ExtractionError {
 pub struct VideoInfo {
     /// Video title
     pub title: String,
+    /// Channel/author name
+    pub channel: Option<String>,
+    /// View count
+    pub view_count: Option<u64>,
     /// Video description (optional)
     pub description: Option<String>,
     /// Video duration in seconds
@@ -95,6 +99,8 @@ mod tests {
     fn test_video_info_serialization() {
         let info = VideoInfo {
             title: "Test Video".to_string(),
+            channel: Some("Test Channel".to_string()),
+            view_count: Some(123456),
             description: None,
             duration: Some(120),
             thumbnail: None,

@@ -38,6 +38,12 @@ pub struct ExtractResponse {
 pub struct VideoMetadata {
     /// Video title
     pub title: String,
+    /// Channel/author name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel: Option<String>,
+    /// View count
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view_count: Option<u64>,
     /// Video description (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -123,6 +129,8 @@ pub async fn extract_handler(
             // Convert to response format
             let metadata = VideoMetadata {
                 title: video_info.title.clone(),
+                channel: video_info.channel,
+                view_count: video_info.view_count,
                 description: video_info.description,
                 duration: video_info.duration,
                 thumbnail: video_info.thumbnail,

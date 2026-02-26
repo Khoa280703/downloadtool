@@ -9,8 +9,8 @@ declare const self: ServiceWorkerGlobalScope;
 const CACHE_NAME = `videodl-${version}`;
 const OFFLINE_URL = '/offline.html';
 
-// Assets to precache on install
-const PRECACHE_ASSETS = [...build, ...files, OFFLINE_URL];
+// Assets to precache on install (dedupe to avoid addAll duplicate requests)
+const PRECACHE_ASSETS = Array.from(new Set([...build, ...files, OFFLINE_URL]));
 
 // Install: precache app shell + offline page
 self.addEventListener('install', (event) => {

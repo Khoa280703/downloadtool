@@ -7,6 +7,86 @@ import type { ExtractResult, BatchMessage } from './types';
 
 const RAW_API_BASE = import.meta.env.VITE_API_URL || '';
 
+function stripErrorPrefix(message: string): string {
+	return message.replace(/^extract(?:ion)?\s+failed:\s*/i, '').replace(/^error:\s*/i, '').trim();
+}
+
+function isBatchLikeYoutubeUrl(url: string): boolean {
+	const lower = url.toLowerCase();
+	return (
+		lower.includes('youtube.com/playlist') ||
+		lower.includes('youtube.com/channel/') ||
+		lower.includes('youtube.com/user/') ||
+		lower.includes('youtube.com/c/') ||
+		lower.includes('youtube.com/@') ||
+		lower.includes('list=')
+	);
+}
+
+function mapExtractErrorMessage(status: number, rawMessage: string, inputUrl: string): string {
+	const clean = stripErrorPrefix(rawMessage);
+	const text = clean.toLowerCase();
+	const urlLower = inputUrl.toLowerCase();
+
+	if (
+		isBatchLikeYoutubeUrl(urlLower) ||
+		text.includes('playlist') ||
+		text.includes('channel')
+	) {
+		return 'Link này là playlist/channel. Hiện tool đang tải từng video; hãy mở 1 video cụ thể rồi thử lại.';
+	}
+
+	if (
+		text.includes('age-restricted') ||
+		text.includes('age restricted') ||
+		text.includes('require authentication') ||
+		text.includes('sign in') ||
+		text.includes('login') ||
+		text.includes('private') ||
+		text.includes('members-only') ||
+		text.includes('restricted')
+	) {
+		return 'Video này đang bị giới hạn quyền truy cập (private/age/members). Hãy thử video public khác.';
+	}
+
+	if (
+		text.includes('region') ||
+		text.includes('country') ||
+		text.includes('geo') ||
+		text.includes('not available')
+	) {
+		return 'Video này có thể bị giới hạn khu vực hoặc tạm thời không khả dụng.';
+	}
+
+	if (
+		status >= 502 ||
+		text.includes('timeout') ||
+		text.includes('timed out') ||
+		text.includes('network') ||
+		text.includes('failed to fetch') ||
+		text.includes('gateway') ||
+		text.includes('connection')
+	) {
+		return 'Kết nối đến nguồn video đang chậm hoặc lỗi tạm thời. Vui lòng thử lại sau vài giây.';
+	}
+
+	if (
+		status === 400 ||
+		text.includes('invalid or unsupported url') ||
+		text.includes('invalid youtube url') ||
+		text.includes('could not extract video id')
+	) {
+		return 'Link chưa đúng định dạng YouTube video. Hãy dán link dạng /watch?v=... hoặc youtu.be/...';
+	}
+
+	if (status >= 500) {
+		return 'Không thể phân tích video lúc này. Vui lòng thử lại sau.';
+	}
+
+	if (clean) return clean;
+	return 'Không thể phân tích link này. Vui lòng thử link YouTube khác.';
+}
+
 function normalizeApiBase(base: string): string {
 	const trimmed = base.trim().replace(/\/+$/, '');
 	if (!trimmed) {
@@ -48,8 +128,18 @@ export async function extract(url: string): Promise<ExtractResult> {
 	});
 
 	if (!response.ok) {
-		const error = await response.text();
-		throw new Error(`Extract failed: ${error}`);
+		const status = response.status;
+		const rawBody = await response.text();
+		let message = rawBody;
+
+		try {
+			const parsed = JSON.parse(rawBody) as { error?: string; message?: string };
+			message = parsed.error || parsed.message || rawBody;
+		} catch {
+			// Keep plain text body as-is when response is not JSON.
+		}
+
+		throw new Error(mapExtractErrorMessage(status, message, url));
 	}
 
 	const raw = await response.json();
@@ -72,6 +162,9 @@ export async function extract(url: string): Promise<ExtractResult> {
 
 	return {
 		title: meta.title || 'Unknown',
+		channel: meta.channel,
+		viewCount: meta.view_count,
+		description: meta.description,
 		streams,
 		platform: getPlatform(url),
 		thumbnail: meta.thumbnail,

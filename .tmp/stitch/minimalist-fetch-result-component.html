@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vibrant Downloader - Friendly Result</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&amp;family=Nunito:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "vibrant-pink": "#FF2E93",
+                        "vibrant-indigo": "#4F46E5",
+                        "vibrant-purple": "#8B5CF6",
+                        "vibrant-cyan": "#06b6d4",
+                        "vibrant-bg": "#F0F4F8",
+                        "surface": "#ffffff",
+                    },
+                    fontFamily: {
+                        "display": ["Fredoka", "sans-serif"],
+                        "body": ["Nunito", "sans-serif"]
+                    },
+                    borderRadius: { "3xl": "1.5rem", "4xl": "2rem" },
+                    boxShadow: {
+                        "soft": "0 10px 40px -10px rgba(79, 70, 229, 0.1), 0 0 0 1px rgba(0,0,0,0.03)",
+                        "pop": "0 8px 20px -4px rgba(255, 46, 147, 0.3)",
+                        "glow-indigo": "0 0 20px rgba(79, 70, 229, 0.25)"
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-vibrant-bg font-body text-slate-800 min-h-screen flex flex-col antialiased selection:bg-vibrant-pink/30 selection:text-vibrant-pink bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+<header class="w-full bg-white/90 backdrop-blur-xl sticky top-0 z-50 border-b border-indigo-50 shadow-sm">
+<div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-10 flex items-center justify-center bg-gradient-to-tr from-vibrant-indigo to-vibrant-pink rounded-xl text-white shadow-lg transform -rotate-3 hover:rotate-0 transition-transform">
+<span class="material-symbols-outlined text-[28px] font-bold">cloud_download</span>
+</div>
+<h2 class="text-2xl font-display font-bold text-slate-800 tracking-tight">PopDownload</h2>
+</div>
+<nav class="hidden md:flex items-center gap-8 font-display">
+<a class="text-slate-600 hover:text-vibrant-indigo text-base font-semibold transition-colors" href="#">Home</a>
+<a class="text-slate-600 hover:text-vibrant-indigo text-base font-semibold transition-colors" href="#">Tools</a>
+<a class="text-slate-600 hover:text-vibrant-indigo text-base font-semibold transition-colors" href="#">Pricing</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="hidden sm:flex h-10 px-6 items-center justify-center rounded-full bg-slate-100 text-slate-700 font-bold hover:bg-indigo-50 hover:text-vibrant-indigo transition-colors border-2 border-transparent hover:border-indigo-100">
+                Sign In
+            </button>
+</div>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center py-12 px-4 sm:px-6">
+<div class="w-full max-w-6xl flex flex-col gap-8">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
+<div class="space-y-2">
+<h1 class="text-4xl md:text-5xl font-display font-bold text-slate-900 tracking-tight">Your video is ready! 🎉</h1>
+<p class="text-slate-500 text-lg font-medium">Choose a format below to start your download.</p>
+</div>
+<button class="group flex items-center gap-2 px-6 py-3 rounded-full bg-white border-2 border-indigo-100 text-vibrant-indigo font-bold hover:bg-vibrant-indigo hover:text-white hover:border-vibrant-indigo transition-all shadow-sm hover:shadow-glow-indigo">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_link</span>
+<span>Convert another</span>
+</button>
+</div>
+<div class="bg-white rounded-[2rem] shadow-soft border border-indigo-50 overflow-hidden flex flex-col lg:flex-row">
+<div class="w-full lg:w-[45%] p-8 flex flex-col gap-6 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
+<div class="relative group w-full aspect-video rounded-3xl overflow-hidden shadow-lg border-4 border-white transform transition-transform duration-500 hover:scale-[1.02]">
+<div class="absolute inset-0 bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAoouaKu1vLk_g4n7tAAPiRwZ6dBJj0Zo2vCH-uKtuS5OqmZ3Eppy4zESvN1iJqSSU9YcN1P3FXXNDUiJhwntYGYP31zsxfmoPCGiX1CUg5D47wwBmmKWs-e7J6mhmRf5MWM9F47TmKLAlzfEj_UBQVlTGIHInLagrOkNROhdrygQJB4-q9R8Gpw0VSVfV9ljaE4ZZqRycPbYX3pwL14FInCUdMAFITB0ySW1VfHto-0p_Tz07AFtuxOpuX8aee1j9YTvOfcOU5gME');"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-80"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<button class="size-16 rounded-full bg-white/25 backdrop-blur-md border-2 border-white/60 flex items-center justify-center text-white shadow-xl hover:scale-110 hover:bg-vibrant-pink hover:border-vibrant-pink transition-all duration-300 group-hover:shadow-pop">
+<span class="material-symbols-outlined text-[40px] fill-1 ml-1">play_arrow</span>
+</button>
+</div>
+<div class="absolute top-4 left-4 bg-vibrant-pink text-white px-3 py-1 rounded-full text-xs font-bold shadow-md uppercase tracking-wider">
+                        Trending
+                    </div>
+<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-bold text-white tabular-nums border border-white/20">
+                        12:45
+                    </div>
+</div>
+<div class="space-y-4">
+<h3 class="text-2xl font-display font-bold text-slate-900 leading-tight">Nature's Awakening - 4K Ultra HD Cinematic Experience</h3>
+<div class="flex flex-wrap items-center gap-3">
+<div class="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full text-vibrant-indigo text-sm font-bold">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+                            1.2M
+                        </div>
+<div class="flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full text-vibrant-pink text-sm font-bold">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+                            45K
+                        </div>
+<div class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-slate-500 text-sm font-bold">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                            2 days ago
+                        </div>
+</div>
+<div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-600 leading-relaxed">
+<span class="font-bold text-slate-800">Description:</span> Experience the breathtaking beauty of nature in stunning 4K resolution. This cinematic journey takes you through misty mountains...
+                    </div>
+</div>
+</div>
+<div class="flex-1 flex flex-col bg-white">
+<div class="flex p-4 gap-2 border-b border-indigo-50">
+<button class="flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-vibrant-indigo text-white shadow-md shadow-indigo-200 transition-transform active:scale-95">
+<div class="flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">movie</span>
+                            Video
+                        </div>
+</button>
+<button class="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-500 hover:text-vibrant-purple hover:bg-purple-50 transition-colors">
+<div class="flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">headphones</span>
+                            Audio
+                        </div>
+</button>
+<button class="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-500 hover:text-vibrant-pink hover:bg-pink-50 transition-colors">
+<div class="flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">subtitles</span>
+                            Subs
+                        </div>
+</button>
+</div>
+<div class="flex-1 p-6 lg:p-8 overflow-y-auto max-h-[600px] scrollbar-hide space-y-4">
+<label class="group relative block cursor-pointer">
+<input checked="" class="peer sr-only" name="quality" type="radio"/>
+<div class="relative flex items-center justify-between p-4 rounded-2xl border-2 border-indigo-100 bg-white hover:border-vibrant-indigo hover:shadow-lg hover:shadow-indigo-100 transition-all peer-checked:border-vibrant-indigo peer-checked:bg-indigo-50/30 peer-checked:shadow-inner">
+<div class="absolute -top-3 right-6 bg-gradient-to-r from-vibrant-indigo to-vibrant-purple text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm uppercase tracking-wide transform group-hover:-translate-y-1 transition-transform">
+                                Best Quality
+                            </div>
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-2xl bg-indigo-100 text-vibrant-indigo flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[28px] fill-1">4k</span>
+</div>
+<div class="flex flex-col">
+<span class="text-slate-900 font-bold text-lg">2160p (4K)</span>
+<div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+<span class="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">MP4</span>
+<span>•</span>
+<span>60fps</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-vibrant-indigo font-bold text-base bg-white px-3 py-1 rounded-lg border border-indigo-100 shadow-sm">1.2 GB</span>
+<div class="size-6 rounded-full border-2 border-slate-300 peer-checked:border-vibrant-indigo peer-checked:bg-vibrant-indigo flex items-center justify-center transition-all">
+<span class="material-symbols-outlined text-white text-[16px] opacity-0 peer-checked:opacity-100">check</span>
+</div>
+</div>
+</div>
+</label>
+<label class="group relative block cursor-pointer">
+<input class="peer sr-only" name="quality" type="radio"/>
+<div class="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-vibrant-indigo/50 hover:bg-indigo-50/10 transition-all peer-checked:border-vibrant-indigo peer-checked:bg-indigo-50/30">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-2xl bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-vibrant-indigo transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">hd</span>
+</div>
+<div class="flex flex-col">
+<span class="text-slate-900 font-bold text-lg">1440p (2K)</span>
+<div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+<span class="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">MP4</span>
+<span>•</span>
+<span>60fps</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-slate-500 font-bold text-sm">650 MB</span>
+<div class="size-6 rounded-full border-2 border-slate-300 peer-checked:border-vibrant-indigo peer-checked:bg-vibrant-indigo flex items-center justify-center transition-all">
+<span class="material-symbols-outlined text-white text-[16px] opacity-0 peer-checked:opacity-100">check</span>
+</div>
+</div>
+</div>
+</label>
+<label class="group relative block cursor-pointer">
+<input class="peer sr-only" name="quality" type="radio"/>
+<div class="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-vibrant-pink/50 hover:bg-pink-50/10 transition-all peer-checked:border-vibrant-pink peer-checked:bg-pink-50/30">
+<div class="absolute -top-3 right-6 bg-vibrant-pink text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm uppercase tracking-wide transform scale-0 group-hover:scale-100 transition-transform">
+                                Popular
+                            </div>
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-2xl bg-pink-50 text-vibrant-pink flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">hd</span>
+</div>
+<div class="flex flex-col">
+<span class="text-slate-900 font-bold text-lg">1080p Full HD</span>
+<div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+<span class="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">MP4</span>
+<span>•</span>
+<span>60fps</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-slate-500 font-bold text-sm">320 MB</span>
+<div class="size-6 rounded-full border-2 border-slate-300 peer-checked:border-vibrant-pink peer-checked:bg-vibrant-pink flex items-center justify-center transition-all">
+<span class="material-symbols-outlined text-white text-[16px] opacity-0 peer-checked:opacity-100">check</span>
+</div>
+</div>
+</div>
+</label>
+<label class="group relative block cursor-pointer">
+<input class="peer sr-only" name="quality" type="radio"/>
+<div class="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-vibrant-cyan/50 hover:bg-cyan-50/10 transition-all peer-checked:border-vibrant-cyan peer-checked:bg-cyan-50/30">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-2xl bg-cyan-50 text-vibrant-cyan flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">sd</span>
+</div>
+<div class="flex flex-col">
+<span class="text-slate-900 font-bold text-lg">720p HD</span>
+<div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+<span class="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">MP4</span>
+<span>•</span>
+<span>30fps</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-slate-500 font-bold text-sm">120 MB</span>
+<div class="size-6 rounded-full border-2 border-slate-300 peer-checked:border-vibrant-cyan peer-checked:bg-vibrant-cyan flex items-center justify-center transition-all">
+<span class="material-symbols-outlined text-white text-[16px] opacity-0 peer-checked:opacity-100">check</span>
+</div>
+</div>
+</div>
+</label>
+<label class="group relative block cursor-pointer">
+<input class="peer sr-only" name="quality" type="radio"/>
+<div class="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50 transition-all peer-checked:border-slate-400 peer-checked:bg-slate-100">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">smartphone</span>
+</div>
+<div class="flex flex-col">
+<span class="text-slate-900 font-bold text-lg">480p SD</span>
+<div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+<span class="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">MP4</span>
+<span>•</span>
+<span>30fps</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-slate-500 font-bold text-sm">65 MB</span>
+<div class="size-6 rounded-full border-2 border-slate-300 peer-checked:border-slate-500 peer-checked:bg-slate-500 flex items-center justify-center transition-all">
+<span class="material-symbols-outlined text-white text-[16px] opacity-0 peer-checked:opacity-100">check</span>
+</div>
+</div>
+</div>
+</label>
+<label class="group relative block cursor-pointer">
+<input class="peer sr-only" name="quality" type="radio"/>
+<div class="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50 transition-all peer-checked:border-slate-400 peer-checked:bg-slate-100">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">data_saver_on</span>
+</div>
+<div class="flex flex-col">
+<span class="text-slate-900 font-bold text-lg">360p Low</span>
+<div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+<span class="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">MP4</span>
+<span>•</span>
+<span>Data Saver</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-slate-500 font-bold text-sm">30 MB</span>
+<div class="size-6 rounded-full border-2 border-slate-300 peer-checked:border-slate-500 peer-checked:bg-slate-500 flex items-center justify-center transition-all">
+<span class="material-symbols-outlined text-white text-[16px] opacity-0 peer-checked:opacity-100">check</span>
+</div>
+</div>
+</div>
+</label>
+</div>
+<div class="p-6 lg:p-8 border-t border-indigo-50 bg-indigo-50/30 rounded-br-[2rem] rounded-bl-[2rem] lg:rounded-bl-none">
+<button class="w-full flex items-center justify-center gap-3 bg-vibrant-pink text-white h-14 rounded-full font-bold text-lg shadow-pop hover:shadow-glow-indigo hover:-translate-y-1 hover:bg-pink-500 transition-all duration-300">
+<span class="material-symbols-outlined animate-bounce">download</span>
+                        Download Now (1.2 GB)
+                    </button>
+<p class="text-center text-xs font-semibold text-slate-400 mt-4">
+                        By using PopDownload, you accept our <a class="underline decoration-2 hover:text-vibrant-pink" href="#">Terms</a>. No hidden fees, just fun.
+                    </p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="group flex flex-col items-center text-center p-6 rounded-3xl bg-white border border-transparent hover:border-indigo-100 hover:shadow-lg transition-all">
+<div class="size-14 rounded-2xl bg-indigo-100 flex items-center justify-center text-vibrant-indigo mb-4 group-hover:rotate-12 transition-transform">
+<span class="material-symbols-outlined text-3xl">rocket_launch</span>
+</div>
+<h4 class="font-bold text-slate-900 text-lg">Super Fast</h4>
+<p class="text-slate-500 text-sm mt-2">Downloads at light speed so you can watch sooner.</p>
+</div>
+<div class="group flex flex-col items-center text-center p-6 rounded-3xl bg-white border border-transparent hover:border-pink-100 hover:shadow-lg transition-all">
+<div class="size-14 rounded-2xl bg-pink-100 flex items-center justify-center text-vibrant-pink mb-4 group-hover:-rotate-12 transition-transform">
+<span class="material-symbols-outlined text-3xl">verified_user</span>
+</div>
+<h4 class="font-bold text-slate-900 text-lg">100% Secure</h4>
+<p class="text-slate-500 text-sm mt-2">Private and safe. We care about your data.</p>
+</div>
+<div class="group flex flex-col items-center text-center p-6 rounded-3xl bg-white border border-transparent hover:border-purple-100 hover:shadow-lg transition-all">
+<div class="size-14 rounded-2xl bg-purple-100 flex items-center justify-center text-vibrant-purple mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">auto_awesome</span>
+</div>
+<h4 class="font-bold text-slate-900 text-lg">Crystal Clear</h4>
+<p class="text-slate-500 text-sm mt-2">Best quality every time. No blurry videos here.</p>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

@@ -178,6 +178,13 @@ fn parse_extraction_result(
         .unwrap_or("Unknown")
         .to_string();
 
+    let channel = result
+        .get("channel")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let view_count = result.get("viewCount").and_then(parse_u64_value);
+
     let description = result.get("description").and_then(|v| v.as_str()).map(String::from);
 
     let duration = result.get("duration").and_then(|v| v.as_u64());
@@ -225,6 +232,11 @@ fn parse_extraction_result(
         let width = stream_obj.get("width").and_then(|v| v.as_u64()).map(|w| w as u32);
 
         let bitrate = stream_obj.get("bitrate").and_then(|v| v.as_u64());
+        let filesize = stream_obj
+            .get("filesize")
+            .and_then(parse_u64_value)
+            .or_else(|| stream_obj.get("contentLength").and_then(parse_u64_value))
+            .or_else(|| extract_clen_from_url(url));
 
         let codec = stream_obj.get("codec").and_then(|v| v.as_str()).map(String::from);
         let codec_label = stream_obj.get("codecLabel").and_then(|v| v.as_str()).map(String::from);
@@ -245,18 +257,38 @@ fn parse_extraction_result(
             bitrate,
             ext: format.to_string(),
             url: url.to_string(),
-            filesize: None,
+            filesize,
         });
     }
 
     Ok(VideoInfo {
         title,
+        channel,
+        view_count,
         description,
         duration,
         thumbnail,
         formats,
         original_url: original_url.to_string(),
     })
+}
+
+/// Parse an integer-like JSON value to u64.
+///
+/// Accepts either number (`123`) or string (`"123"`).
+fn parse_u64_value(value: &serde_json::Value) -> Option<u64> {
+    value
+        .as_u64()
+        .or_else(|| value.as_str().and_then(|s| s.parse::<u64>().ok()))
+}
+
+/// Extract `clen` (content length) from CDN URL query params.
+fn extract_clen_from_url(url: &str) -> Option<u64> {
+    let parsed = reqwest::Url::parse(url).ok()?;
+    parsed
+        .query_pairs()
+        .find(|(k, _)| k == "clen")
+        .and_then(|(_, v)| v.parse::<u64>().ok())
 }
 
 /// Allowed domains for HTTP fetch (security whitelist)
@@ -443,6 +475,7 @@ fn op_log(#[string] level: String, #[string] message: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_should_use_socks5_youtube() {
@@ -472,5 +505,20 @@ mod tests {
     #[test]
     fn test_should_use_socks5_invalid_url_false() {
         assert!(!should_use_socks5("not-a-valid-url"));
+    }
+
+    #[test]
+    fn test_parse_u64_value_number_and_string() {
+        assert_eq!(parse_u64_value(&json!(12345)), Some(12_345));
+        assert_eq!(parse_u64_value(&json!("67890")), Some(67_890));
+        assert_eq!(parse_u64_value(&json!("not-a-number")), None);
+    }
+
+    #[test]
+    fn test_extract_clen_from_url() {
+        let url = "https://rr1.googlevideo.com/videoplayback?clen=20971520&mime=video%2Fmp4";
+        assert_eq!(extract_clen_from_url(url), Some(20_971_520));
+        assert_eq!(extract_clen_from_url("https://example.com/video?foo=bar"), None);
+        assert_eq!(extract_clen_from_url("not-a-url"), None);
     }
 }
