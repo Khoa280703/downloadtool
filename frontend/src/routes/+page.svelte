@@ -1,13 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import UrlInput from '$components/UrlInput.svelte';
 	import BatchInput from '$components/BatchInput.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import BatchProgress from '$components/BatchProgress.svelte';
-	import AdBanner from '$components/AdBanner.svelte';
-	import InterstitialAd from '$components/InterstitialAd.svelte';
+	import { isValidVideoUrl } from '$lib/api';
 	import { currentDownload } from '$stores/download';
-	import { hasConsent } from '$stores/consent';
 	import type { ExtractResult, Stream } from '$lib/types';
 	import {
 		trackExtractSuccess,
@@ -16,14 +15,12 @@
 
 	let extractResult = $state<ExtractResult | null>(null);
 	let isExtracting = $state(false);
-	let showInterstitial = $state(false);
-	let pendingExtractResult = $state<ExtractResult | null>(null);
 	/** Audio stream to pair with video-only stream for transparent muxing */
 	let selectedAudioStream = $state<Stream | null>(null);
-
-	/** Enable interstitial flag */
-	const enableInterstitial = import.meta.env.PUBLIC_ENABLE_INTERSTITIAL !== 'false';
-	const enableBanners = import.meta.env.PUBLIC_ENABLE_BANNERS !== 'false';
+	/** URL prefilled from share-target or clipboard detection */
+	let prefilledUrl = $state('');
+	/** Bookmarklet loader link generated from current origin */
+	let bookmarkletHref = $state('javascript:void(0)');
 
 	/**
 	 * Handle extract completion from UrlInput
@@ -34,25 +31,7 @@
 		// Track successful extraction
 		trackExtractSuccess(result.platform, 0, result.streams.length);
 
-		// Show interstitial if enabled and user has consent
-		if (enableInterstitial && $hasConsent) {
-			pendingExtractResult = result;
-			showInterstitial = true;
-		} else {
-			extractResult = result;
-		}
-	}
-
-
-	/**
-	 * Handle interstitial completion
-	 */
-	function handleInterstitialComplete(): void {
-		showInterstitial = false;
-		if (pendingExtractResult) {
-			extractResult = pendingExtractResult;
-			pendingExtractResult = null;
-		}
+		extractResult = result;
 	}
 
 	/**
@@ -72,6 +51,32 @@
 			);
 		}
 	}
+
+	function applyPrefilledUrl(candidate: string): void {
+		const value = candidate.trim();
+		if (!value || !isValidVideoUrl(value)) return;
+		prefilledUrl = value;
+	}
+
+	onMount(() => {
+		const queryUrl = new URLSearchParams(window.location.search).get('url') ?? '';
+		applyPrefilledUrl(queryUrl);
+
+		const onUrlDetected: EventListener = (event) => {
+			const customEvent = event as CustomEvent<{ url?: string }>;
+			applyPrefilledUrl(customEvent.detail?.url ?? '');
+		};
+		window.addEventListener('yturl-detected', onUrlDetected);
+
+		bookmarkletHref =
+			`javascript:(function(){var s=document.createElement("script");` +
+			`s.src="${window.location.origin}/bm.js?t="+Date.now();` +
+			`document.body.appendChild(s);})()`;
+
+		return () => {
+			window.removeEventListener('yturl-detected', onUrlDetected);
+		};
+	});
 
 </script>
 
@@ -110,13 +115,6 @@
 	</script>
 </svelte:head>
 
-<!-- Interstitial Ad Modal -->
-<InterstitialAd
-	bind:show={showInterstitial}
-	onComplete={handleInterstitialComplete}
-	countdownSeconds={3}
-/>
-
 <div class="hero">
 	<h1>Download YouTube Videos Free</h1>
 	<p class="subtitle">
@@ -124,12 +122,8 @@
 	</p>
 </div>
 
-{#if enableBanners}
-	<AdBanner size="300x250" slot="top-banner" network="adsterra" />
-{/if}
-
 <section class="download-section" aria-label="Video download">
-	<UrlInput onExtract={handleExtract} />
+	<UrlInput onExtract={handleExtract} prefilledUrl={prefilledUrl} />
 
 	{#if isExtracting}
 		<div class="loading-state">
@@ -175,13 +169,37 @@
 	{/if}
 </section>
 
-{#if enableBanners}
-	<AdBanner size="300x250" slot="mid-rectangle" network="adsterra" />
-{/if}
-
 <section class="batch-section" aria-label="Batch download">
 	<BatchInput />
 	<BatchProgress />
+</section>
+
+<section class="install-section" aria-label="Omnichannel install options">
+	<h2>Install Tools</h2>
+	<div class="install-grid">
+		<article class="install-card">
+			<h3>Bookmarklet</h3>
+			<p>Drag this button to your bookmarks bar for one-click downloads on YouTube pages.</p>
+			<a class="install-link bookmarklet-link" href={bookmarkletHref}>
+				Drag VideoDL Bookmarklet
+			</a>
+			<p class="install-note">If drag-and-drop is unavailable, create a bookmark and paste the link URL.</p>
+		</article>
+
+		<article class="install-card">
+			<h3>UserScript</h3>
+			<p>Install the userscript for Tampermonkey or Violentmonkey.</p>
+			<a
+				class="install-link userscript-link"
+				href="/userscript"
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				Install UserScript
+			</a>
+			<p class="install-note">Requires Tampermonkey or Violentmonkey extension.</p>
+		</article>
+	</div>
 </section>
 
 <section class="features" aria-label="Features">
@@ -314,6 +332,78 @@
 
 	.batch-section {
 		margin-bottom: 2rem;
+	}
+
+	.install-section {
+		margin-bottom: 2rem;
+		padding-top: 2rem;
+		border-top: 1px solid var(--border-color);
+	}
+
+	.install-section h2 {
+		text-align: center;
+		font-size: 1.5rem;
+		margin-bottom: 1rem;
+		color: var(--text-color);
+	}
+
+	.install-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 1rem;
+	}
+
+	.install-card {
+		padding: 1.25rem;
+		background: var(--card-bg);
+		border-radius: 1rem;
+		border: 1px solid var(--border-color);
+	}
+
+	.install-card h3 {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text-color);
+		margin-bottom: 0.5rem;
+	}
+
+	.install-card p {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+		margin: 0 0 0.75rem;
+	}
+
+	.install-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		padding: 0.75rem;
+		border-radius: 0.75rem;
+		text-decoration: none;
+		font-weight: 600;
+		color: #fff;
+	}
+
+	.bookmarklet-link {
+		background: var(--primary-color);
+	}
+
+	.bookmarklet-link:hover {
+		background: var(--primary-hover);
+	}
+
+	.userscript-link {
+		background: var(--secondary-color);
+	}
+
+	.userscript-link:hover {
+		background: var(--secondary-hover);
+	}
+
+	.install-note {
+		margin-top: 0.75rem;
+		font-size: 0.8125rem;
 	}
 
 	.features {

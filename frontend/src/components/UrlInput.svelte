@@ -11,13 +11,15 @@
 
 	interface Props {
 		onExtract?: (result: ExtractResult) => void;
+		prefilledUrl?: string;
 	}
 
-	let { onExtract }: Props = $props();
+	let { onExtract, prefilledUrl = '' }: Props = $props();
 
 	let url = $state('');
 	let isPasting = $state(false);
 	let validationError = $state('');
+	let lastAutoFilledUrl = $state('');
 
 	/** Validate URL format */
 	function validate(input: string): boolean {
@@ -32,6 +34,18 @@
 		validationError = '';
 		return true;
 	}
+
+	$effect(() => {
+		const candidate = prefilledUrl.trim();
+		if (!candidate || candidate === lastAutoFilledUrl || candidate === url) return;
+
+		// Do not override manually typed input.
+		if (url.trim() && url !== lastAutoFilledUrl) return;
+
+		url = candidate;
+		lastAutoFilledUrl = candidate;
+		validate(candidate);
+	});
 
 	/** Handle paste button click */
 	async function handlePaste(): Promise<void> {
