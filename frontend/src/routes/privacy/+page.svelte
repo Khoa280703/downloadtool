@@ -46,7 +46,7 @@
 			</li>
 			<li>
 				<strong>Cookies:</strong> We use cookies and similar technologies to enhance your browsing
-				experience and serve relevant advertisements. See our Cookie Policy below for details.
+				experience and improve site performance. See our Cookie Policy below for details.
 			</li>
 		</ul>
 	</section>
@@ -58,7 +58,6 @@
 			<li>To provide and maintain our video downloading service</li>
 			<li>To improve and optimize our website performance</li>
 			<li>To analyze usage patterns and trends</li>
-			<li>To serve relevant advertisements (with your consent)</li>
 			<li>To detect and prevent abuse of our service</li>
 			<li>To comply with legal obligations</li>
 		</ul>
@@ -82,8 +81,8 @@
 				by collecting and reporting information anonymously.
 			</li>
 			<li>
-				<strong>Advertising Cookies:</strong> Used to deliver relevant advertisements and track
-				ad performance. These are only set with your explicit consent.
+				<strong>Preference Cookies:</strong> Remember your settings and provide a more
+				consistent experience across visits.
 			</li>
 		</ul>
 
@@ -100,10 +99,6 @@
 			<li>
 				<strong>Google Analytics:</strong> For website analytics and usage statistics.
 				<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>
-			</li>
-			<li>
-				<strong>Advertising Partners:</strong> We display advertisements from third-party networks
-				including AdsTerra and PropellerAds. These partners may use cookies to personalize ads.
 			</li>
 			<li>
 				<strong>Cloudflare:</strong> For website security and performance optimization.
@@ -189,7 +184,7 @@
 				<strong>Legitimate Interest:</strong> For essential service functionality and security
 			</li>
 			<li>
-				<strong>Consent:</strong> For analytics and advertising cookies
+				<strong>Consent:</strong> For analytics and preference cookies
 			</li>
 		</ul>
 		<p>

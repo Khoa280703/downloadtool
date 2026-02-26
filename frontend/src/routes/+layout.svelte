@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
-	import AdBanner from '$components/AdBanner.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
 	import { initGA } from '$lib/analytics';
 	import { browser } from '$app/environment';
@@ -10,9 +9,6 @@
 
 	/** GA4 Measurement ID from env */
 	const GA_MEASUREMENT_ID = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || '';
-
-	/** Enable banners flag */
-	const enableBanners = import.meta.env.PUBLIC_ENABLE_BANNERS !== 'false';
 
 	/** Deferred install prompt for PWA "Add to Home Screen" */
 	let deferredInstallPrompt = $state<BeforeInstallPromptEvent | null>(null);
@@ -105,30 +101,11 @@
 				<button class="install-btn" onclick={handleInstall}>⬇ Install App</button>
 			{/if}
 		</nav>
-
-		{#if enableBanners}
-			<!-- Desktop Header Banner -->
-			<div class="header-ad-desktop">
-				<AdBanner size="728x90" slot="header-desktop" network="adsterra" lazy={false} />
-			</div>
-
-			<!-- Mobile Header Banner -->
-			<div class="header-ad-mobile">
-				<AdBanner size="320x50" slot="header-mobile" network="adsterra" lazy={false} />
-			</div>
-		{/if}
 	</header>
 
 	<main class="main">
 		{@render children()}
 	</main>
-
-	{#if enableBanners}
-		<!-- Footer Banner (Mobile Sticky) -->
-		<div class="footer-ad-mobile">
-			<AdBanner size="320x50" slot="footer-mobile" network="adsterra" />
-		</div>
-	{/if}
 
 	<footer class="footer">
 		<p>&copy; {new Date().getFullYear()} VideoDL. Free video downloader.</p>
@@ -221,39 +198,12 @@
 	}
 	.install-btn:hover { background: var(--primary-hover); }
 
-	.header-ad-desktop {
-		display: none;
-		padding: 0.5rem 1.5rem;
-		background: var(--card-bg);
-		border-top: 1px solid var(--border-color);
-	}
-
-	.header-ad-mobile {
-		display: block;
-		padding: 0.5rem;
-		background: var(--card-bg);
-		border-top: 1px solid var(--border-color);
-	}
-
 	.main {
 		flex: 1;
 		max-width: 800px;
 		width: 100%;
 		margin: 0 auto;
 		padding: 2rem 1.5rem;
-		padding-bottom: 5rem; /* Space for mobile sticky ad */
-	}
-
-	.footer-ad-mobile {
-		position: fixed;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		background: var(--bg-color);
-		border-top: 1px solid var(--border-color);
-		padding: 0.5rem;
-		z-index: 50;
-		display: block;
 	}
 
 	.footer {
@@ -263,7 +213,6 @@
 		color: var(--text-secondary);
 		font-size: 0.875rem;
 		background: var(--bg-color);
-		margin-bottom: 70px; /* Space for mobile sticky ad */
 	}
 
 	.footer p {
@@ -286,31 +235,15 @@
 	}
 
 	@media (min-width: 768px) {
-		.header-ad-desktop {
-			display: block;
-		}
-
-		.header-ad-mobile {
-			display: none;
-		}
-
-		.footer-ad-mobile {
-			display: none;
-		}
-
 		.main {
 			padding-bottom: 2rem;
-		}
-
-		.footer {
-			margin-bottom: 0;
 		}
 	}
 
 	@media (max-width: 640px) {
 		.main {
 			padding: 1rem;
-			padding-bottom: 5rem;
+			padding-bottom: 2rem;
 		}
 
 		.nav {

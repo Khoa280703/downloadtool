@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { slide } from 'svelte/transition';
 	import { consent, hasDecided } from '$stores/consent';
 	import { trackConsent } from '$lib/analytics';
@@ -7,6 +9,13 @@
 	 * Show/hide detailed info
 	 */
 	let showDetails = $state(false);
+	let isClientReady = $state(false);
+
+	onMount(() => {
+		// Avoid SSR -> CSR flicker where banner appears briefly then closes
+		// when consent state is restored from localStorage on the client.
+		isClientReady = true;
+	});
 
 	/**
 	 * Handle accept action
@@ -25,7 +34,7 @@
 	}
 </script>
 
-{#if !$hasDecided}
+{#if browser && isClientReady && !$hasDecided}
 	<div
 		class="cookie-banner"
 		transition:slide={{ duration: 300 }}
@@ -36,7 +45,7 @@
 			<div class="cookie-text">
 				<h4>We value your privacy</h4>
 				<p>
-					We use cookies to enhance your browsing experience, serve personalized ads,
+					We use cookies to enhance your browsing experience,
 					and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.
 					<a href="/privacy">Learn more</a>
 				</p>
@@ -54,8 +63,8 @@
 							with our website.
 						</li>
 						<li>
-							<strong>Advertising:</strong> Used to deliver relevant advertisements
-							and track their performance.
+							<strong>Preferences:</strong> Remembers your choices for a better
+							site experience.
 						</li>
 					</ul>
 				</div>
