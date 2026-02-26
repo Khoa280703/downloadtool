@@ -193,7 +193,7 @@
 				class="install-link userscript-link"
 				href="/userscript"
 				target="_blank"
-				rel="noopener noreferrer"
+				rel="external noopener noreferrer"
 			>
 				Install UserScript
 			</a>
