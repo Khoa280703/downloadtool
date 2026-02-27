@@ -97,69 +97,9 @@
 
 <svelte:head>
 <title>FetchTube - Vibrant Video Downloader</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&amp;family=Nunito:ital,wght@0,200..1000;1,200..1000&amp;family=Spline+Sans:wght@300..700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#FF4D8C", // Hot Pink
-                        "secondary": "#FFB938", // Marigold
-                        "accent": "#6C5CE7", // Periwinkle
-                        "plum": "#2D1B36", // Deep Plum
-                        "muted": "#8B7E96",
-                        "bg-page": "#FFF5F9", // Pale Pink White
-                        "bg-surface": "#FFFFFF",
-                        "background-light": "#FFF5F9",
-                        "surface": "#FFFFFF",
-                        "text-main": "#2D1B36",
-                    },
-                    fontFamily: {
-                        "heading": ["Fredoka", "sans-serif"],
-                        "body": ["Nunito", "sans-serif"],
-                        "display": ["Spline Sans", "sans-serif"]
-                    },
-                    borderRadius: {
-                        "xl": "24px",
-                        "2xl": "32px", // radius-xl
-                        "3xl": "48px",
-                        "full": "9999px",
-                        "blob": "40% 60% 70% 30% / 40% 50% 60% 50%"
-                    },
-                    boxShadow: {
-                        "float": "0 20px 40px -10px rgba(255, 77, 140, 0.3)",
-                        "candy": "0 10px 25px -5px rgba(255, 77, 140, 0.4), 0 8px 10px -6px rgba(255, 77, 140, 0.1)",
-                        "input-focus": "0 0 0 4px rgba(255, 77, 140, 0.2)",
-                        "card": "0 10px 30px -5px rgba(45, 27, 54, 0.05)",
-                        "glow": "0 0 20px rgba(255, 77, 140, 0.4)"
-                    },
-                    animation: {
-                        'bob': 'bob 3s ease-in-out infinite',
-                        'bob-delayed': 'bob 3s ease-in-out infinite 1.5s',
-                        'wiggle': 'wiggle 1s ease-in-out infinite',
-                        'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                    },
-                    keyframes: {
-                        bob: {
-                            '0%, 100%': { transform: 'translateY(0)' },
-                            '50%': { transform: 'translateY(-15px)' },
-                        },
-                        wiggle: {
-                            '0%, 100%': { transform: 'rotate(-3deg)' },
-                            '50%': { transform: 'rotate(3deg)' },
-                        },
-                        'pulse-glow': {
-                            '0%, 100%': { opacity: 1, boxShadow: '0 0 0 0 rgba(255, 77, 140, 0.7)' },
-                            '50%': { opacity: .5, boxShadow: '0 0 0 10px rgba(255, 77, 140, 0)' },
-                        }
-                    }
-                },
-            },
-        }
-    </script>
+<link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+<link rel="preload" href="/fonts/nunito-normal-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+<link rel="preload" href="/fonts/material-symbols-outlined.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 <style>
         body {
             font-family: 'Nunito', sans-serif;
@@ -522,7 +462,7 @@ Available
 <div class="flex-1 bg-white rounded-full h-3 ml-2"></div>
 </div>
 <div class="flex-1 relative overflow-hidden bg-background-light">
-<img alt="Abstract 3D illustration of a character watching a colorful screen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUE52gefPx9GfaaiAVYCx9c75IjqlqTyvWaZ1XNQPkXQ2XPkECWD8XY4Z31Tjlya5CkEBBq6o98gEsW7TdGXVwWJ8LJOkmaH87xlhH95XVVAS1juqrAsIAP4_gn5ulok4TGsxJKMowAwd4zjZ9F9smdj9BcaaxGotZMo4sCEq1dtTAYhg3lbTfRHxkRGL2Emxt7wszmO70pYq_nxIobSLDzB-64rRmPzT9ybjNH6Vj4ogYsa-Q-3LlEAXIpGgpNIYb5nkP4VDKXFc" loading="lazy" decoding="async"/>
+<img alt="Abstract 3D illustration of a character watching a colorful screen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUE52gefPx9GfaaiAVYCx9c75IjqlqTyvWaZ1XNQPkXQ2XPkECWD8XY4Z31Tjlya5CkEBBq6o98gEsW7TdGXVwWJ8LJOkmaH87xlhH95XVVAS1juqrAsIAP4_gn5ulok4TGsxJKMowAwd4zjZ9F9smdj9BcaaxGotZMo4sCEq1dtTAYhg3lbTfRHxkRGL2Emxt7wszmO70pYq_nxIobSLDzB-64rRmPzT9ybjNH6Vj4ogYsa-Q-3LlEAXIpGgpNIYb5nkP4VDKXFc" loading="lazy" decoding="async" fetchpriority="low"/>
 <div class="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg flex items-center gap-3 animate-pulse">
 <span class="material-symbols-outlined text-primary">link</span>
 <div class="h-2 w-2/3 bg-gray-200 rounded-full"></div>
@@ -563,7 +503,7 @@ Available
 <div class="ml-auto bg-primary text-white rounded-full p-2 shadow-lg">
 <span class="material-symbols-outlined text-sm">download</span>
 </div>
-<img alt="3D stylized hand interacting with a digital interface element" class="absolute -top-24 -right-12 w-48 h-48 object-cover rounded-full border-4 border-white shadow-xl z-30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSiB2lQRivL_3C8SHYi3mXfiOG-SxLgKM-SB1ywVm8Et0-lZ5KhNtf1xEVtGI53bX8HHOcwqwN-DmNoRm_V7HSr3gIcb3ggiLkvozwClXDX56-Y0lKSeSXCdmqT17Bk-ir8nJWtuROT3YRCjgeh3mAfiE-Hr2_80jm-1VrsBBn6dnyLHr5w7xehIGRFqMxu9yuDHgZFwfSnAphrXCeR4lht9tofH5e-gN0vawA_YNcG_XsTTRLE9DuD4mztrFvAEGe3UpM5C9pOQk" loading="lazy" decoding="async"/>
+<img alt="3D stylized hand interacting with a digital interface element" class="absolute -top-24 -right-12 w-48 h-48 object-cover rounded-full border-4 border-white shadow-xl z-30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSiB2lQRivL_3C8SHYi3mXfiOG-SxLgKM-SB1ywVm8Et0-lZ5KhNtf1xEVtGI53bX8HHOcwqwN-DmNoRm_V7HSr3gIcb3ggiLkvozwClXDX56-Y0lKSeSXCdmqT17Bk-ir8nJWtuROT3YRCjgeh3mAfiE-Hr2_80jm-1VrsBBn6dnyLHr5w7xehIGRFqMxu9yuDHgZFwfSnAphrXCeR4lht9tofH5e-gN0vawA_YNcG_XsTTRLE9DuD4mztrFvAEGe3UpM5C9pOQk" loading="lazy" decoding="async" fetchpriority="low"/>
 </div>
 <div class="absolute w-48 h-48 bg-secondary rounded-full -bottom-4 -left-4 z-10 opacity-20"></div>
 <div class="absolute w-32 h-32 bg-primary rounded-full top-0 right-10 z-0 opacity-10"></div>
@@ -592,7 +532,7 @@ Available
 <div class="relative w-full max-w-md aspect-square">
 <div class="absolute inset-0 bg-gradient-to-r from-accent/20 to-secondary/20 rounded-blob blur-2xl transform -rotate-12"></div>
 <div class="relative h-full w-full bg-surface rounded-[3rem] shadow-float overflow-hidden border-8 border-white group">
-<img alt="Person relaxing by a pool looking at a tablet screen" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeEqX7ATwqRX3iw85ORD_oO7ZvZSNsaKjYmel3GwH8W7eemo3nMQPyZ7M4D3f0vNiu9g2-ejMvoBWTcN4NDcX_uCQyCIZAP3Y830M9s9IjtyIAMqcDq6WA5mT5p7kYpDvdyRzxw4gWYo6xZjHNR2SJPNUePHiCOVsFNRU4tA5jQ7zL4v1yQfV_EExDvoxc1z9tLBp1MzG0zXLD4MIbV8ZpzcbvaAwt9iYtpDQlSDKyVXliqf5JOE9uEb62ggrYxcLdbyRHKGpGEB0" loading="lazy" decoding="async"/>
+<img alt="Person relaxing by a pool looking at a tablet screen" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeEqX7ATwqRX3iw85ORD_oO7ZvZSNsaKjYmel3GwH8W7eemo3nMQPyZ7M4D3f0vNiu9g2-ejMvoBWTcN4NDcX_uCQyCIZAP3Y830M9s9IjtyIAMqcDq6WA5mT5p7kYpDvdyRzxw4gWYo6xZjHNR2SJPNUePHiCOVsFNRU4tA5jQ7zL4v1yQfV_EExDvoxc1z9tLBp1MzG0zXLD4MIbV8ZpzcbvaAwt9iYtpDQlSDKyVXliqf5JOE9uEb62ggrYxcLdbyRHKGpGEB0" loading="lazy" decoding="async" fetchpriority="low"/>
 <div class="absolute top-8 right-8 bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg flex items-center gap-2">
 <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
 <span class="text-xs font-bold text-text-main">Offline Mode</span>
@@ -627,7 +567,7 @@ Available
 <div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
 <div class="flex items-center gap-4 mb-4">
 <div class="size-12 rounded-full overflow-hidden border-2 border-primary">
-<img alt="Portrait of Sarah" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Y3A-H3EGvPU8zmqaikjguZFx0MdWCuAVz4FZ7BL-f0S8kmzaaMnFNde8chh1kdoCn-oaSF7Lx0F15djvpv4EZlhnDenwAcl9oNmyhvAOxw03HXO5cFt4IG723uHTi1UIUN9uktuYRDVdOXr8JjjLdFFN5gGE-32PYiKwFSkgcsVcKEaJR3x_yt1wi4120_C8xmqTy2i7x2mmdJnmwEXRiLCVJsjUu6gik5exKPKpfI-zjLRXtnc7JV0qMZDWoRqSOjJW_SmzdI4" loading="lazy" decoding="async"/>
+<img alt="Portrait of Sarah" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Y3A-H3EGvPU8zmqaikjguZFx0MdWCuAVz4FZ7BL-f0S8kmzaaMnFNde8chh1kdoCn-oaSF7Lx0F15djvpv4EZlhnDenwAcl9oNmyhvAOxw03HXO5cFt4IG723uHTi1UIUN9uktuYRDVdOXr8JjjLdFFN5gGE-32PYiKwFSkgcsVcKEaJR3x_yt1wi4120_C8xmqTy2i7x2mmdJnmwEXRiLCVJsjUu6gik5exKPKpfI-zjLRXtnc7JV0qMZDWoRqSOjJW_SmzdI4" loading="lazy" decoding="async" fetchpriority="low"/>
 </div>
 <div>
 <h4 class="font-heading font-bold text-text-main">Sarah Jenkins</h4>
@@ -647,7 +587,7 @@ Available
 <div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-primary text-white p-8 rounded-3xl shadow-float transform md:scale-105 hover:-translate-y-2 transition-transform duration-300">
 <div class="flex items-center gap-4 mb-4">
 <div class="size-12 rounded-full overflow-hidden border-2 border-white">
-<img alt="Portrait of Mike" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC76jOxNNtx3Aysjd69Cxad7WEobtismgpD69h9FpOcD1oiwzQceZ8WnbAj7C0bIaV81x5YTNd7SzKorY0qKRd-QSTX44ds-jTUPzRaipVGnena-HEv8HoJFHEf-FnevgwaEcSEpy3aVWTB-X9GRLmAzWdXdfsKcYZuPd2dfoMLSYzccApsUCgo82fU-ZqSBZir02kNcmHE46EBnwy5-BRnbdSrI6_htYogzzZ8WZv4de8syjsAdKQ1-EpRQ-ZQEN0BhqHXoAMaBuY" loading="lazy" decoding="async"/>
+<img alt="Portrait of Mike" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC76jOxNNtx3Aysjd69Cxad7WEobtismgpD69h9FpOcD1oiwzQceZ8WnbAj7C0bIaV81x5YTNd7SzKorY0qKRd-QSTX44ds-jTUPzRaipVGnena-HEv8HoJFHEf-FnevgwaEcSEpy3aVWTB-X9GRLmAzWdXdfsKcYZuPd2dfoMLSYzccApsUCgo82fU-ZqSBZir02kNcmHE46EBnwy5-BRnbdSrI6_htYogzzZ8WZv4de8syjsAdKQ1-EpRQ-ZQEN0BhqHXoAMaBuY" loading="lazy" decoding="async" fetchpriority="low"/>
 </div>
 <div>
 <h4 class="font-heading font-bold text-white">Mike Chen</h4>
@@ -667,7 +607,7 @@ Available
 <div class="snap-center shrink-0 w-[300px] md:w-[350px] bg-background-light p-8 rounded-3xl shadow-sm border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
 <div class="flex items-center gap-4 mb-4">
 <div class="size-12 rounded-full overflow-hidden border-2 border-accent">
-<img alt="Portrait of Jen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwRQbiiA6Y7bXK-6WZaKAwVf8k_zWHvy8Pmmk5DenO-jb0SrMgLBAJZ17iHWyn2gLlPspECc-fMFAMcR10e0yhJUVehY5SekEFrX4dE3RMZaDtPHyCqddQhEuOGuehKsGIrgY-F3aq6YJa15QkQGLvLVfyGgoBtoAKhGbVPMCYdjL1GV_Wl6Te7H7fnEEM4j4b08BO2MEx9rF8wFYjiL-9gHhf4b6bTfBfF39i5zB_PMhLy1VHKrt7Hby-vKVm7-Mfk0EsIKw9NM4" loading="lazy" decoding="async"/>
+<img alt="Portrait of Jen" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwRQbiiA6Y7bXK-6WZaKAwVf8k_zWHvy8Pmmk5DenO-jb0SrMgLBAJZ17iHWyn2gLlPspECc-fMFAMcR10e0yhJUVehY5SekEFrX4dE3RMZaDtPHyCqddQhEuOGuehKsGIrgY-F3aq6YJa15QkQGLvLVfyGgoBtoAKhGbVPMCYdjL1GV_Wl6Te7H7fnEEM4j4b08BO2MEx9rF8wFYjiL-9gHhf4b6bTfBfF39i5zB_PMhLy1VHKrt7Hby-vKVm7-Mfk0EsIKw9NM4" loading="lazy" decoding="async" fetchpriority="low"/>
 </div>
 <div>
 <h4 class="font-heading font-bold text-text-main">Jen Alston</h4>

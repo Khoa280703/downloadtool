@@ -5,7 +5,7 @@
 
 use axum::body::Body;
 use axum::extract::Query;
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
@@ -26,6 +26,7 @@ use muxer::{remux_streams, MuxerError};
 /// Each sub-range request is served at full line speed. Fetching in ≤9.5 MB explicit
 /// range chunks bypasses the per-file throttle entirely — same technique as yt-dlp.
 const YOUTUBE_CHUNK_SIZE: u64 = 9_500_000;
+const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
 
 /// Query parameters for stream proxy.
 #[derive(Debug, Deserialize)]
@@ -66,6 +67,7 @@ impl IntoResponse for ApiError {
         Response::builder()
             .status(self.status)
             .header("content-type", "application/json")
+            .header(header::CACHE_CONTROL, NO_STORE_CACHE_CONTROL)
             .body(Body::from(body))
             .unwrap()
     }
@@ -138,6 +140,7 @@ async fn proxy_single_request(
             let filename = build_filename(&params.title, &params.format);
             add_content_disposition(&mut response_headers, &filename);
             add_cors_headers(&mut response_headers);
+            add_no_store_header(&mut response_headers);
 
             let body = Body::from_stream(byte_stream);
             let mut rb = Response::builder();
@@ -187,6 +190,7 @@ async fn proxy_chunked(
     let filename = build_filename(&params.title, &params.format);
     add_content_disposition(&mut response_headers, &filename);
     add_cors_headers(&mut response_headers);
+    add_no_store_header(&mut response_headers);
 
     let stream = chunked_stream(params.url.clone(), total_size, 0, platform);
     let body = Body::from_stream(stream);
@@ -327,6 +331,7 @@ pub async fn muxed_stream_handler(
     let filename = build_filename(&params.title, &Some("mp4".to_string()));
     add_content_disposition(&mut response_headers, &filename);
     add_cors_headers(&mut response_headers);
+    add_no_store_header(&mut response_headers);
 
     let compat_stream = stream_with_muxer_error(muxed_stream);
     let body = Body::from_stream(compat_stream);
@@ -416,6 +421,14 @@ fn add_cors_headers(headers: &mut HeaderMap) {
     headers.insert(
         "Access-Control-Allow-Methods",
         HeaderValue::from_static("GET, HEAD, OPTIONS"),
+    );
+}
+
+/// Disable response caching for dynamic API payloads.
+fn add_no_store_header(headers: &mut HeaderMap) {
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(NO_STORE_CACHE_CONTROL),
     );
 }
 

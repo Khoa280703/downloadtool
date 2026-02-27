@@ -2,11 +2,18 @@
 //!
 //! POST /api/extract - Extract video information from a URL
 
-use axum::{extract::Json as ExtractJson, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::Json as ExtractJson,
+    http::{header, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use extractor::VideoFormat;
+
+const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
 
 /// Request body for video extraction.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -93,10 +100,15 @@ pub struct ApiError {
 }
 
 impl IntoResponse for ApiError {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
         let status = StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         let body = axum::Json(self);
-        (status, body).into_response()
+        let mut response = (status, body).into_response();
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static(NO_STORE_CACHE_CONTROL),
+        );
+        response
     }
 }
 
@@ -109,7 +121,7 @@ impl IntoResponse for ApiError {
 /// and returns stream list + recommended stream URL.
 pub async fn extract_handler(
     ExtractJson(body): ExtractJson<ExtractRequest>,
-) -> Result<Json<ExtractResponse>, ApiError> {
+) -> Result<Response, ApiError> {
     info!("Extracting video from URL: {}", body.url);
 
     // Validate URL against allowed platforms
@@ -152,7 +164,12 @@ pub async fn extract_handler(
                 error: None,
             };
 
-            Ok(Json(response))
+            let mut http_response = Json(response).into_response();
+            http_response.headers_mut().insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static(NO_STORE_CACHE_CONTROL),
+            );
+            Ok(http_response)
         }
         Err(e) => {
             error!("Extraction failed: {}", e);

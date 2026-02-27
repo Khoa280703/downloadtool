@@ -3,12 +3,15 @@
 //! GET /api/batch - Server-Sent Events endpoint for batch video extraction
 
 use axum::extract::Query;
-use axum::response::{sse::Event, IntoResponse, Sse};
+use axum::http::{header, HeaderValue};
+use axum::response::{sse::Event, IntoResponse, Response, Sse};
 use futures::stream::{self, BoxStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::time::Duration;
 use tracing::{info, warn};
+
+const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
 
 /// Query parameters for batch extraction.
 #[derive(Debug, Deserialize)]
@@ -67,7 +70,7 @@ pub enum BatchEvent {
 /// - data: {"type":"progress","current":10,"total":50}
 pub async fn batch_handler(
     Query(params): Query<BatchParams>,
-) -> impl IntoResponse {
+) -> Response {
     info!("Batch extraction request for URL: {}", params.url);
 
     let stream: BoxStream<'static, Result<Event, Infallible>> =
@@ -83,10 +86,17 @@ pub async fn batch_handler(
             Box::pin(create_batch_stream(&params.url))
         };
 
-    Sse::new(stream).keep_alive(
-        axum::response::sse::KeepAlive::new()
-            .interval(Duration::from_secs(15)),
-    )
+    let mut response = Sse::new(stream)
+        .keep_alive(
+            axum::response::sse::KeepAlive::new()
+                .interval(Duration::from_secs(15)),
+        )
+        .into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(NO_STORE_CACHE_CONTROL),
+    );
+    response
 }
 
 /// Create a stream of SSE events for batch extraction.
