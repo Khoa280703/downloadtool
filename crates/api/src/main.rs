@@ -1,7 +1,13 @@
-//! API Server - Axum HTTP server for video downloader
+//! API Server - Axum HTTP server for video downloader.
 //!
 //! This is the main entry point for the API deployment.
-//! It provides HTTP endpoints for video extraction and download.
+
+use std::net::{IpAddr, SocketAddr};
+use std::num::NonZeroU32;
+use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 use axum::{
     extract::{ConnectInfo, Request, State},
@@ -11,28 +17,26 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use governor::{
-    clock::DefaultClock,
-    state::keyed::DefaultKeyedStateStore,
-    Quota, RateLimiter,
-};
+use governor::{clock::DefaultClock, state::keyed::DefaultKeyedStateStore, Quota, RateLimiter};
 use serde_json::json;
-use std::net::IpAddr;
-use std::net::SocketAddr;
-use std::num::NonZeroU32;
-use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
+use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
+mod auth;
 mod config;
 mod routes;
 
 use config::Config;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub db_pool: sqlx::PgPool,
+    pub jwt_secret: String,
+    pub whop_webhook_secret: String,
+}
 
 type KeyedLimiter = RateLimiter<IpAddr, DefaultKeyedStateStore<IpAddr>, DefaultClock>;
 
@@ -100,12 +104,8 @@ async fn rate_limit_middleware(
     next.run(request).await
 }
 
-fn build_app(limiter: Arc<KeyedLimiter>) -> Router {
-    Router::new()
-        .route("/health", get(routes::health_check))
-        .route("/openapi.json", get(routes::openapi_handler))
-        .route("/bm.js", get(routes::bm_js_handler))
-        .route("/userscript", get(routes::userscript_handler))
+fn build_app(app_state: AppState, limiter: Arc<KeyedLimiter>) -> Router {
+    let protected_api = Router::new()
         .route(
             "/api/extract",
             post(routes::extract_handler).route_layer(middleware::from_fn_with_state(
@@ -116,19 +116,30 @@ fn build_app(limiter: Arc<KeyedLimiter>) -> Router {
         .route("/api/stream", get(routes::stream_handler))
         .route("/api/stream/muxed", get(routes::muxed_stream_handler))
         .route("/api/batch", get(routes::batch_handler))
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            auth::jwt_middleware::jwt_auth_middleware,
+        ));
+
+    Router::new()
+        .route("/health", get(routes::health_check))
+        .route("/openapi.json", get(routes::openapi_handler))
+        .route("/bm.js", get(routes::bm_js_handler))
+        .route("/userscript", get(routes::userscript_handler))
+        .route("/api/webhooks/whop", post(routes::whop_webhook_handler))
+        .merge(protected_api)
+        .with_state(app_state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    // Load configuration
     let config = Config::from_env()?;
     let extractor_path = Path::new(&config.extractor_dir);
     if extractor_path.is_file() {
@@ -145,13 +156,23 @@ async fn main() -> anyhow::Result<()> {
         extractor::init(None).await?;
     }
 
+    let db_pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&config.database_url)
+        .await?;
+    sqlx::migrate!("./migrations").run(&db_pool).await?;
+    info!("Database pool connected");
+
+    let app_state = AppState {
+        db_pool,
+        jwt_secret: config.jwt_secret,
+        whop_webhook_secret: config.whop_webhook_secret,
+    };
+
     info!("Starting API server on port {}", config.port);
     let limiter = make_rate_limiter();
+    let app = build_app(app_state, limiter);
 
-    // Build router with all routes
-    let app = build_app(limiter);
-
-    // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("API server listening on {}", addr);
@@ -169,12 +190,25 @@ async fn main() -> anyhow::Result<()> {
 mod tests {
     use super::*;
 
+    fn test_app_state() -> AppState {
+        let db_pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://postgres:postgres@localhost:5432/postgres")
+            .expect("valid postgres url for lazy pool");
+
+        AppState {
+            db_pool,
+            jwt_secret: "test-secret".to_string(),
+            whop_webhook_secret: "test-whop-secret".to_string(),
+        }
+    }
+
     async fn spawn_test_server(with_connect_info: bool) -> SocketAddr {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind test listener");
         let addr = listener.local_addr().expect("local addr");
-        let app = build_app(make_rate_limiter());
+        let app = build_app(test_app_state(), make_rate_limiter());
 
         tokio::spawn(async move {
             if with_connect_info {
@@ -208,7 +242,10 @@ mod tests {
         }
 
         assert!(
-            statuses.iter().take(5).all(|status| *status != StatusCode::TOO_MANY_REQUESTS),
+            statuses
+                .iter()
+                .take(5)
+                .all(|status| *status != StatusCode::TOO_MANY_REQUESTS),
             "first 5 requests should consume burst tokens, got: {statuses:?}"
         );
         assert_eq!(statuses[5], StatusCode::TOO_MANY_REQUESTS);

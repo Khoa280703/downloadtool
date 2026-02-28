@@ -1,9 +1,30 @@
+import { building } from '$app/environment';
 import type { Handle } from '@sveltejs/kit';
+import { svelteKitHandler } from 'better-auth/svelte-kit';
 
-const HTML_CACHE_CONTROL = 'public, max-age=300';
+import { auth } from '$lib/server/auth';
+
+const HTML_CACHE_CONTROL = 'private, no-store';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const response = await resolve(event);
+	if (building) {
+		event.locals.session = null;
+		event.locals.user = null;
+	} else {
+		const authSession = await auth.api.getSession({
+			headers: event.request.headers
+		});
+
+		event.locals.session = authSession?.session ?? null;
+		event.locals.user = authSession?.user ?? null;
+	}
+
+	const response = await svelteKitHandler({
+		auth,
+		event,
+		resolve,
+		building
+	});
 
 	if (
 		(event.request.method === 'GET' || event.request.method === 'HEAD') &&

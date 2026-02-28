@@ -1,4 +1,4 @@
-//! Configuration module for API server
+//! Configuration module for API server.
 //!
 //! Loads configuration from environment variables.
 
@@ -11,6 +11,12 @@ pub struct Config {
     pub port: u16,
     /// Directory containing TypeScript extractor scripts
     pub extractor_dir: String,
+    /// PostgreSQL connection string
+    pub database_url: String,
+    /// Better Auth shared secret (JWT verify + session signing key)
+    pub jwt_secret: String,
+    /// Whop webhook HMAC secret
+    pub whop_webhook_secret: String,
 }
 
 impl Config {
@@ -19,21 +25,29 @@ impl Config {
     /// # Environment Variables
     /// - `PORT` - Server port (default: 3068)
     /// - `EXTRACTOR_DIR` - Path to extractor scripts (default: "./extractors")
-    ///
-    /// # Errors
-    /// Returns an error if PORT is not a valid u16.
+    /// - `DATABASE_URL` - PostgreSQL connection string
+    /// - `BETTER_AUTH_SECRET` - Shared Better Auth secret
+    /// - `WHOP_WEBHOOK_SECRET` - Whop webhook signing secret
     pub fn from_env() -> anyhow::Result<Self> {
         let port = env::var("PORT")
             .ok()
             .and_then(|p| p.parse().ok())
             .unwrap_or(3068);
 
-        let extractor_dir = env::var("EXTRACTOR_DIR")
-            .unwrap_or_else(|_| "./extractors".to_string());
+        let extractor_dir = env::var("EXTRACTOR_DIR").unwrap_or_else(|_| "./extractors".to_string());
+        let database_url = env::var("DATABASE_URL")
+            .map_err(|_| anyhow::anyhow!("DATABASE_URL env var is required"))?;
+        let jwt_secret = env::var("BETTER_AUTH_SECRET")
+            .map_err(|_| anyhow::anyhow!("BETTER_AUTH_SECRET env var is required"))?;
+        let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")
+            .map_err(|_| anyhow::anyhow!("WHOP_WEBHOOK_SECRET env var is required"))?;
 
         Ok(Self {
             port,
             extractor_dir,
+            database_url,
+            jwt_secret,
+            whop_webhook_secret,
         })
     }
 }
@@ -43,13 +57,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_default_config() {
+    fn test_config_fields() {
         let config = Config {
             port: 3068,
             extractor_dir: "./extractors".to_string(),
+            database_url: "postgres://user:pass@localhost:5432/db".to_string(),
+            jwt_secret: "secret".to_string(),
+            whop_webhook_secret: "whop_secret".to_string(),
         };
 
         assert_eq!(config.port, 3068);
         assert_eq!(config.extractor_dir, "./extractors");
+        assert!(config.database_url.starts_with("postgres://"));
+        assert_eq!(config.jwt_secret, "secret");
+        assert_eq!(config.whop_webhook_secret, "whop_secret");
     }
 }

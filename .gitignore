@@ -16,6 +16,7 @@ Thumbs.db
 
 # Environment
 .env
+.env.production
 .env.local
 .env.*.local
 
@@ -38,3 +39,6 @@ node_modules/
 # Logs
 *.log
 logs/
+
+# Temporary local files
+.tmp/

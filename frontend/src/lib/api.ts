@@ -119,7 +119,7 @@ function buildApiUrl(path: string): string {
  * @throws Error if extraction fails
  */
 export async function extract(url: string, signal?: AbortSignal): Promise<ExtractResult> {
-	const response = await fetch(buildApiUrl('/api/extract'), {
+	const response = await fetch('/api/proxy/extract', {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json'
@@ -250,14 +250,59 @@ export function subscribeBatch(
 	return es;
 }
 
+function isYouTubeHost(hostname: string): boolean {
+	const host = hostname.toLowerCase().replace(/^www\./, '');
+	return host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be';
+}
+
+export function extractYouTubeVideoId(url: string): string | null {
+	try {
+		const parsed = new URL(url.trim());
+		if (!isYouTubeHost(parsed.hostname)) return null;
+		const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+		const isValidId = (id: string | null): id is string =>
+			!!id && /^[A-Za-z0-9_-]{11}$/.test(id);
+
+		if (host === 'youtu.be') {
+			const firstSegment = parsed.pathname.split('/').filter(Boolean)[0] ?? null;
+			return isValidId(firstSegment) ? firstSegment : null;
+		}
+
+		const v = parsed.searchParams.get('v');
+		if (isValidId(v)) return v;
+
+		const shortsMatch = parsed.pathname.match(/^\/shorts\/([A-Za-z0-9_-]{11})(?:[/?#]|$)/);
+		if (shortsMatch) return shortsMatch[1];
+
+		const liveMatch = parsed.pathname.match(/^\/live\/([A-Za-z0-9_-]{11})(?:[/?#]|$)/);
+		if (liveMatch) return liveMatch[1];
+
+		const embedMatch = parsed.pathname.match(/^\/embed\/([A-Za-z0-9_-]{11})(?:[/?#]|$)/);
+		if (embedMatch) return embedMatch[1];
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
 /**
  * Validate video URL (YouTube only)
  * @param url - URL to validate
  * @returns True if valid video URL
  */
 export function isValidVideoUrl(url: string): boolean {
-	const patterns = [/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/];
-	return patterns.some((p) => p.test(url));
+	try {
+		const parsed = new URL(url.trim());
+		if (!(parsed.protocol === 'http:' || parsed.protocol === 'https:')) return false;
+		if (!isYouTubeHost(parsed.hostname)) return false;
+
+		// Accept real video URLs and playlist links (needed by BatchInput).
+		if (extractYouTubeVideoId(url)) return true;
+		return parsed.searchParams.has('list');
+	} catch {
+		return false;
+	}
 }
 
 /**
@@ -266,8 +311,5 @@ export function isValidVideoUrl(url: string): boolean {
  * @returns Platform name or 'unknown'
  */
 export function getPlatform(url: string): 'youtube' | 'unknown' {
-	if (/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/.test(url)) {
-		return 'youtube';
-	}
-	return 'unknown';
+	return isValidVideoUrl(url) ? 'youtube' : 'unknown';
 }

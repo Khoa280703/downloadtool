@@ -4,7 +4,9 @@
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import BatchInput from '$components/BatchInput.svelte';
 	import BatchProgress from '$components/BatchProgress.svelte';
-	import { extract, isValidVideoUrl } from '$lib/api';
+	import UserMenu from '$components/UserMenu.svelte';
+	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
+	import { authClient } from '$lib/auth-client';
 	import type { ExtractResult, Stream } from '$lib/types';
 	import { currentDownload } from '$stores/download';
 
@@ -14,6 +16,12 @@
 	let isExtracting = $state(false);
 	let extractError = $state('');
 	let isDarkMode = $state(false);
+	let previewThumbnailLoadFailed = $state(false);
+	let previewThumbnailId = $derived(isExtracting ? extractYouTubeVideoId(inputUrl) : null);
+	let previewThumbnailUrl = $derived(
+		previewThumbnailId ? `https://i.ytimg.com/vi/${previewThumbnailId}/hqdefault.jpg` : null
+	);
+	const session = authClient.useSession();
 
 	onMount(() => {
 		const saved = localStorage.getItem('fetchtube-theme');
@@ -45,6 +53,7 @@
 		}
 
 		isExtracting = true;
+		previewThumbnailLoadFailed = false;
 		extractError = '';
 		extractResult = null;
 		selectedAudioStream = null;
@@ -302,14 +311,26 @@
 					<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#how-it-works">How it Works</a>
 					<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#tools">Tools</a>
 				</nav>
-				<button class="flex h-10 px-6 items-center justify-center rounded-full bg-plum text-white text-sm font-bold shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 tracking-wide uppercase">
-					Login
-				</button>
+				{#if $session?.data?.user}
+					<UserMenu user={$session.data.user} />
+				{:else}
+					<a
+						href="/login"
+						class="flex h-10 px-6 items-center justify-center rounded-full bg-plum text-white text-sm font-bold shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 tracking-wide uppercase"
+					>
+						Login
+					</a>
+				{/if}
 			</div>
 			<div class="md:hidden">
-				<button class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors">
-					<span class="material-symbols-outlined text-3xl">menu_open</span>
-				</button>
+				<a
+					href={$session?.data?.user ? '/account' : '/login'}
+					class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors flex items-center"
+				>
+					<span class="material-symbols-outlined text-3xl">
+						{$session?.data?.user ? 'account_circle' : 'login'}
+					</span>
+				</a>
 			</div>
 		</div>
 	</header>
@@ -378,7 +399,26 @@
 				<div class="max-w-7xl mx-auto">
 					<div class="bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row animate-pulse">
 						<div class="w-full lg:w-[42%] p-6 md:p-8 flex flex-col gap-5 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
-							<div class="w-full aspect-video rounded-3xl bg-slate-200"></div>
+							<div class="relative w-full aspect-video rounded-3xl overflow-hidden bg-slate-200">
+								{#if previewThumbnailUrl && !previewThumbnailLoadFailed}
+									<img
+										class="absolute inset-0 w-full h-full object-cover"
+										src={previewThumbnailUrl}
+										alt="YouTube thumbnail preview"
+										decoding="async"
+										onerror={() => (previewThumbnailLoadFailed = true)}
+									/>
+								{:else}
+									<div class="absolute inset-0 grid place-items-center text-slate-400">
+										<span class="material-symbols-outlined text-6xl">movie</span>
+									</div>
+								{/if}
+								<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+								<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/20 flex items-center gap-1">
+									<span class="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+									Fetching...
+								</div>
+							</div>
 							<div class="h-7 w-11/12 rounded-xl bg-slate-200"></div>
 							<div class="flex gap-2">
 								<div class="h-8 w-24 rounded-full bg-slate-200"></div>

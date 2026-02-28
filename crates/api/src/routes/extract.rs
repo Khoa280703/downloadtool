@@ -6,11 +6,12 @@ use axum::{
     extract::Json as ExtractJson,
     http::{header, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    Json,
+    Extension, Json,
 };
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
+use crate::auth::user_tier::UserTier;
 use extractor::VideoFormat;
 
 const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
@@ -120,6 +121,7 @@ impl IntoResponse for ApiError {
 /// Validates URL (youtube.com only), calls extractor,
 /// and returns stream list + recommended stream URL.
 pub async fn extract_handler(
+    Extension(_user_tier): Extension<UserTier>,
     ExtractJson(body): ExtractJson<ExtractRequest>,
 ) -> Result<Response, ApiError> {
     info!("Extracting video from URL: {}", body.url);

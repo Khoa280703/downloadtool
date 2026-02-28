@@ -1,7 +1,7 @@
 ---
 title: "Phase 01 — Database Setup"
 priority: P1
-status: pending
+status: completed
 effort: 2h
 ---
 
@@ -20,7 +20,7 @@ Provision PostgreSQL and create the `subscriptions` table (Rust-owned). Better A
 - `subscriptions` table is owned by Rust; use `sqlx` migrate for it
 - Shared DB: both SvelteKit (Better Auth) and Rust API connect to same PostgreSQL instance
 - `user_id` in `subscriptions` is a foreign key to Better Auth's `user.id` (TEXT/UUID)
-- `stripe_customer_id` stored on user row — Better Auth supports custom user fields
+- No custom fields on `user` table — Whop join key is `custom_data` embedded at checkout time
 
 ## Requirements
 
@@ -69,14 +69,14 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     plan                  TEXT NOT NULL DEFAULT 'free',   -- 'free' | 'premium'
     status                TEXT NOT NULL DEFAULT 'active', -- 'active' | 'cancelled' | 'expired'
     current_period_end    TIMESTAMPTZ,
-    stripe_subscription_id TEXT,
-    stripe_customer_id    TEXT,
+    whop_membership_id    TEXT,                           -- Whop membership ID for reference
+    whop_updated_at       TIMESTAMPTZ,                    -- Last Whop event timestamp (idempotency guard)
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id)                                       -- One active subscription per user
 );
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_subscription_id ON subscriptions(stripe_subscription_id);
 ```
 
 ## Related Code Files
@@ -161,7 +161,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_subscription_id ON subscript
 ## Risk Assessment
 
 - **Better Auth table naming:** Better Auth uses `user` (not `users`) — `subscriptions.user_id` FK must reference `"user"(id)`. Use quoted identifier in SQL.
-- **Migration ordering:** sqlx migrate runs on Rust startup; Better Auth runs on SvelteKit startup. Race condition possible on first deploy — SvelteKit must start and run BA migrations before Rust inserts any data referencing `user.id`. In practice fine since Rust only writes to `subscriptions` from Stripe webhooks (post-user-creation).
+- **Migration ordering:** sqlx migrate runs on Rust startup; Better Auth runs on SvelteKit startup. Race condition possible on first deploy — SvelteKit must start and run BA migrations before Rust inserts any data referencing `user.id`. In practice fine since Rust only writes to `subscriptions` from Whop webhooks (post-user-creation).
 - **Connection pool exhaustion:** Homeserver has limited memory. Cap pool at 5 connections per service via `PgPoolOptions::max_connections(5)`.
 
 ## Security Considerations

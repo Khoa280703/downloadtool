@@ -17,7 +17,7 @@ use tracing::{debug, warn};
 const MAX_CONCURRENT_YTDLP: usize = 10;
 const EXTRACT_CACHE_MAX_CAPACITY: u64 = 500;
 const EXTRACT_CACHE_TTL_SECONDS: u64 = 300;
-const PRIMARY_PLAYER_CLIENT_ARGS: &str = "youtube:player_client=android,web";
+const ALTERNATE_PLAYER_CLIENT_ARGS: &str = "youtube:player_client=android,web";
 
 static YTDLP_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 static EXTRACT_CACHE: OnceLock<Cache<String, Arc<VideoInfo>>> = OnceLock::new();
@@ -134,62 +134,46 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
     })?;
 
-    let mut cmd = build_command(&url, Some(PRIMARY_PLAYER_CLIENT_ARGS));
-    let output = cmd
+    let mut primary_cmd = build_command(&url, None);
+    let primary_output = primary_cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
         .await
         .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e)))?;
 
-    let output = if output.status.success() {
-        output
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stderr_trimmed = stderr.trim();
-        if should_retry_without_client_args(stderr_trimmed) {
-            let retries = EXTRACT_FALLBACK_RETRIES.fetch_add(1, Ordering::Relaxed) + 1;
-            warn!(
-                fallback_retries = retries,
-                "yt-dlp failed with player_client args for {}: {}. Retrying without extractor args",
-                url, stderr_trimmed
-            );
-            let mut fallback_cmd = build_command(&url, None);
-            let fallback_output = fallback_cmd
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .await
-                .map_err(|e| {
-                    ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e))
-                })?;
-            if !fallback_output.status.success() {
-                let fallback_stderr = String::from_utf8_lossy(&fallback_output.stderr);
-                warn!(
-                    "yt-dlp fallback failed for {}: {}",
-                    url,
-                    fallback_stderr.trim()
-                );
-                return Err(ExtractionError::ScriptExecutionFailed(format!(
-                    "yt-dlp error: {}",
-                    fallback_stderr.trim()
-                )));
-            }
-            fallback_output
-        } else {
-            warn!("yt-dlp failed for {}: {}", url, stderr_trimmed);
-            return Err(ExtractionError::ScriptExecutionFailed(format!(
-                "yt-dlp error: {}",
-                stderr_trimmed
-            )));
-        }
-    };
+    if primary_output.status.success() {
+        let primary_json: Value = serde_json::from_slice(&primary_output.stdout)
+            .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e)))?;
+        let primary_info = parse_ytdlp_json(primary_json, &url)?;
+        return Ok(Arc::new(primary_info));
+    }
 
-    let json: Value = serde_json::from_slice(&output.stdout)
-        .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e)))?;
+    let stderr = String::from_utf8_lossy(&primary_output.stderr);
+    let stderr_trimmed = stderr.trim();
+    if !should_retry_with_alternate_client_args(stderr_trimmed) {
+        warn!("yt-dlp failed for {}: {}", url, stderr_trimmed);
+        return Err(ExtractionError::ScriptExecutionFailed(format!(
+            "yt-dlp error: {}",
+            stderr_trimmed
+        )));
+    }
 
-    let video_info = parse_ytdlp_json(json, &url)?;
-    Ok(Arc::new(video_info))
+    let retries = EXTRACT_FALLBACK_RETRIES.fetch_add(1, Ordering::Relaxed) + 1;
+    warn!(
+        fallback_retries = retries,
+        "yt-dlp primary extraction failed for {}: {}. Retrying with alternate player_client args",
+        url, stderr_trimmed
+    );
+
+    if let Some(fallback_info) = try_extract_with_args(&url, Some(ALTERNATE_PLAYER_CLIENT_ARGS)).await? {
+        return Ok(Arc::new(fallback_info))
+    }
+
+    Err(ExtractionError::ScriptExecutionFailed(format!(
+        "yt-dlp error: {}",
+        stderr_trimmed
+    )))
 }
 
 /// Build the yt-dlp Command with appropriate flags
@@ -220,9 +204,37 @@ fn build_command(url: &str, extractor_args: Option<&str>) -> Command {
     cmd
 }
 
-fn should_retry_without_client_args(stderr: &str) -> bool {
+fn should_retry_with_alternate_client_args(stderr: &str) -> bool {
     stderr.contains("Requested format is not available")
         || stderr.contains("No video formats found")
+}
+
+async fn try_extract_with_args(
+    url: &str,
+    extractor_args: Option<&str>,
+) -> Result<Option<VideoInfo>, ExtractionError> {
+    let mut fallback_cmd = build_command(url, extractor_args);
+    let fallback_output = fallback_cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e)))?;
+
+    if !fallback_output.status.success() {
+        let fallback_stderr = String::from_utf8_lossy(&fallback_output.stderr);
+        warn!(
+            "yt-dlp fallback failed for {}: {}",
+            url,
+            fallback_stderr.trim()
+        );
+        return Ok(None);
+    }
+
+    let fallback_json: Value = serde_json::from_slice(&fallback_output.stdout)
+        .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e)))?;
+    let fallback_info = parse_ytdlp_json(fallback_json, url)?;
+    Ok(Some(fallback_info))
 }
 
 /// Parse yt-dlp `-J` JSON output into VideoInfo

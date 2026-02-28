@@ -1,7 +1,7 @@
 ---
 title: "Phase 04 — Whop Payment Webhook Endpoint (Rust)"
 priority: P1
-status: pending
+status: completed
 effort: 3h
 ---
 
@@ -24,11 +24,12 @@ Add `POST /api/webhooks/whop` endpoint to the Rust API. Verifies Whop webhook si
 - Whop webhook verification: HMAC-SHA256 of raw body using `WHOP_WEBHOOK_SECRET`
 - Whop sends `x-whop-signature: <hex_sig>` header
 - **Raw body must be captured before JSON deserialization** — body bytes needed for HMAC
+- **Constant-time comparison via `mac.verify_slice()`** — NOT `computed != sig_header` (timing attack)
 - Relevant events:
   - `membership.went_valid` → upsert subscription row, status=active
-  - `membership.went_invalid` → set status=expired/cancelled
-- `whop_user_id` in event payload links Whop member to `user_id` in our DB
-- Whop member ID must be stored when user initiates checkout (Phase 05)
+  - `membership.went_invalid` → set status=expired
+- **`custom_data` is the join key**: SvelteKit embeds `user.id` in the Whop checkout URL as `custom_data`. Webhook payload carries it back → Rust reads `custom_data` and updates `subscriptions` directly. No email lookup, no `whop_user_id` column on `user` table.
+- **Idempotency guard**: `whop_updated_at` column — if incoming event timestamp ≤ stored value, ignore (prevents out-of-order replay overwriting newer state)
 - Whop provides its own member management portal at `https://whop.com/hub/` — no need to build a custom billing portal
 
 ## Requirements
@@ -37,7 +38,7 @@ Add `POST /api/webhooks/whop` endpoint to the Rust API. Verifies Whop webhook si
 - Verify `x-whop-signature` header; return 400 if invalid
 - Parse event type from JSON body
 - Handle 2 membership lifecycle events
-- Upsert `subscriptions` table row via `user_id` (looked up from `whop_user_id`)
+- Upsert `subscriptions` table row using `custom_data` (= our `user.id`) from webhook payload
 - Return 200 for unhandled events (Whop retries on non-200)
 - Return 200 for all successfully processed events
 
@@ -105,17 +106,13 @@ fn verify_whop_signature(
     sig_header: &str,
     secret: &str,
 ) -> Result<(), WebhookError> {
-    // Compute HMAC-SHA256(payload, secret)
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
         .map_err(|_| WebhookError::InvalidSecret)?;
     mac.update(payload);
-    let computed = hex::encode(mac.finalize().into_bytes());
-
-    // Constant-time compare
-    if computed != sig_header {
-        return Err(WebhookError::InvalidSignature);
-    }
-    Ok(())
+    // True constant-time comparison via verify_slice — prevents timing attacks.
+    // sig_header is hex-encoded; decode first.
+    let sig_bytes = hex::decode(sig_header).map_err(|_| WebhookError::InvalidSignature)?;
+    mac.verify_slice(&sig_bytes).map_err(|_| WebhookError::InvalidSignature)
 }
 ```
 
@@ -125,37 +122,39 @@ fn verify_whop_signature(
 // Upsert subscription (membership.went_valid)
 async fn upsert_subscription(
     pool: &PgPool,
+    event: &serde_json::Value,
     membership: &serde_json::Value,
 ) -> Result<(), sqlx::Error> {
-    let whop_user_id = membership["user_id"].as_str()...;
-    let whop_membership_id = membership["id"].as_str()...;
-    let renewal_period_end = membership["renewal_period_end"].as_i64()...;
+    // custom_data = our user.id, embedded by SvelteKit when generating checkout URL
+    let user_id = event["data"]["custom_data"].as_str().unwrap_or_default();
+    let whop_membership_id = membership["id"].as_str().unwrap_or_default();
+    let renewal_period_end = membership["renewal_period_end"].as_i64().unwrap_or(0);
+    // Unix timestamp of this event — used as idempotency guard
+    let event_ts = event["created_at"].as_i64().unwrap_or(0);
 
-    // Lookup user_id from whop_user_id
-    let user_id = sqlx::query_scalar!(
-        "SELECT id FROM \"user\" WHERE whop_user_id = $1",
-        whop_user_id
-    ).fetch_optional(pool).await?;
+    if user_id.is_empty() {
+        tracing::warn!("Whop webhook missing custom_data (user_id)");
+        return Ok(()); // Return 200 so Whop doesn't retry
+    }
 
-    let Some(user_id) = user_id else {
-        tracing::warn!("No user found for whop_user_id {}", whop_user_id);
-        return Ok(());  // Return OK so Whop doesn't retry
-    };
-
-    // Upsert subscriptions row
+    // Idempotency guard: ignore event if it's older than the last processed event
+    // Prevents out-of-order replay from overwriting newer subscription state
     sqlx::query!(
         r#"
         INSERT INTO subscriptions
-            (user_id, plan, status, current_period_end, whop_membership_id, updated_at)
-        VALUES ($1, 'premium', 'active', to_timestamp($2), $3, NOW())
+            (user_id, plan, status, current_period_end, whop_membership_id, whop_updated_at, updated_at)
+        VALUES ($1, 'premium', 'active', to_timestamp($2), $3, to_timestamp($4), NOW())
         ON CONFLICT (user_id) DO UPDATE SET
             plan = 'premium',
             status = 'active',
             current_period_end = EXCLUDED.current_period_end,
             whop_membership_id = EXCLUDED.whop_membership_id,
+            whop_updated_at = EXCLUDED.whop_updated_at,
             updated_at = NOW()
+        WHERE subscriptions.whop_updated_at IS NULL
+           OR subscriptions.whop_updated_at < EXCLUDED.whop_updated_at
         "#,
-        user_id, renewal_period_end as f64, whop_membership_id
+        user_id, renewal_period_end as f64, whop_membership_id, event_ts as f64
     ).execute(pool).await?;
     Ok(())
 }
@@ -163,23 +162,31 @@ async fn upsert_subscription(
 // Expire subscription (membership.went_invalid)
 async fn expire_subscription(
     pool: &PgPool,
-    membership: &serde_json::Value,
+    event: &serde_json::Value,
 ) -> Result<(), sqlx::Error> {
-    let whop_user_id = membership["user_id"].as_str()...;
+    let user_id = event["data"]["custom_data"].as_str().unwrap_or_default();
+    let event_ts = event["created_at"].as_i64().unwrap_or(0);
 
+    if user_id.is_empty() {
+        tracing::warn!("Whop webhook missing custom_data (user_id)");
+        return Ok(());
+    }
+
+    // Only update if this event is newer than last processed
     sqlx::query!(
         r#"
         UPDATE subscriptions
-        SET status = 'expired', updated_at = NOW()
-        WHERE user_id = (SELECT id FROM "user" WHERE whop_user_id = $1)
+        SET status = 'expired', whop_updated_at = to_timestamp($2), updated_at = NOW()
+        WHERE user_id = $1
+          AND (whop_updated_at IS NULL OR whop_updated_at < to_timestamp($2))
         "#,
-        whop_user_id
+        user_id, event_ts as f64
     ).execute(pool).await?;
     Ok(())
 }
 ```
 
-Note: Add `UNIQUE(user_id)` constraint to `subscriptions` table migration to support `ON CONFLICT (user_id)`.
+Note: `ON CONFLICT (user_id)` requires `UNIQUE(user_id)` in `subscriptions`; this is already present in the Phase 01 migration.
 
 ## Whop Product Setup (Manual — Pre-Implementation)
 
@@ -202,7 +209,7 @@ Before implementing, set up in Whop Dashboard:
 - `crates/api/src/routes/mod.rs` — export `whop_webhook_handler`
 - `crates/api/src/main.rs` — register `POST /api/webhooks/whop` route (EXEMPT from JWT middleware and rate limiter)
 - `crates/api/src/config.rs` — add `whop_webhook_secret: String`
-- `crates/api/migrations/0001_create_subscriptions.sql` — add `UNIQUE(user_id)` constraint, rename `stripe_*` columns to `whop_*`
+- `crates/api/migrations/0001_create_subscriptions.sql` — already clean in Phase 01 (no changes needed)
 - `docker-compose.server.yml` (api service) — add `WHOP_WEBHOOK_SECRET` env var
 
 ## Implementation Steps
@@ -216,10 +223,10 @@ Before implementing, set up in Whop Dashboard:
 
 2. **Add `whop_webhook_secret` to `config.rs`**
 
-3. **Update migration** `0001_create_subscriptions.sql`:
-   - Add `UNIQUE(user_id)` to support upsert
-   - Use `whop_membership_id TEXT` instead of `stripe_subscription_id`
-   - Add `whop_user_id` to `user` table (stored in Better Auth user custom field)
+3. **Migration `0001_create_subscriptions.sql`** — already clean in Phase 01:
+   - Has `UNIQUE(user_id)`, `whop_membership_id`, `whop_updated_at`
+   - No stripe columns, no `whop_user_id` on `user` table
+   - No changes needed in this phase
 
 4. **Create `crates/api/src/routes/whop_webhook.rs`**:
    - `whop_webhook_handler`: uses `Bytes` extractor (not `Json`) to get raw body
@@ -253,7 +260,7 @@ Before implementing, set up in Whop Dashboard:
 - [ ] Register webhook endpoint in Whop Dashboard, record `WHOP_WEBHOOK_SECRET`
 - [ ] Add `hmac`, `sha2`, `hex` to workspace Cargo.toml
 - [ ] Add `whop_webhook_secret` to `config.rs`
-- [ ] Update migration: `UNIQUE(user_id)` on subscriptions, `whop_membership_id`, `whop_user_id` on user
+- [ ] Verify migration `0001_create_subscriptions.sql` has: `UNIQUE(user_id)`, `whop_membership_id`, `whop_updated_at` columns (set up in Phase 01, no changes needed here)
 - [ ] Create `crates/api/src/routes/whop_webhook.rs`
 - [ ] Register route in `main.rs` (exempt from JWT middleware)
 - [ ] Add `WHOP_WEBHOOK_SECRET` env var to docker-compose api service
@@ -272,17 +279,18 @@ Before implementing, set up in Whop Dashboard:
 
 ## Risk Assessment
 
-- **`whop_user_id` lookup:** Depends on SvelteKit storing `whop_user_id` in the Better Auth user record when user completes Whop checkout. This handshake must be documented — it happens when user returns from Whop checkout (Phase 05).
-- **`user` table custom field:** Better Auth stores `whopUserId` as a custom field. Verify actual column name after BA migration runs (`whop_user_id` snake_case).
+- **`custom_data` path in payload:** Verify actual JSON path for `custom_data` in Whop webhook. Check Whop Dashboard "Test webhook" output. If path differs, update field accessor.
+- **`created_at` timestamp path:** Verify field name for event timestamp in Whop payload (may be `created_at`, `timestamp`, or similar). Used for idempotency guard.
+- **`custom_data` missing:** If user initiated checkout via old link (without custom_data), webhook has empty value → log warning + 200, no DB update. Operator must link manually.
 - **Unhandled event volume:** Whop may send various event types. Unhandled events must return 200, not 500 — or Whop will retry.
 
 ## Security Considerations
 
-- HMAC verification is the sole authentication for this endpoint — no JWT, no session
+- HMAC verification via `mac.verify_slice()` — true constant-time, no timing attack risk
 - `WHOP_WEBHOOK_SECRET` is endpoint-specific
 - Route excluded from rate limiter (Whop IPs can trigger limit on bursts)
 - Raw body captured as `Bytes` before any parsing — critical for signature validity
 
 ## Next Steps
 
-→ Phase 05: Frontend billing UI (Whop Checkout redirect lives in SvelteKit — user redirected to `https://whop.com/checkout/{plan_id}/`, on return SvelteKit stores `whop_user_id`)
+→ Phase 05: Frontend sends user to `https://whop.com/checkout/{plan_id}/?custom_data={user.id}` — `custom_data` flows back via webhook to Rust for direct DB update

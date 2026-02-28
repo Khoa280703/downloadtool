@@ -1,7 +1,7 @@
 ---
 title: "Phase 03 — Rust JWT Middleware"
 priority: P1
-status: pending
+status: completed
 effort: 2h
 ---
 
@@ -13,7 +13,7 @@ effort: 2h
 
 ## Overview
 
-Add Axum middleware that reads the `Authorization: Bearer <jwt>` header on every request, verifies the HS256 signature using `BETTER_AUTH_SECRET`, extracts `tier` from claims, and injects a `UserTier` enum into request extensions. Handlers receive `UserTier` from extensions — no DB call needed for most routes.
+Add Axum middleware that reads the `Authorization: Bearer <jwt>` header on requests behind the JWT layer, verifies the HS256 signature using `BETTER_AUTH_SECRET`, extracts `tier` from claims, and injects a `UserTier` enum into request extensions. Handlers receive `UserTier` from extensions — no DB call needed for most routes.
 
 **Về staleness:** `definePayload` là async và query DB khi JWT được issue → tier trong JWT là fresh tại thời điểm issue. JWT sống 15min → tối đa 15min stale sau khi subscription thay đổi. DB lookup thêm ở `/api/extract` là optional safety net, không bắt buộc — quyết định khi implement phase 04.
 
@@ -29,11 +29,11 @@ Add Axum middleware that reads the `Authorization: Bearer <jwt>` header on every
 ## Requirements
 
 ### Functional
-- Parse `Authorization: Bearer <token>` header (or cookie fallback — see risk section)
+- Parse `Authorization: Bearer <token>` header
 - Verify HS256 signature with `BETTER_AUTH_SECRET`
 - Verify expiry (`exp` claim)
 - Map `tier` claim → `UserTier` enum
-- Inject `UserTier` into request extensions for all routes
+- Inject `UserTier` into request extensions for routes behind JWT middleware (webhook route excluded)
 - `/api/extract` handler: DB lookup subscription là **optional** — JWT tier đã fresh từ `definePayload`. Implement nếu cần strict accuracy.
 
 ### Non-functional
@@ -196,7 +196,7 @@ pub async fn extract_handler(
        ))
        .with_state(app_state);
    ```
-   Note: JWT middleware applies to ALL routes. Rate limiter stays on `/api/extract` only.
+   Note: JWT middleware applies to API routes behind the JWT layer. Keep `/api/webhooks/whop` in a separate sub-router without JWT middleware. Rate limiter stays on `/api/extract` only.
 
 7. **Update `extract_handler`** in `crates/api/src/routes/extract.rs`:
    - Add `Extension(user_tier): Extension<UserTier>` parameter
@@ -235,7 +235,7 @@ pub async fn extract_handler(
 ## Risk Assessment
 
 - **JWT secret sync:** `BETTER_AUTH_SECRET` in SvelteKit and `BETTER_AUTH_SECRET` in Rust MUST be the same string. If they differ, all JWT verifications fail silently (fall back to Anonymous). Document in deployment guide.
-- **Token delivery:** Frontend must attach JWT in `Authorization: Bearer` header for every Rust API call. Currently `frontend/src/lib/api.ts` calls Rust directly without auth header — needs update in Phase 05.
+- **Token delivery:** SvelteKit BFF proxy (`/api/proxy/extract`) fetches JWT server-side and attaches `Authorization: Bearer` before forwarding to Rust. JWT never exposed to browser.
 - **`jsonwebtoken` v9 API:** Uses `DecodingKey::from_secret(secret.as_bytes())`. Confirm algorithm is `HS256` (matches Better Auth JWT plugin default).
 - **Clock skew:** `exp` validation uses system clock. If Rust container clock drifts from SvelteKit container, tokens may appear expired. Use `leeway` in validation: `validation.leeway = 10;` (10 seconds).
 
@@ -248,5 +248,5 @@ pub async fn extract_handler(
 
 ## Next Steps
 
-→ Phase 04: Stripe webhook (shares `AppState.db_pool`)
-→ Phase 05: Frontend must attach JWT to API calls (update `frontend/src/lib/api.ts`)
+→ Phase 04: Whop webhook (shares `AppState.db_pool`)
+→ Phase 05: SvelteKit BFF proxy attaches JWT server-side (update `api.ts` to call `/api/proxy/extract`)

@@ -43,6 +43,15 @@ async-stream = "0.3"
 # OpenAPI spec generation
 utoipa = { workspace = true }
 
+# Database
+sqlx = { workspace = true }
+
+# Auth + crypto
+jsonwebtoken = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
 # Internal crates
 extractor = { path = "../extractor" }
 proxy = { path = "../proxy" }

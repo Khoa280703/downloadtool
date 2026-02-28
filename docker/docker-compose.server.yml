@@ -1,4 +1,17 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: downloadtool-postgres
+    environment:
+      - POSTGRES_DB=downloadtool
+      - POSTGRES_USER=downloadtool
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - coolify
+
   api:
     build:
       context: .
@@ -7,6 +20,9 @@ services:
     environment:
       - PORT=3068
       - RUST_LOG=info
+      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - WHOP_WEBHOOK_SECRET=${WHOP_WEBHOOK_SECRET}
     expose:
       - "3068"
     volumes:
@@ -28,11 +44,21 @@ services:
       - NODE_ENV=production
       - PORT=5168
       - HOST=0.0.0.0
-      - ORIGIN=https://download.khoadangbui.online
+      - ORIGIN=${ORIGIN}
+      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_TRUSTED_ORIGINS=${BETTER_AUTH_TRUSTED_ORIGINS}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - WHOP_PLAN_ID=${WHOP_PLAN_ID}
+      - RUST_API_URL=http://api:3068
     expose:
       - "5168"
+    ports:
+      - "5168:5168"
     restart: unless-stopped
     depends_on:
+      - postgres
       - api
     networks:
       - coolify
@@ -41,6 +67,7 @@ services:
 
 volumes:
   api-data:
+  postgres-data:
 
 networks:
   coolify:

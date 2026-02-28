@@ -1,7 +1,7 @@
 ---
 title: "Phase 05 — Frontend Auth UI"
 priority: P2
-status: pending
+status: completed
 effort: 4h
 ---
 
@@ -13,7 +13,7 @@ effort: 4h
 
 ## Overview
 
-Build the minimum viable auth UI in SvelteKit: a login/register page (email+password + Google OAuth button), an account page showing subscription status, and wire up the existing header "Login" button. Also update `frontend/src/lib/api.ts` to attach JWT to Rust API calls.
+Build the minimum viable auth UI in SvelteKit: a login/register page (email+password + Google OAuth button), an account page showing subscription status, and wire up the existing header "Login" button. Also update `frontend/src/lib/api.ts` to call SvelteKit BFF proxy routes for Rust API calls.
 
 ## Key Insights
 
@@ -21,10 +21,10 @@ Build the minimum viable auth UI in SvelteKit: a login/register page (email+pass
 - Design system: Nunito/Fredoka fonts, pink/purple palette (`#ff4d8c` primary, `#2d1b36` plum), rounded cards, `shadow-candy` — match existing page style
 - `authClient` from Phase 02 exposes `signIn.email()`, `signUp.email()`, `signIn.social()`, `useSession()` (Svelte store)
 - Account page shows: email, plan badge (Free/Premium), subscription expiry date, "Upgrade" CTA (links to Whop Checkout), "Manage" button (links to Whop member portal)
-- **Whop Checkout:** Redirect user to `https://whop.com/checkout/{WHOP_PLAN_ID}/` — no server-side session creation needed (simpler than Stripe). After payment, Whop fires webhook to Rust API.
+- **Whop Checkout:** Redirect user to `https://whop.com/checkout/{WHOP_PLAN_ID}/?custom_data={user.id}` — no server-side session creation needed (simpler than Stripe). After payment, Whop fires webhook to Rust API.
 - **Whop member portal:** Link to `https://whop.com/hub/` — Whop's own portal for subscription management (cancel, invoices, payment method). No custom billing portal needed.
-- On return from Whop checkout, SvelteKit reads `whop_user_id` from Whop callback and stores it on the Better Auth user record — this is what links the Whop member to our DB user for webhook lookups.
-- JWT must be attached to every Rust API call — update `frontend/src/lib/api.ts` to fetch token from layout server load
+- **Webhook is the source of truth:** Rust webhook reads `custom_data` (= our `user.id`) embedded in the checkout URL. No email lookup, no `whop_user_id`. Callback only redirects — no DB writes in SvelteKit.
+- **BFF proxy:** JWT never reaches browser. SvelteKit `/api/proxy/extract` fetches JWT server-side and forwards to Rust with `Authorization: Bearer`. Browser calls only SvelteKit.
 
 ## Requirements
 
@@ -34,9 +34,10 @@ Build the minimum viable auth UI in SvelteKit: a login/register page (email+pass
 - `/account` page: protected route (redirect to `/login` if not authenticated)
 - `/account` page: show email, subscription plan, `current_period_end`, "Manage" / "Upgrade" buttons
 - Header "Login" button → `/login`; when logged in → avatar/email + link to `/account`
-- JWT attached as `Authorization: Bearer` header in `api.ts` for all Rust API calls
-- `GET /api/checkout` server route: redirect to `https://whop.com/checkout/{WHOP_PLAN_ID}/`
-- `GET /api/checkout/callback` server route: receive Whop return, store `whop_user_id` on user
+- JWT attached server-side in `/api/proxy/extract` before forwarding to Rust; `api.ts` only calls same-origin SvelteKit proxy
+- `GET /api/checkout` server route: redirect to `https://whop.com/checkout/{WHOP_PLAN_ID}/?custom_data={user.id}`
+- `GET /api/checkout/callback` server route: receive Whop return, redirect to `/account?checkout=success` (no DB write)
+- `POST /api/proxy/extract` server route: BFF proxy — attach JWT server-side, forward to Rust
 
 ### Non-functional
 - Auth pages match existing design system (no new fonts/colors)
@@ -58,17 +59,16 @@ frontend/src/
         +page.server.ts          ← protected: redirect to /login if no session
     api/
       checkout/
-        +server.ts               ← GET: redirect to Whop checkout URL
+        +server.ts               ← GET: redirect to Whop checkout URL (with custom_data)
         callback/
-          +server.ts             ← GET: handle Whop return, store whop_user_id
-      jwt/
-        +server.ts               ← GET: return current JWT for client-side API calls
+          +server.ts             ← GET: handle Whop return → redirect /account?checkout=success
+      proxy/
+        extract/
+          +server.ts             ← POST: BFF proxy — attach JWT server-side, call Rust
   components/
     UserMenu.svelte              ← header user avatar + dropdown
   lib/
-    api.ts                       ← UPDATED: attach JWT to Rust API calls
-    stores/
-      auth.ts                    ← Svelte store wrapping authClient.useSession()
+    api.ts                       ← UPDATED: calls /api/proxy/* instead of Rust directly
 ```
 
 ## Page Designs
@@ -118,50 +118,57 @@ frontend/src/
 └─────────────────────────────────────┘
 ```
 
-## JWT Attachment Strategy
+## BFF Proxy Strategy (JWT never touches browser)
 
-Client-side API calls in `api.ts` currently call Rust directly via `VITE_API_URL`. To attach JWT:
+Browser calls SvelteKit server routes → SvelteKit fetches JWT server-side and proxies to Rust → JWT stays on server. Eliminates XSS risk.
 
-**Strategy: Server-side load passes JWT token to page, stored in Svelte store**
-
-```typescript
-// frontend/src/routes/+layout.server.ts
-export async function load({ locals }) {
-  let jwt: string | null = null;
-  if (locals.session) {
-    const tokenResp = await auth.api.getToken({ ... });
-    jwt = tokenResp?.token ?? null;
-  }
-  return { jwt };
-}
-
-// frontend/src/routes/+layout.svelte
-<script>
-  let { data } = $props();
-  import { apiToken } from '$lib/stores/api-token';
-  $effect(() => { apiToken.set(data.jwt); });
-</script>
+```
+Browser → POST /api/proxy/extract (httpOnly cookie) → SvelteKit server
+                                                         ↓ get JWT from Better Auth
+                                                         ↓ POST Rust /api/extract (Authorization: Bearer)
+                                                         ↓ return result to browser
 ```
 
 ```typescript
-// frontend/src/lib/api.ts  (updated)
-import { get } from 'svelte/store';
-import { apiToken } from '$stores/api-token';
+// frontend/src/routes/api/proxy/extract/+server.ts  (NEW)
+import { auth } from '$lib/server/auth';
+import { RUST_API_URL } from '$env/static/private';
 
-function getAuthHeaders(): Record<string, string> {
-  const token = get(apiToken);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+export async function POST({ request, locals }) {
+  const body = await request.json();
 
-export async function extract(url: string): Promise<ExtractResult> {
-  const res = await fetch(`${API_URL}/api/extract`, {
+  // Get JWT server-side — never sent to browser
+  let authHeaders: Record<string, string> = {};
+  if (locals.session) {
+    const tokenResp = await auth.api.getToken({ headers: request.headers });
+    if (tokenResp?.token) {
+      authHeaders['Authorization'] = `Bearer ${tokenResp.token}`;
+    }
+  }
+
+  const resp = await fetch(`${RUST_API_URL}/api/extract`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify(body),
+  });
+  return new Response(resp.body, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
+}
+```
+
+```typescript
+// frontend/src/lib/api.ts  (updated — calls SvelteKit proxy, not Rust directly)
+export async function extract(url: string): Promise<ExtractResult> {
+  const res = await fetch('/api/proxy/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    // credentials: 'include' not needed — same-origin by default
     body: JSON.stringify({ url }),
   });
   // ...
 }
 ```
+
+No `apiToken` store, no JWT in `$page.data`, no client-side auth headers.
 
 ## Whop Checkout Integration
 
@@ -174,9 +181,9 @@ const WHOP_PLAN_ID = process.env.WHOP_PLAN_ID!;
 export async function GET({ locals }) {
   if (!locals.user) throw error(401);
 
-  // Redirect to Whop hosted checkout — no server-side session creation needed
-  // Whop appends ?user_id=<whop_user_id> on successful payment redirect back
-  const checkoutUrl = `https://whop.com/checkout/${WHOP_PLAN_ID}/`;
+  // Embed our user.id as custom_data — Whop carries it in the webhook payload
+  // This is the join key: Rust webhook reads custom_data to identify which user paid
+  const checkoutUrl = `https://whop.com/checkout/${WHOP_PLAN_ID}/?custom_data=${locals.user.id}`;
   throw redirect(302, checkoutUrl);
 }
 ```
@@ -184,22 +191,12 @@ export async function GET({ locals }) {
 ```typescript
 // frontend/src/routes/api/checkout/callback/+server.ts
 import { redirect } from '@sveltejs/kit';
-import { auth } from '$lib/server/auth';
 
-export async function GET({ url, locals }) {
+export async function GET({ locals }) {
   if (!locals.user) throw redirect(302, '/login');
 
-  // Whop passes whop_user_id in the return URL after payment
-  const whopUserId = url.searchParams.get('whop_user_id');
-  if (whopUserId) {
-    // Store whop_user_id on the Better Auth user record
-    // This enables Rust webhook handler to link Whop events to our user
-    await auth.api.updateUser({
-      body: { whopUserId },
-      headers: { cookie: locals.session?.sessionToken ?? '' },
-    });
-  }
-
+  // Rust webhook reads custom_data (user.id) from Whop payload to link subscription.
+  // No DB write here — callback only redirects. Subscription activates via webhook.
   throw redirect(302, '/account?checkout=success');
 }
 ```
@@ -223,42 +220,36 @@ export async function GET({ url, locals }) {
 - `frontend/src/routes/(auth)/login/+page.server.ts`
 - `frontend/src/routes/(auth)/account/+page.svelte`
 - `frontend/src/routes/(auth)/account/+page.server.ts`
-- `frontend/src/routes/api/checkout/+server.ts`
-- `frontend/src/routes/api/checkout/callback/+server.ts`
-- `frontend/src/routes/+layout.server.ts` — JWT load
+- `frontend/src/routes/api/checkout/+server.ts` — redirect with `custom_data`
+- `frontend/src/routes/api/checkout/callback/+server.ts` — redirect only, no DB write
+- `frontend/src/routes/api/proxy/extract/+server.ts` — BFF proxy to Rust
 - `frontend/src/components/UserMenu.svelte`
-- `frontend/src/stores/api-token.ts`
 
 ### Files to modify
 - `frontend/src/routes/+page.svelte` — wire header "Login" button + `UserMenu`
-- `frontend/src/lib/api.ts` — add auth headers to all Rust API calls
-- `docker-compose.server.yml` (frontend service) — add `WHOP_PLAN_ID` env var
+- `frontend/src/lib/api.ts` — call `/api/proxy/extract` instead of Rust directly
+- `docker-compose.server.yml` (frontend service) — add `WHOP_PLAN_ID`, `RUST_API_URL` env vars
 
 ## Implementation Steps
 
-1. **Create `frontend/src/stores/api-token.ts`**
-   ```typescript
-   import { writable } from 'svelte/store';
-   export const apiToken = writable<string | null>(null);
-   ```
+1. **Create `frontend/src/routes/api/proxy/extract/+server.ts`** — BFF proxy:
+   - Reads JWT server-side from Better Auth (`auth.api.getToken()`)
+   - Forwards request to Rust with `Authorization: Bearer <jwt>`
+   - JWT never reaches browser
 
-2. **Create `frontend/src/routes/+layout.server.ts`** — load JWT from Better Auth and pass to client
+2. **Update `frontend/src/lib/api.ts`** — change target from `VITE_API_URL/api/extract` → `/api/proxy/extract` (same-origin call, no auth headers needed client-side)
 
-3. **Update `frontend/src/routes/+layout.svelte`** — set `apiToken` store from layout data
-
-4. **Update `frontend/src/lib/api.ts`** — add `getAuthHeaders()` + attach to all fetch calls
-
-5. **Create login page** `(auth)/login/+page.svelte`:
+3. **Create login page** `(auth)/login/+page.svelte`:
    - Email + password fields with loading state
    - `authClient.signIn.email()` / `authClient.signUp.email()` handlers
    - Google button: `authClient.signIn.social({ provider: 'google' })`
    - Error display
    - Redirect to `/` on success (or `?redirectTo` param)
 
-6. **Create `(auth)/login/+page.server.ts`**:
+4. **Create `(auth)/login/+page.server.ts`**:
    - If `locals.session` exists, redirect to `/account`
 
-7. **Create account page** `(auth)/account/+page.svelte`:
+5. **Create account page** `(auth)/account/+page.svelte`:
    - Protected: server load redirects to `/login` if no session
    - Load subscription data from `subscriptions` table in server load
    - Show plan badge, expiry date
@@ -266,40 +257,38 @@ export async function GET({ url, locals }) {
    - "Manage Subscription" link → `https://whop.com/hub/`
    - "Logout" button → `authClient.signOut()`
 
-8. **Create `(auth)/account/+page.server.ts`**:
+6. **Create `(auth)/account/+page.server.ts`**:
    - Check `locals.session`, redirect to `/login` if null
    - Query `subscriptions` table for user's subscription
    - Return `{ user, subscription }` to page
 
-9. **Create `UserMenu.svelte`** component — avatar + email + dropdown with Account/Logout links
+7. **Create `UserMenu.svelte`** component — avatar + email + dropdown with Account/Logout links
 
-10. **Update header in `+page.svelte`** — replace static Login button with session-aware component
+8. **Update header in `+page.svelte`** — replace static Login button with session-aware component
 
-11. **Create `frontend/src/routes/api/checkout/+server.ts`** — redirect to Whop checkout URL
+9. **Create `frontend/src/routes/api/checkout/+server.ts`** — redirect to `https://whop.com/checkout/{WHOP_PLAN_ID}/?custom_data={user.id}`
 
-12. **Create `frontend/src/routes/api/checkout/callback/+server.ts`** — handle Whop return, store `whop_user_id`
+10. **Create `frontend/src/routes/api/checkout/callback/+server.ts`** — redirect to `/account?checkout=success` (no DB write)
 
-13. **Add `WHOP_PLAN_ID` env var** to frontend docker-compose service
+11. **Add env vars** to frontend docker-compose service: `WHOP_PLAN_ID`, `RUST_API_URL` (private, used by BFF proxy)
 
 ## Todo
 
-- [ ] Create `frontend/src/stores/api-token.ts`
-- [ ] Create `frontend/src/routes/+layout.server.ts`
-- [ ] Update `frontend/src/routes/+layout.svelte` to set apiToken
-- [ ] Update `frontend/src/lib/api.ts` with auth headers
-- [ ] Create `(auth)/login/+page.svelte`
-- [ ] Create `(auth)/login/+page.server.ts`
-- [ ] Create `(auth)/account/+page.svelte`
-- [ ] Create `(auth)/account/+page.server.ts`
-- [ ] Create `UserMenu.svelte`
-- [ ] Update header in `+page.svelte`
-- [ ] Create `frontend/src/routes/api/checkout/+server.ts`
-- [ ] Create `frontend/src/routes/api/checkout/callback/+server.ts`
-- [ ] Add `WHOP_PLAN_ID` env var to docker-compose
-- [ ] Test login flow (email + Google)
-- [ ] Test account page shows correct plan
-- [ ] Test Whop Checkout redirect
-- [ ] Test callback stores `whop_user_id` on user record
+- [x] Create `frontend/src/routes/api/proxy/extract/+server.ts` (BFF proxy)
+- [x] Update `frontend/src/lib/api.ts` to call `/api/proxy/extract` instead of Rust directly
+- [x] Create `(auth)/login/+page.svelte`
+- [x] Create `(auth)/login/+page.server.ts`
+- [x] Create `(auth)/account/+page.svelte`
+- [x] Create `(auth)/account/+page.server.ts`
+- [x] Create `UserMenu.svelte`
+- [x] Update header in `+page.svelte`
+- [x] Create `frontend/src/routes/api/checkout/+server.ts`
+- [x] Create `frontend/src/routes/api/checkout/callback/+server.ts`
+- [x] Add `WHOP_PLAN_ID`, `RUST_API_URL` env vars to frontend docker-compose service
+- [ ] Test login flow (email + Google) in running environment with real Better Auth tables
+- [ ] Test account page shows correct plan with seeded subscription data
+- [ ] Test Whop Checkout redirect against real `WHOP_PLAN_ID`
+- [ ] Test callback redirects to `/account?checkout=success` (no DB write)
 - [ ] Verify JWT attached in Rust API calls (check Rust logs for `UserTier`)
 
 ## Success Criteria
@@ -307,26 +296,24 @@ export async function GET({ url, locals }) {
 - Unauthenticated user: "Login" button visible in header, `/account` redirects to `/login`
 - After login: `UserMenu` shows email in header, `/account` loads correctly
 - Account page shows correct plan (Free/Premium) from DB
-- "Upgrade" button redirects to `https://whop.com/checkout/{WHOP_PLAN_ID}/`
+- "Upgrade" button redirects to `https://whop.com/checkout/{WHOP_PLAN_ID}/?custom_data={user.id}`
 - "Manage Subscription" links to `https://whop.com/hub/`
-- Checkout callback stores `whop_user_id` on user record
-- Rust API receives `Authorization: Bearer <jwt>` header from frontend calls
+- Checkout callback redirects to `/account?checkout=success` (no DB write)
+- `/api/proxy/extract` calls Rust with `Authorization: Bearer <jwt>` (verify in Rust logs)
 - Rust logs show `UserTier::Free` or `UserTier::Premium` (not Anonymous) for logged-in users
 
 ## Risk Assessment
 
-- **JWT token freshness:** Layout server load fetches JWT on every SSR render. For client-side navigation, the token in the store may be up to 15min stale (acceptable per design).
-- **`+layout.server.ts` timing:** If Better Auth session doesn't exist yet during load (race with cookie), JWT will be null. Client falls back to Anonymous — acceptable.
-- **Whop callback `whop_user_id`:** Must verify Whop actually appends this to the redirect URL. Check Whop dashboard webhook/redirect settings. If not available via redirect, fallback: query Whop API with user email to get `whop_user_id`.
-- **`whopUserId` custom field column name:** Better Auth may store as `whop_user_id` (snake_case) in DB. Verify after BA migration and use consistent name in queries.
+- **Webhook latency on account page:** After callback redirects to `/account?checkout=success`, webhook may not have arrived yet → plan still shows "Free". Show hint: "Subscription may take a few seconds to activate. Refresh if needed."
+- **`custom_data` missing:** If user finds a raw Whop checkout link (without `custom_data`), webhook cannot link to user. Mitigate: only expose checkout via `/api/checkout` server route (never expose raw Whop URL in UI).
 - **`(auth)` route group:** SvelteKit route groups `(auth)` don't affect URL — `/login` and `/account` paths remain clean.
 
 ## Security Considerations
 
 - Account page server load validates session server-side (not just client-side check)
 - `WHOP_PLAN_ID` is public (it's in the checkout URL) — safe in env var but not secret
-- Checkout callback validates session before storing `whop_user_id`
-- `whopUserId` stored in DB, not exposed in JWT
+- Checkout callback validates session before redirecting (no DB write in SvelteKit)
+- Subscription linking handled server-side by Rust webhook (not client-exposed)
 - Logout: `authClient.signOut()` clears session cookie + invalidates server session
 
 ## Next Steps

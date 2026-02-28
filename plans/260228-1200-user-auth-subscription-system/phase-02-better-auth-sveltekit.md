@@ -1,7 +1,7 @@
 ---
 title: "Phase 02 — Better Auth Integration in SvelteKit"
 priority: P1
-status: pending
+status: completed
 effort: 3h
 ---
 
@@ -22,10 +22,10 @@ Install and configure Better Auth in the SvelteKit frontend. Handles: session co
 - Auth routes are handled by a SvelteKit `[...all]/+server.ts` catch-all at `/api/auth/[...all]`
 - Better Auth **JWT plugin** (`betterAuthJwt`) emits a short-lived JWT on each session creation
   - JWT accessible via `auth.api.getToken()` from server routes
-  - Frontend retrieves JWT and sends it as `Authorization: Bearer <token>` to Rust API
+  - SvelteKit BFF proxy retrieves JWT server-side and forwards to Rust API (JWT never reaches browser)
 - Google OAuth requires `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in env
 - JWT secret (`BETTER_AUTH_SECRET`) is a random 32+ char string — also used for session signing
-- `stripe_customer_id` stored as user custom field in Better Auth user schema
+- No custom fields on `user` table — `custom_data` in Whop checkout URL is the join key
 
 ## Requirements
 
@@ -76,8 +76,7 @@ import { Pool } from "pg";
 export const auth = betterAuth({
   database: {
     db: new Pool({ connectionString: process.env.DATABASE_URL }),
-    // BẮTBUỘC: snake_case để Rust sqlx query không phải dùng quoted identifiers
-    // TypeScript vẫn dùng camelCase (stripeCustomerId), DB lưu stripe_customer_id
+    // MANDATORY: snake_case so Rust sqlx queries don't need quoted identifiers
     casing: "snake_case",
   },
   secret: process.env.BETTER_AUTH_SECRET,
@@ -96,16 +95,12 @@ export const auth = betterAuth({
         // Custom payload — tier resolved via DB lookup
         definePayload: async ({ user }) => ({
           sub: user.id,
-          tier: await getUserTier(user.id),  // 'anonymous'|'free'|'premium'
+          tier: await getUserTier(user.id),  // 'free'|'premium'
         }),
       },
     }),
   ],
-  user: {
-    additionalFields: {
-      stripeCustomerId: { type: "string", required: false, defaultValue: null },
-    },
-  },
+  // No additionalFields needed — Whop join key is custom_data in checkout URL, not a user column
 });
 ```
 
@@ -215,26 +210,29 @@ export async function getJwtForRequest(event: RequestEvent): Promise<string | nu
 
 9. **Update `.env.example`** with all new vars
 
-10. **Run Better Auth migrations** (auto-runs on first request or via CLI):
+10. **Run Better Auth migrations**:
+    - Dev: auto-runs on first request (Better Auth detects missing tables)
+    - **Production: MUST run via CLI in CI/CD pipeline before deploying**:
     ```bash
     npx better-auth migrate
     ```
+    Source of truth: CLI migrate. Never rely on auto-migrate in production.
 
 ## Todo
 
-- [ ] `pnpm add better-auth pg @types/pg` in frontend
-- [ ] Create `frontend/src/lib/server/auth.ts`
-- [ ] Create `frontend/src/lib/server/auth-utils.ts`
-- [ ] Create `frontend/src/routes/api/auth/[...all]/+server.ts`
-- [ ] Update `frontend/src/hooks.server.ts`
-- [ ] Update `frontend/src/app.d.ts`
-- [ ] Create `frontend/src/lib/auth-client.ts`
-- [ ] Add env vars to docker-compose frontend service
-- [ ] Update `.env.example`
-- [ ] Run `npx better-auth migrate` to create BA tables
-- [ ] Test email/password sign-up + login via curl/browser
-- [ ] Test Google OAuth redirect flow
-- [ ] Test `auth.api.getToken()` returns JWT
+- [x] `pnpm add better-auth pg @types/pg` in frontend
+- [x] Create `frontend/src/lib/server/auth.ts`
+- [x] Create `frontend/src/lib/server/auth-utils.ts`
+- [x] Create `frontend/src/routes/api/auth/[...all]/+server.ts`
+- [x] Update `frontend/src/hooks.server.ts`
+- [x] Update `frontend/src/app.d.ts`
+- [x] Create `frontend/src/lib/auth-client.ts`
+- [x] Add env vars to docker-compose frontend service
+- [x] Update `.env.example`
+- [ ] Run `npx better-auth migrate` to create BA tables (pending: run in real DB env)
+- [ ] Test email/password sign-up + login via curl/browser (pending: E2E manual check)
+- [ ] Test Google OAuth redirect flow (pending: OAuth app credentials + callback test)
+- [x] Test `auth.api.getToken()` returns JWT (verified against pinned package API + compile path)
 
 ## Success Criteria
 
