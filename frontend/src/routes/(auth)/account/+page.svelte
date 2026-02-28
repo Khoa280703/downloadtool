@@ -6,6 +6,7 @@
 
 	let { data }: { data: PageData } = $props();
 	let isSigningOut = $state(false);
+	let signOutError = $state('');
 
 	const isPremium = $derived(
 		data.subscription.plan === 'premium' && data.subscription.status === 'active'
@@ -23,13 +24,20 @@
 	}
 
 	async function handleSignOut(): Promise<void> {
+		signOutError = '';
 		isSigningOut = true;
 		try {
-			await authClient.signOut();
+			const response = await authClient.signOut();
+			if (response?.error) {
+				signOutError = response.error.message ?? 'Đăng xuất thất bại.';
+				return;
+			}
+			await goto('/', { invalidateAll: true, replaceState: true });
+		} catch (error) {
+			signOutError = error instanceof Error ? error.message : 'Đăng xuất thất bại.';
 		} finally {
 			isSigningOut = false;
 		}
-		await goto('/login', { invalidateAll: true });
 	}
 </script>
 
@@ -54,11 +62,17 @@
 			</button>
 		</div>
 
-		{#if data.checkoutStatus === 'success'}
-			<p class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-				Thanh toán đã hoàn tất. Nếu plan chưa cập nhật ngay, hãy đợi vài giây để webhook đồng bộ.
-			</p>
-		{/if}
+			{#if data.checkoutStatus === 'success'}
+				<p class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+					Thanh toán đã hoàn tất. Nếu plan chưa cập nhật ngay, hãy đợi vài giây để webhook đồng bộ.
+				</p>
+			{/if}
+
+			{#if signOutError}
+				<p class="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+					{signOutError}
+				</p>
+			{/if}
 
 		<div class="mt-6 grid gap-4 md:grid-cols-2">
 			<div class="rounded-2xl border border-pink-100 bg-pink-50 p-4">

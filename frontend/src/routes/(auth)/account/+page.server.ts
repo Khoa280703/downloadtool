@@ -5,7 +5,7 @@ import { getSubscriptionForUser } from '$lib/server/auth-utils';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user || !locals.session) {
-		throw redirect(302, `/login?redirectTo=${encodeURIComponent('/account')}`);
+		throw redirect(302, `/?auth=required&redirectTo=${encodeURIComponent('/account')}`);
 	}
 
 	const subscription = await getSubscriptionForUser(locals.user.id);

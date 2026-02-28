@@ -12,7 +12,7 @@ function requireWhopPlanId(): string {
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
-		throw redirect(302, '/login?redirectTo=%2Faccount');
+		throw redirect(302, '/?auth=required&redirectTo=%2Faccount');
 	}
 
 	const planId = requireWhopPlanId();

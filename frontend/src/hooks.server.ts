@@ -33,6 +33,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		response.headers.get('content-type')?.startsWith('text/html')
 	) {
 		response.headers.set('cache-control', HTML_CACHE_CONTROL);
+		response.headers.set('vary', 'cookie');
 	}
 
 	if (event.url.pathname.startsWith('/api/auth/')) {

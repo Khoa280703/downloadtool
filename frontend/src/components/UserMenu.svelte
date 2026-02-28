@@ -13,19 +13,27 @@
 
 	let open = $state(false);
 	let signingOut = $state(false);
+	let signOutError = $state('');
 
 	const displayName = $derived(user.name?.trim() || user.email.split('@')[0]);
 	const avatarLabel = $derived(displayName.slice(0, 1).toUpperCase());
 
 	async function handleSignOut(): Promise<void> {
+		signOutError = '';
 		signingOut = true;
 		try {
-			await authClient.signOut();
+			const response = await authClient.signOut();
+			if (response?.error) {
+				signOutError = response.error.message ?? 'Đăng xuất thất bại.';
+				return;
+			}
+			open = false;
+			await goto('/', { invalidateAll: true, replaceState: true });
+		} catch (error) {
+			signOutError = error instanceof Error ? error.message : 'Đăng xuất thất bại.';
 		} finally {
 			signingOut = false;
-			open = false;
 		}
-		await goto('/login', { invalidateAll: true });
 	}
 </script>
 
@@ -60,14 +68,17 @@
 			>
 				Account
 			</a>
-			<button
-				type="button"
-				class="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-plum transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60"
-				onclick={handleSignOut}
-				disabled={signingOut}
-			>
-				{signingOut ? 'Đang đăng xuất...' : 'Logout'}
-			</button>
-		</div>
-	{/if}
-</div>
+				<button
+					type="button"
+					class="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-plum transition hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60"
+					onclick={handleSignOut}
+					disabled={signingOut}
+				>
+					{signingOut ? 'Đang đăng xuất...' : 'Logout'}
+				</button>
+				{#if signOutError}
+					<p class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{signOutError}</p>
+				{/if}
+			</div>
+		{/if}
+	</div>

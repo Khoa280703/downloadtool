@@ -1,14 +1,18 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import AuthModal from '$components/AuthModal.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import BatchInput from '$components/BatchInput.svelte';
 	import BatchProgress from '$components/BatchProgress.svelte';
 	import UserMenu from '$components/UserMenu.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
-	import { authClient } from '$lib/auth-client';
 	import type { ExtractResult, Stream } from '$lib/types';
+	import type { PageData } from './$types';
 	import { currentDownload } from '$stores/download';
+
+	let { data }: { data: PageData } = $props();
 
 	let inputUrl = $state('');
 	let extractResult = $state<ExtractResult | null>(null);
@@ -21,7 +25,13 @@
 	let previewThumbnailUrl = $derived(
 		previewThumbnailId ? `https://i.ytimg.com/vi/${previewThumbnailId}/hqdefault.jpg` : null
 	);
-	const session = authClient.useSession();
+	let authModalOpen = $state(false);
+
+	$effect(() => {
+		if (data.authRequired && !data.user) {
+			authModalOpen = true;
+		}
+	});
 
 	onMount(() => {
 		const saved = localStorage.getItem('fetchtube-theme');
@@ -111,6 +121,23 @@
 
 	function toggleTheme(): void {
 		isDarkMode = !isDarkMode;
+	}
+
+	function openAuthModal(): void {
+		authModalOpen = true;
+	}
+
+	async function closeAuthModal(): Promise<void> {
+		authModalOpen = false;
+
+		if (data.authRequired && !data.user) {
+			await goto('/', { replaceState: true, noScroll: true, invalidateAll: false });
+		}
+	}
+
+	async function handleAuthSuccess(target: string): Promise<void> {
+		authModalOpen = false;
+		await goto(target, { invalidateAll: true, replaceState: true });
 	}
 </script>
 
@@ -311,29 +338,35 @@
 					<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#how-it-works">How it Works</a>
 					<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#tools">Tools</a>
 				</nav>
-				{#if $session?.data?.user}
-					<UserMenu user={$session.data.user} />
-				{:else}
-					<a
-						href="/login"
-						class="flex h-10 px-6 items-center justify-center rounded-full bg-plum text-white text-sm font-bold shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 tracking-wide uppercase"
-					>
-						Login
-					</a>
-				{/if}
+					{#if data.user}
+						<UserMenu user={data.user} />
+					{:else}
+						<button
+							type="button"
+							class="flex h-10 px-6 items-center justify-center rounded-full bg-plum text-white text-sm font-bold shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 tracking-wide uppercase"
+							onclick={openAuthModal}
+						>
+							Login
+						</button>
+					{/if}
+				</div>
+				<div class="md:hidden">
+					{#if data.user}
+						<a href="/account" class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors flex items-center">
+							<span class="material-symbols-outlined text-3xl">account_circle</span>
+						</a>
+					{:else}
+						<button
+							type="button"
+							class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors flex items-center"
+							onclick={openAuthModal}
+						>
+							<span class="material-symbols-outlined text-3xl">login</span>
+						</button>
+					{/if}
+				</div>
 			</div>
-			<div class="md:hidden">
-				<a
-					href={$session?.data?.user ? '/account' : '/login'}
-					class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors flex items-center"
-				>
-					<span class="material-symbols-outlined text-3xl">
-						{$session?.data?.user ? 'account_circle' : 'login'}
-					</span>
-				</a>
-			</div>
-		</div>
-	</header>
+		</header>
 
 	<main class="flex-1 w-full">
 		<section class="relative pt-12 pb-8 px-6 overflow-visible" id="home">
@@ -698,7 +731,14 @@
 				</div>
 			</div>
 		</section>
-	</main>
+		</main>
+
+		<AuthModal
+			open={authModalOpen}
+			redirectTo={data.redirectTo}
+			onClose={closeAuthModal}
+			onSuccess={handleAuthSuccess}
+		/>
 
 	<footer class="bg-white border-t border-pink-100 py-6 px-6">
 		<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">

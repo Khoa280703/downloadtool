@@ -2,12 +2,11 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
+	const redirectTo = url.searchParams.get('redirectTo') ?? '/account';
+
 	if (locals.session) {
-		const redirectTo = url.searchParams.get('redirectTo') ?? '/account';
 		throw redirect(302, redirectTo);
 	}
 
-	return {
-		redirectTo: url.searchParams.get('redirectTo') ?? '/account'
-	};
+	throw redirect(302, `/?auth=required&redirectTo=${encodeURIComponent(redirectTo)}`);
 };
