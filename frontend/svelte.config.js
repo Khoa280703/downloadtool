@@ -4,10 +4,6 @@ import adapter from '@sveltejs/adapter-node';
 const config = {
 	kit: {
 		adapter: adapter(),
-		prerender: {
-			entries: ['/'],
-			handleMissingId: 'ignore'
-		},
 		alias: {
 			$components: './src/components',
 			$stores: './src/stores'

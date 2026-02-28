@@ -5,6 +5,7 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { auth } from '$lib/server/auth';
 
 const HTML_CACHE_CONTROL = 'private, no-store';
+const AUTH_API_CACHE_CONTROL = 'private, no-store, max-age=0, must-revalidate';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (building) {
@@ -32,6 +33,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		response.headers.get('content-type')?.startsWith('text/html')
 	) {
 		response.headers.set('cache-control', HTML_CACHE_CONTROL);
+	}
+
+	if (event.url.pathname.startsWith('/api/auth/')) {
+		response.headers.set('cache-control', AUTH_API_CACHE_CONTROL);
+		response.headers.set('pragma', 'no-cache');
+		response.headers.set('expires', '0');
+		response.headers.set('vary', 'cookie');
 	}
 
 	return response;
