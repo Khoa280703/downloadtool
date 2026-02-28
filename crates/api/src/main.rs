@@ -135,6 +135,9 @@ fn build_app(app_state: AppState, limiter: Arc<KeyedLimiter>) -> Router {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load .env (if present) so local `cargo run` works without manual `source .env`.
+    let _ = dotenvy::dotenv();
+
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
