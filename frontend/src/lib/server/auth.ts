@@ -7,12 +7,18 @@ import { sveltekitCookies } from 'better-auth/svelte-kit';
 
 import { getDatabasePool, getUserTier } from './auth-utils';
 
-function requireEnv(name: keyof typeof env, fallback = ''): string {
-	const value = env[name];
-	if (!value && !building) {
-		throw new Error(`${name} is required`);
+function resolveAuthSecret(): string {
+	const value = env.BETTER_AUTH_SECRET?.trim();
+
+	if (!value || value === 'better-auth-secret') {
+		if (!building) {
+			throw new Error('BETTER_AUTH_SECRET is required and must not use default value');
+		}
+
+		return 'snapvie-build-placeholder-secret-please-set-better-auth-secret-in-runtime';
 	}
-	return value ?? fallback;
+
+	return value;
 }
 
 const trustedOrigins = (env.BETTER_AUTH_TRUSTED_ORIGINS ?? '')
@@ -33,10 +39,7 @@ const socialProviders =
 export const auth = betterAuth({
 	baseURL: env.ORIGIN ?? env.BETTER_AUTH_URL ?? 'http://localhost:5168',
 	database: getDatabasePool(),
-	secret: requireEnv(
-		'BETTER_AUTH_SECRET',
-		'snapvie-build-placeholder-secret-please-set-better-auth-secret-in-runtime'
-	),
+	secret: resolveAuthSecret(),
 	trustedOrigins,
 	emailAndPassword: {
 		enabled: true
