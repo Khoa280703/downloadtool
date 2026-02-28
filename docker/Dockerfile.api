@@ -67,6 +67,18 @@ RUN apt-get update && apt-get install -y \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
+# Install latest yt-dlp binary (newer than Debian package).
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64) ytdlp_asset="yt-dlp_linux" ;; \
+      arm64) ytdlp_asset="yt-dlp_linux_aarch64" ;; \
+      *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlp_asset}" -o /usr/local/bin/yt-dlp; \
+    chmod +x /usr/local/bin/yt-dlp; \
+    /usr/local/bin/yt-dlp --version
+
 # Create non-root user
 RUN useradd -m -u 1000 -s /bin/bash appuser
 
@@ -83,6 +95,7 @@ USER appuser
 # Environment variables
 ENV PORT=3068
 ENV EXTRACTOR_DIR=/app/extractors
+ENV YTDLP_PATH=/usr/local/bin/yt-dlp
 ENV RUST_LOG=info
 
 # Expose port

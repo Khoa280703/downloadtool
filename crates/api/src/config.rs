@@ -3,6 +3,7 @@
 //! Loads configuration from environment variables.
 
 use std::env;
+use std::process::Command;
 
 /// Application configuration loaded from environment variables.
 #[derive(Debug, Clone)]
@@ -20,6 +21,42 @@ pub struct Config {
 }
 
 impl Config {
+    fn resolve_local_database_url(raw_url: &str) -> String {
+        let uses_localhost =
+            raw_url.contains("@127.0.0.1:") || raw_url.contains("@localhost:");
+        if !uses_localhost {
+            return raw_url.to_string();
+        }
+
+        let output = Command::new("docker")
+            .args([
+                "inspect",
+                "-f",
+                "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+                "downloadtool-postgres",
+            ])
+            .output();
+
+        let Ok(output) = output else {
+            return raw_url.to_string();
+        };
+
+        if !output.status.success() {
+            return raw_url.to_string();
+        }
+
+        let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if ip.is_empty() {
+            return raw_url.to_string();
+        }
+
+        if raw_url.contains("@127.0.0.1:") {
+            return raw_url.replacen("@127.0.0.1:", &format!("@{}:", ip), 1);
+        }
+
+        raw_url.replacen("@localhost:", &format!("@{}:", ip), 1)
+    }
+
     /// Load configuration from environment variables.
     ///
     /// # Environment Variables
@@ -37,6 +74,7 @@ impl Config {
         let extractor_dir = env::var("EXTRACTOR_DIR").unwrap_or_else(|_| "./extractors".to_string());
         let database_url = env::var("DATABASE_URL")
             .map_err(|_| anyhow::anyhow!("DATABASE_URL env var is required"))?;
+        let database_url = Self::resolve_local_database_url(&database_url);
         let jwt_secret = env::var("BETTER_AUTH_SECRET")
             .map_err(|_| anyhow::anyhow!("BETTER_AUTH_SECRET env var is required"))?;
         let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")

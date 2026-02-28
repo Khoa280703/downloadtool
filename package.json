@@ -9,6 +9,13 @@
     "onlyBuiltDependencies": ["esbuild", "@parcel/watcher", "vite-plugin-monkey"]
   },
   "scripts": {
+    "dev:db": "docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml up -d postgres",
+    "dev:down": "docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml down",
+    "dev:be": "cargo run -p api --bin api-server",
+    "dev:fe": "bash -lc 'set -a; source .env; set +a; pnpm --filter frontend dev -- --host 0.0.0.0 --port 5168'",
+    "logs:db": "docker logs -f downloadtool-postgres",
+    "logs:api": "docker logs -f downloadtool-api",
+    "logs:fe": "docker logs -f downloadtool-frontend",
     "dev:web": "pnpm --filter frontend dev",
     "build:web": "pnpm --filter frontend build",
     "build:injector": "pnpm --filter @downloadtool/injector build",

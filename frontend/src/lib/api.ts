@@ -27,11 +27,11 @@ function mapExtractErrorMessage(status: number, rawMessage: string, inputUrl: st
 	const clean = stripErrorPrefix(rawMessage);
 	const text = clean.toLowerCase();
 	const urlLower = inputUrl.toLowerCase();
+	const hasSingleVideoId = extractYouTubeVideoId(inputUrl) !== null;
 
 	if (
-		isBatchLikeYoutubeUrl(urlLower) ||
-		text.includes('playlist') ||
-		text.includes('channel')
+		(!hasSingleVideoId && isBatchLikeYoutubeUrl(urlLower)) ||
+		(!hasSingleVideoId && (text.includes('playlist') || text.includes('channel')))
 	) {
 		return 'Link này là playlist/channel. Hiện tool đang tải từng video; hãy mở 1 video cụ thể rồi thử lại.';
 	}
@@ -112,6 +112,12 @@ function buildApiUrl(path: string): string {
 	return `${base}${path}`;
 }
 
+function normalizeExtractUrl(url: string): string {
+	const videoId = extractYouTubeVideoId(url);
+	if (!videoId) return url;
+	return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
 /**
  * Extract video information from URL
  * @param url - Video URL to extract
@@ -119,12 +125,13 @@ function buildApiUrl(path: string): string {
  * @throws Error if extraction fails
  */
 export async function extract(url: string, signal?: AbortSignal): Promise<ExtractResult> {
+	const requestUrl = normalizeExtractUrl(url);
 	const response = await fetch('/api/proxy/extract', {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({ url }),
+		body: JSON.stringify({ url: requestUrl }),
 		signal
 	});
 
