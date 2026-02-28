@@ -1,32 +1,43 @@
 # Code Standards & Codebase Structure
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-02-28
 
 ## Directory Structure
 
 ```
 downloadtool/
 ├── crates/                          # Rust workspace with 6 crates
-│   ├── api/                         # HTTP API server
+│   ├── api/                         # HTTP API server (Axum + PostgreSQL)
 │   │   ├── src/
-│   │   │   ├── main.rs              # Server entry & config loading
-│   │   │   ├── config.rs            # Configuration structs
+│   │   │   ├── main.rs              # Server entry, PostgreSQL pool, route setup
+│   │   │   ├── config.rs            # Environment config (JWT_SECRET, DATABASE_URL, etc.)
+│   │   │   ├── auth/                # Authentication [NEW 2026-02-28]
+│   │   │   │   ├── mod.rs           # Module exports
+│   │   │   │   ├── jwt_claims.rs    # JWT payload (user_id, tier, exp)
+│   │   │   │   ├── jwt_middleware.rs # Axum middleware for JWT validation
+│   │   │   │   └── user_tier.rs     # Enum: Free, Pro, Premium
 │   │   │   └── routes/
 │   │   │       ├── mod.rs           # Route exports
-│   │   │       ├── extract.rs       # GET /extract endpoint
-│   │   │       ├── batch.rs         # POST /batch endpoint
+│   │   │       ├── extract.rs       # POST /extract endpoint (JWT required)
+│   │   │       ├── batch.rs         # POST /batch endpoint (SSE, JWT required)
 │   │   │       ├── stream.rs        # WS /stream endpoint
-│   │   │       └── transcode.rs     # POST /transcode endpoint
+│   │   │       ├── transcode.rs     # POST /transcode endpoint
+│   │   │       ├── whop_webhook.rs  # POST /whop-webhook (HMAC validation) [NEW]
+│   │   │       ├── openapi.rs       # OpenAPI spec generation (utoipa)
+│   │   │       └── static_files.rs  # Frontend static file serving
+│   │   ├── migrations/              # SQL migrations [NEW]
+│   │   │   └── 0001_create_subscriptions.sql
 │   │   ├── Cargo.toml
 │   │   └── README.md
 │   │
-│   ├── extractor/                   # Extraction engine (Deno runtime)
+│   ├── extractor/                   # Extraction engine (yt-dlp + Deno runtime)
 │   │   ├── src/
 │   │   │   ├── main.rs
 │   │   │   ├── lib.rs               # Public interface
 │   │   │   ├── engine.rs            # Core orchestrator
 │   │   │   ├── runtime.rs           # Deno runtime management
 │   │   │   ├── pool.rs              # Connection pooling
+│   │   │   ├── ytdlp.rs             # yt-dlp subprocess extractor [NEW 2026-02-28]
 │   │   │   ├── hot_reload.rs        # Script hot-reload
 │   │   │   └── types.rs             # Shared types
 │   │   ├── build.rs                 # Build script for Deno
@@ -358,7 +369,190 @@ async function extractViaHTML(videoId, originalUrl, cookies): Promise<Extraction
 - Both strategies call `transformStreamUrls()` for CDN optimization
 - Error handling: InnerTube fails → try HTML → throw error
 
-### 5. GPU Pipeline (`crates/gpu-pipeline/src/pipeline.rs`)
+### 5. yt-dlp Subprocess Extractor (`crates/extractor/src/ytdlp.rs`) [NEW 2026-02-28]
+
+**File Size:** 536 LOC
+
+**Architecture:**
+```
+URL Input
+    │
+    ├─► Cache Lookup (moka, 500 items, 300s TTL)
+    │       │
+    │       ├─► Hit: Return Arc<VideoInfo> (~50μs)
+    │       │
+    │       └─► Miss: Proceed to extraction
+    │
+    ├─► Semaphore Acquire (max 10 concurrent)
+    │
+    └─► yt-dlp Subprocess Call
+        │
+        Command: yt-dlp -J --no-playlist {url}
+        │
+        ├─► Success: Parse JSON → Cache → Return
+        │
+        └─► Failure: Retry with alternate player client
+            └─► youtube:player_client=android,web
+```
+
+**Key Functions:**
+```rust
+pub async fn extract_via_ytdlp(url: &str) -> Result<Arc<VideoInfo>, ExtractionError>
+
+fn normalize_cache_key(url: &str) -> String  // Canonical YouTube URL
+fn extract_video_id(url: &str) -> Option<&str>  // Parse v= or youtu.be/shorts/
+fn resolve_ytdlp_binary() -> String  // YTDLP_PATH env or "yt-dlp"
+```
+
+**Caching Strategy:**
+- Cache key: Normalized YouTube URL (e.g., `https://www.youtube.com/watch?v=...`)
+- TTL: 300 seconds (5 minutes)
+- Capacity: 500 items (LRU eviction)
+- Thread-safe: Using `moka::future::Cache<String, Arc<VideoInfo>>`
+
+**Rate Limiting:**
+- Semaphore: `Arc<Semaphore>::new(10)` — prevents resource exhaustion
+- Fallback: On first failure, retry with `youtube:player_client=android,web`
+
+**Metrics:**
+- `EXTRACT_CACHE_HITS`: AtomicU64 counter for cache hit rate monitoring
+- `EXTRACT_CACHE_MISSES`: For cache efficiency analysis
+- `EXTRACT_FALLBACK_RETRIES`: Tracks fallback attempts
+
+**Error Handling:**
+```rust
+match Command::new(binary).args(&args).output().await {
+    Ok(output) => {
+        // Parse JSON
+        let info: VideoInfo = serde_json::from_slice(&output.stdout)?;
+        cache.insert(key.clone(), Arc::new(info.clone())).await;
+        Ok(Arc::new(info))
+    }
+    Err(e) => {
+        // Retry with fallback args
+        if !retried {
+            return extract_via_ytdlp_with_fallback(url).await;
+        }
+        Err(ExtractionError::YtdlpFailed(e))
+    }
+}
+```
+
+### 6. JWT Authentication & Middleware (`crates/api/src/auth/`) [NEW 2026-02-28]
+
+**Files:**
+- `jwt_claims.rs` — JWT payload structure
+- `jwt_middleware.rs` — Axum extractor & validation (141 LOC)
+- `user_tier.rs` — User subscription levels
+
+**JWT Claims Structure:**
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    pub user_id: String,
+    pub tier: UserTier,  // Free | Pro | Premium
+    pub exp: u64,  // Unix timestamp
+}
+```
+
+**Middleware Pattern:**
+```rust
+// In route handlers:
+async fn extract_route(
+    State(state): State<AppState>,
+    UserClaims(claims): UserClaims,  // Extracted by middleware
+) -> Result<Json<ExtractionResult>, ApiError> {
+    // claims.user_id, claims.tier available here
+    // Rate limiting applied based on tier
+}
+```
+
+**Signature Verification:**
+```rust
+let token_data = decode::<Claims>(
+    token,
+    &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
+    &Validation::default(),
+)?;
+```
+
+**Rate Limit Tiers:**
+| Tier | Daily Extractions | Batch Downloads |
+|------|------------------|-----------------|
+| Free | 5 | 1 |
+| Pro | 50 | 10 |
+| Premium | Unlimited | Unlimited |
+
+**BFF Proxy Pattern (SvelteKit):**
+```typescript
+// Frontend calls SvelteKit endpoint (not Rust directly)
+POST /api/extract
+  │
+  └─► SvelteKit backend:
+       ├─► Get JWT from secure HTTP-only cookie
+       ├─► Proxy request to Rust API with JWT header
+       ├─► Inject Authorization: Bearer {jwt}
+       └─► Return response to frontend
+```
+
+**Security Benefits:**
+- JWT never exposed to browser XSS
+- Signature validation prevents token tampering
+- Short expiration (1 hour) limits token lifespan
+
+### 7. Whop Webhook Handler (`crates/api/src/routes/whop_webhook.rs`) [NEW 2026-02-28]
+
+**File Size:** 187 LOC
+
+**Signature Verification:**
+```rust
+pub async fn whop_webhook_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, WebhookError> {
+    let signature = headers.get("x-whop-signature")?.to_str()?;
+
+    let mut mac = HmacSha256::new_from_slice(WHOP_API_KEY.as_bytes())?;
+    mac.update(&body);
+    mac.verify_slice(hex::decode(signature)?)  // HMAC-SHA256
+        .map_err(|_| WebhookError::InvalidSignature)?;
+
+    // Signature valid, process webhook
+}
+```
+
+**Webhook Payload:**
+```json
+{
+  "event": "subscription.created",
+  "data": {
+    "customer": {
+      "id": "cus_...",
+      "email": "user@example.com"
+    },
+    "plan": {
+      "id": "plan_pro",
+      "name": "Pro Plan"
+    },
+    "custom_data": "user_id=12345"
+  }
+}
+```
+
+**Database Update:**
+```rust
+sqlx::query(
+    "INSERT INTO subscriptions (user_id, tier, created_at, expires_at)
+     VALUES ($1, $2, NOW(), NOW() + INTERVAL '1 month')"
+)
+.bind(user_id)
+.bind(tier_from_whop_plan(&plan))
+.execute(&state.db)
+.await?;
+```
+
+### 8. GPU Pipeline (`crates/gpu-pipeline/src/pipeline.rs`)
 
 **File Size:** ~3,976 tokens
 
@@ -382,7 +576,7 @@ Output File
 - Frame rate management
 - Error propagation with `Result<T, PipelineError>`
 
-### 6. Legacy Architecture (Removed 2026-02-24)
+### 9. Legacy Architecture (Removed 2026-02-24)
 
 **Removed:** Old `fmp4_muxer.rs` module
 

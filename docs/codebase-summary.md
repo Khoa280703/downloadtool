@@ -1,7 +1,7 @@
 # Codebase Summary
 
-**Generated:** 2026-02-24
-**Total Files:** 106 | **Total Tokens:** 146,804
+**Generated:** 2026-02-28
+**Total Files:** 110 | **Total Tokens:** ~160,000
 
 ## Project Overview
 
@@ -58,13 +58,20 @@ A high-performance video downloader platform supporting YouTube and other platfo
 - **Features:** Responsive design, real-time progress, ad monetization
 
 ### 2. **API Layer** (`crates/api`)
-- **Entry Point:** `main.rs` - HTTP server (Tokio-based)
+- **Entry Point:** `main.rs` - HTTP server (Tokio-based), PostgreSQL pool setup
 - **Routes:**
   - `extract.rs` - Extract video metadata & streams
-  - `batch.rs` - Batch download operations
-  - `stream.rs` - WebSocket stream handler
+  - `batch.rs` - Batch download operations with SSE (Server-Sent Events) streaming
+  - `stream.rs` - WebSocket stream handler with 422 WebM validation
   - `transcode.rs` - GPU transcoding requests
-- **Config:** Platform-aware settings, environment-based configuration
+  - `whop_webhook.rs` - **NEW (2026-02-28):** Whop subscription webhook handler with HMAC-SHA256 signature verification
+  - `openapi.rs` - OpenAPI/Swagger spec generation (utoipa)
+  - `static_files.rs` - Frontend static file serving with cache headers
+- **Auth System** (`auth/`)  - **NEW (2026-02-28)**
+  - `jwt_claims.rs` - JWT token structure (user_id, tier, expiration)
+  - `jwt_middleware.rs` - Axum extractor for JWT validation and user context injection
+  - `user_tier.rs` - User tier enumeration (Free, Pro, Premium) with rate limit quotas
+- **Config:** Environment variables (DATABASE_URL, JWT_SECRET, WHOP_API_KEY, etc.)
 
 ### 3. **Extractor Engine** (`crates/extractor`)
 - **Purpose:** Dynamic extraction of video metadata from various platforms
@@ -73,8 +80,9 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `runtime.rs` - Deno runtime management for JavaScript extractors
   - `pool.rs` - Connection pooling & reuse
   - `hot_reload.rs` - Live reload of extractor scripts
+  - `ytdlp.rs` - **NEW (2026-02-28):** yt-dlp subprocess extractor with moka cache (500 items, 300s TTL) and semaphore throttle (max 10 concurrent processes)
   - `types.rs` - Shared types (Stream, Platform, ExtractionResult)
-- **Key Feature:** Dynamically loads TypeScript extractors from `/extractors` directory
+- **Key Feature:** Dual extraction strategy: yt-dlp for primary extraction, Deno fallback for playlists/channels
 
 ### 4. **Proxy & Anti-Bot Layer** (`crates/proxy`)
 - **Purpose:** Evade YouTube/CDN bot detection and throttling
@@ -189,6 +197,63 @@ The platform now reaches users via 4 independent channels:
 - `GET /userscript`: Serves userscript (compile-time embed via `include_str!`)
 - No new API endpoints required; uses existing `POST /api/extract` + `GET /api/stream/muxed`
 
+## Recent Changes (2026-02-28)
+
+### 1. **yt-dlp Subprocess Extractor** ✅
+- **File:** `crates/extractor/src/ytdlp.rs` (NEW, 536 LOC)
+- **Purpose:** Replace Deno in-process extraction with subprocess call to yt-dlp
+- **Features:**
+  - Calls `yt-dlp -J --no-playlist` for JSON metadata + stream URLs
+  - yt-dlp handles PO Token, signature decryption, throttle bypass automatically
+  - Moka async cache (500 items, 300s TTL) for repeat URL lookups
+  - Tokio Semaphore (max 10 concurrent yt-dlp processes) to prevent resource exhaustion
+  - governor rate limiting (per-IP keyed) via middleware
+  - Fallback retry with alternate player client (`youtube:player_client=android,web`) on format errors
+  - Cache metrics: hits/misses tracked for observability
+- **Integration:** `lib.rs` calls `ytdlp::extract_via_ytdlp()` as primary; Deno pool kept for playlists only
+- **Metrics:** Extract cache hits/misses, fallback retry count via `EXTRACT_CACHE_HITS`, `EXTRACT_CACHE_MISSES`, `EXTRACT_FALLBACK_RETRIES` atomics
+
+### 2. **Authentication & JWT System** ✅
+- **Files:** `crates/api/src/auth/` (NEW)
+- **Components:**
+  - `jwt_claims.rs` - JWT payload (user_id, tier, exp)
+  - `jwt_middleware.rs` - Axum middleware for token validation & user injection (141 LOC)
+  - `user_tier.rs` - User tier enum (Free, Pro, Premium) with rate limit quotas
+- **Security:** HMAC-SHA256 JWT signing via `jsonwebtoken` crate
+- **Tier-Based Features:** Different extraction/batch limits per subscription level
+- **BFF Pattern:** SvelteKit frontend proxies Rust API calls with JWT server-side (prevents XSS token exposure)
+
+### 3. **Whop Subscription Integration** ✅
+- **File:** `crates/api/src/routes/whop_webhook.rs` (NEW, 187 LOC)
+- **Purpose:** Accept Whop webhook events for subscription management
+- **Implementation:**
+  - Validates HMAC-SHA256 signature via `X-Whop-Signature` header
+  - Parses webhook JSON (customer, plan, custom_data with user.id)
+  - Updates PostgreSQL `subscriptions` table with user tier
+- **Migration:** `crates/api/migrations/0001_create_subscriptions.sql` creates schema
+- **Flow:** User purchases on Whop → webhook fires → JWT issued with new tier
+
+### 4. **Batch Operations Enhancement** ✅
+- **File:** `crates/api/src/routes/batch.rs` (updated, 274 LOC)
+- **New Features:**
+  - SSE (Server-Sent Events) streaming of batch progress instead of polling
+  - Per-download status events (queued, started, completed, failed)
+  - Rate limiting per user tier (Free: 5/day, Pro: 50/day, Premium: unlimited)
+  - Database persistence of batch jobs for resume capability
+- **Frontend Components:**
+  - `BatchInput.svelte` - Multiple URL input, submission
+  - `BatchProgress.svelte` - Real-time SSE progress tracking
+  - `BatchActiveState.svelte` - NEW: Visual state machine for batch job UI
+
+### 5. **PostgreSQL Integration** ✅
+- **New Dependency:** `sqlx` with PostgreSQL driver
+- **Schema:**
+  - `subscriptions` table: user_id, tier, created_at, expires_at
+  - `users` table (implied): email, jwt_secret_hash
+  - `batch_jobs` table (implied): user_id, urls[], statuses[], created_at
+- **Connection:** Pooled via `sqlx::PgPool` in `AppState`
+- **Migrations:** Located at `crates/api/migrations/0001_*`
+
 ## Recent Changes (2026-02-24)
 
 ### 1. **WebM Video-Only Stream Exclusion** ✅
@@ -227,13 +292,16 @@ The platform now reaches users via 4 independent channels:
 
 | Metric | Value |
 |--------|-------|
-| Total Files | 106 |
-| Rust Files | 43 (10,188 LOC) |
-| Frontend Files | ~30 (TypeScript + Svelte) |
+| Total Files | 110 |
+| Rust Files | 40+ (~11,500 LOC including ytdlp.rs + auth) |
+| TypeScript/Svelte | ~35 files (frontend, extractors) |
 | Muxer Crate | 9 files, 3,205 LOC (8 modules) |
-| Largest File | `crates/muxer/src/traf_merger.rs` (416 LOC) |
-| Language Distribution | Rust, TypeScript, Svelte, YAML |
-| Key Dependencies | Tokio, reqwest, deno_core, GPU libraries |
+| Extractor Crate | 6 files, 700+ LOC (includes new ytdlp.rs 536 LOC) |
+| API Crate | 9 routes + auth (includes new jwt middleware, webhooks) |
+| Largest File | `crates/muxer/src/traf_merger.rs` (416 LOC) or `crates/gpu-pipeline/src/encoder.rs` (12,395 tokens) |
+| Database Migrations | 1+ SQL files in `crates/api/migrations/` |
+| Language Distribution | Rust, TypeScript, Svelte, SQL, YAML |
+| Key Dependencies | Tokio, reqwest, deno_core, sqlx, jsonwebtoken, moka, governor |
 
 ## Technology Stack
 
@@ -319,5 +387,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-02-24
-**Status:** Complete & Operational (WebM Exclusion + QuickTime Fix Deployed)
+**Last Updated:** 2026-02-28
+**Status:** Complete & Operational (yt-dlp + Auth System + Batch SSE Deployed)

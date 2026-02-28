@@ -2,7 +2,7 @@
 
 Welcome to the downloadtool documentation. This folder contains comprehensive guides for users, developers, and operators.
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-02-28
 
 ## Quick Navigation
 
@@ -23,14 +23,14 @@ Deploy and maintain the system:
 
 ## Document Overview
 
-### 1. Codebase Summary (255 lines)
+### 1. Codebase Summary (323 lines)
 **Purpose:** High-level overview of project structure
 
 **Contains:**
 - Project overview and vision
 - Complete architecture with diagrams
 - 8 major components overview
-- Recent changes (2026-02-24): WebM exclusion, QuickTime fix, dual-traf muxer
+- Recent changes (2026-02-28): yt-dlp subprocess extractor, batch SSE operations, auth system, Whop webhooks
 - Technology stack
 - File organization
 - Design patterns
@@ -66,27 +66,29 @@ Deploy and maintain the system:
 
 ---
 
-### 3. Code Standards (600 lines)
+### 3. Code Standards (640 lines)
 **Purpose:** Development guidelines and best practices
 
 **Contains:**
 - Complete directory structure with annotations
-- Rust workspace organization (8 muxer modules listed)
+- Rust workspace organization (40+ source files across 6 crates)
 - Naming conventions (Rust, TypeScript, Svelte)
 - Code organization principles
 - Error handling & logging patterns
-- 6 critical component walkthroughs:
-  - Muxer architecture (NEW: dual-traf, 3,205 LOC, QuickTime fix details)
-  - Anti-bot client (with timeout fix explanation)
+- 8 critical component walkthroughs:
+  - yt-dlp subprocess extractor (NEW: 536 LOC, moka cache, semaphore throttle)
+  - JWT middleware & claims (NEW: auth system)
+  - Whop webhook handler (NEW: subscription integration)
+  - Muxer architecture (dual-traf, 3,205 LOC, QuickTime fix)
+  - Anti-bot client (timeout fix explanation)
   - YouTube n-transform module (algorithm & regex)
-  - YouTube extractor (dual strategy)
   - GPU pipeline (hardware acceleration)
-  - Legacy architecture (removed components)
+  - Batch operations with SSE (NEW)
 - Testing & quality standards
 - Performance optimizations
-- Security practices
+- Security practices (JWT, HMAC signatures)
 - Build & compilation
-- Common pitfalls & solutions (WebM, duration, timeout added)
+- Common pitfalls & solutions
 - Deployment checklist
 
 **Start here if:** You're implementing features or fixing bugs
@@ -120,6 +122,46 @@ Deploy and maintain the system:
 **Start here if:** You need to understand requirements or plan features
 
 ---
+
+## Key Changes (2026-02-28)
+
+### 1. yt-dlp Subprocess Extractor
+**File:** `crates/extractor/src/ytdlp.rs` (NEW, 536 LOC)
+- Replaced Deno in-process with `yt-dlp -J --no-playlist` subprocess
+- Moka cache (500 items, 300s TTL) for faster repeat lookups
+- Tokio Semaphore (max 10 concurrent) prevents resource exhaustion
+- Fallback retry with alternate player client on format errors
+- Metrics: cache hits/misses, fallback retry count tracked
+
+**Why:** yt-dlp handles PO Token, signature decryption, throttle bypass automatically
+
+### 2. JWT Authentication System
+**Files:** `crates/api/src/auth/` (NEW, 3 modules)
+- `jwt_claims.rs` — Token structure (user_id, tier, exp)
+- `jwt_middleware.rs` — Axum extractor for validation (141 LOC)
+- `user_tier.rs` — Enum (Free, Pro, Premium) with rate limits
+- HMAC-SHA256 signing via `jsonwebtoken` crate
+- BFF pattern: SvelteKit proxies API calls with JWT server-side
+
+### 3. Whop Subscription Integration
+**File:** `crates/api/src/routes/whop_webhook.rs` (NEW, 187 LOC)
+- HMAC-SHA256 signature verification (X-Whop-Signature header)
+- Updates PostgreSQL subscriptions table on webhook
+- User tier changes take effect immediately
+
+### 4. Batch Operations with SSE
+**File:** `crates/api/src/routes/batch.rs` (updated)
+- Server-Sent Events (SSE) stream instead of polling
+- Real-time per-download status updates
+- Rate limiting per user tier
+- Frontend components: BatchInput, BatchProgress, BatchActiveState
+
+### 5. PostgreSQL Integration
+- Connection pooling via `sqlx::PgPool`
+- Schema: subscriptions(user_id, tier, created_at, expires_at)
+- Migrations in `crates/api/migrations/0001_*`
+
+**Documented in:** All core doc files updated (overview, codebase summary, code standards, system architecture)
 
 ## Key Changes (2026-02-24)
 
@@ -298,8 +340,8 @@ A: See System Architecture → Performance Characteristics table or Project Over
 
 ---
 
-**Documentation Version:** 2.1
-**Last Generated:** 2026-02-24
-**Status:** Complete ✅
+**Documentation Version:** 2.2
+**Last Generated:** 2026-02-28
+**Status:** Complete ✅ (Phase 9 in progress)
 
 For the latest updates, check `/plans/reports/` for implementation reports.

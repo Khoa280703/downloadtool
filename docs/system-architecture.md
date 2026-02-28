@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-02-28
 
 ## High-Level Architecture
 
@@ -9,25 +9,16 @@ Internet
    │
    ├─► YouTube CDN (via proxy + n-param transform)
    ├─► YouTube InnerTube API
-   └─► Other Platforms
+   └─► Other Platforms (via yt-dlp)
         │
         ▼
    ┌────────────────────────────────────────────────┐
-   │   Anti-Bot & Proxy Layer (crates/proxy)        │
-   │ • Proxy rotation & health tracking              │
-   │ • Cookie persistence per platform               │
-   │ • Header randomization                          │
-   │ • Domain request throttling                      │
-   │ • Retry logic (exponential backoff)              │
-   └────────┬─────────────────────────────────────────┘
-            │
-            ▼
-   ┌────────────────────────────────────────────────┐
-   │   Extraction Engine (crates/extractor)         │
-   │ • Deno runtime for TS/JS extractors            │
-   │ • Hot reload support                           │
-   │ • Connection pooling                           │
-   │ • Returns: streams[], metadata                 │
+   │   yt-dlp Subprocess Extractor (NEW 2026-02-28) │
+   │ • Call: yt-dlp -J --no-playlist {url}         │
+   │ • Moka cache: 500 items, 300s TTL              │
+   │ • Semaphore: max 10 concurrent processes       │
+   │ • Fallback: alternate player client on error   │
+   │ • Returns: JSON (video_id, formats[])         │
    └────────┬─────────────────────────────────────────┘
             │
             ├─► YouTube N-Transform (extractors/youtube-n-transform.ts)
@@ -38,25 +29,37 @@ Internet
             │
             ▼
    ┌────────────────────────────────────────────────┐
+   │   JWT Middleware & Auth (NEW 2026-02-28)       │
+   │ • Validate X-Authorization: Bearer {jwt}       │
+   │ • Extract user_id, tier from claims            │
+   │ • Check rate limits (Free/Pro/Premium)         │
+   │ • Inject into request context                  │
+   └────────┬─────────────────────────────────────────┘
+            │
+            ▼
+   ┌────────────────────────────────────────────────┐
    │   API Server (crates/api)                      │
    │ • HTTP routes:                                 │
-   │   - POST /extract → metadata                   │
-   │   - POST /batch → schedule downloads           │
+   │   - POST /extract → metadata (JWT required)    │
+   │   - POST /batch → SSE stream (JWT required)    │
    │   - WS /stream → stream data                   │
    │   - POST /transcode → GPU job                  │
-   │ • Request validation & error handling          │
+   │   - POST /whop-webhook → subscription update   │
+   │ • Request validation & rate limiting           │
+   │ • PostgreSQL connection pool (subscriptions)   │
    └────────┬─────────────────────────────────────────┘
             │
    ┌────────┴──────┬──────────────────┬──────────────┐
    │               │                  │              │
    ▼               ▼                  ▼              ▼
 ┌──────┐    ┌──────────┐        ┌──────────┐   ┌──────────┐
-│ Muxer│    │GPU       │        │WebSocket │   │Frontend  │
+│ Muxer│    │GPU       │        │SSE Batch │   │Frontend  │
 │(fMP4)│    │Pipeline  │        │Stream    │   │(Svelte)  │
 └──────┘    └──────────┘        └──────────┘   └──────────┘
    │            │                    │
    ▼            ▼                    ▼
 Stored File  Transcoded File    Browser UI
+             (tier-gated)       (JWT-protected)
 ```
 
 ## Data Flow Diagrams
