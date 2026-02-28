@@ -7,6 +7,7 @@ use crate::types::{ExtractionError, VideoFormat, VideoInfo};
 use moka::future::Cache;
 use serde_json::Value;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::process::Command;
@@ -20,6 +21,9 @@ const PRIMARY_PLAYER_CLIENT_ARGS: &str = "youtube:player_client=android,web";
 
 static YTDLP_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 static EXTRACT_CACHE: OnceLock<Cache<String, Arc<VideoInfo>>> = OnceLock::new();
+static EXTRACT_CACHE_HITS: AtomicU64 = AtomicU64::new(0);
+static EXTRACT_CACHE_MISSES: AtomicU64 = AtomicU64::new(0);
+static EXTRACT_FALLBACK_RETRIES: AtomicU64 = AtomicU64::new(0);
 
 fn get_semaphore() -> &'static Arc<Semaphore> {
     YTDLP_SEMAPHORE.get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_YTDLP)))
@@ -99,8 +103,26 @@ pub async fn extract_via_ytdlp(url: &str) -> Result<VideoInfo, ExtractionError> 
     debug!("yt-dlp extracting: {}", url);
 
     let cache_key = normalize_cache_key(url);
+    let cache = get_cache();
 
-    get_cache()
+    if let Some(cached_video_info) = cache.get(&cache_key).await {
+        let hits = EXTRACT_CACHE_HITS.fetch_add(1, Ordering::Relaxed) + 1;
+        debug!(
+            cache_key = %cache_key,
+            cache_hits = hits,
+            "extract cache hit"
+        );
+        return Ok((*cached_video_info).clone());
+    }
+
+    let misses = EXTRACT_CACHE_MISSES.fetch_add(1, Ordering::Relaxed) + 1;
+    debug!(
+        cache_key = %cache_key,
+        cache_misses = misses,
+        "extract cache miss"
+    );
+
+    cache
         .try_get_with(cache_key, extract_subprocess(url.to_string()))
         .await
         .map(|video_info| (*video_info).clone())
@@ -126,7 +148,9 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stderr_trimmed = stderr.trim();
         if should_retry_without_client_args(stderr_trimmed) {
+            let retries = EXTRACT_FALLBACK_RETRIES.fetch_add(1, Ordering::Relaxed) + 1;
             warn!(
+                fallback_retries = retries,
                 "yt-dlp failed with player_client args for {}: {}. Retrying without extractor args",
                 url, stderr_trimmed
             );
