@@ -33,7 +33,10 @@ const socialProviders =
 export const auth = betterAuth({
 	baseURL: env.ORIGIN ?? env.BETTER_AUTH_URL ?? 'http://localhost:5168',
 	database: getDatabasePool(),
-	secret: requireEnv('BETTER_AUTH_SECRET', 'better-auth-build-secret-do-not-use'),
+	secret: requireEnv(
+		'BETTER_AUTH_SECRET',
+		'snapvie-build-placeholder-secret-please-set-better-auth-secret-in-runtime'
+	),
 	trustedOrigins,
 	emailAndPassword: {
 		enabled: true
