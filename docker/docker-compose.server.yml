@@ -54,8 +54,6 @@ services:
       - RUST_API_URL=http://api:3068
     expose:
       - "5168"
-    ports:
-      - "5168:5168"
     restart: unless-stopped
     depends_on:
       - postgres
