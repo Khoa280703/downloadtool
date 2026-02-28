@@ -10,6 +10,7 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=../../extractors/youtube.ts");
+    println!("cargo:rerun-if-changed=../../extractors/youtube-playlist.ts");
     println!("cargo:rerun-if-changed=../../extractors/youtube-innertube.ts");
     println!("cargo:rerun-if-changed=../../extractors/types.ts");
     println!("cargo:rerun-if-changed=../../extractors/dist/youtube.js");
@@ -81,7 +82,10 @@ fn bundle_with_esbuild_cmd(extractors_dir: &Path, dist_dir: &Path, npx: &str) ->
         r#"
 // Extractor registry - access exports via IIFE global vars (typeof to avoid ReferenceError)
 var extractors = {
-    youtube: { extract: typeof youtube !== "undefined" && youtube && youtube.extract ? youtube.extract : async function(u,c){ throw new Error("YouTube extractor not bundled - run esbuild"); } }
+    youtube: {
+        extract: typeof youtube !== "undefined" && youtube && youtube.extract ? youtube.extract : async function(){ throw new Error("YouTube extractor not bundled - run esbuild"); },
+        extractPlaylist: typeof youtube !== "undefined" && youtube && youtube.extractPlaylist ? youtube.extractPlaylist : async function(){ throw new Error("YouTube playlist extractor not bundled - run esbuild"); }
+    }
 };
 "#,
     );
@@ -165,7 +169,12 @@ fn create_fallback_bundle(extractors_dir: &Path) -> String {
     if bundle.is_empty() {
         create_inline_fallback_bundle()
     } else {
-        bundle.push_str("\nvar extractors = { youtube: { extract: typeof youtube !== \"undefined\" && youtube.extract ? youtube.extract : null } };\n");
+        bundle.push_str(
+            "\nvar extractors = { youtube: {\n\
+                extract: typeof youtube !== \"undefined\" && youtube.extract ? youtube.extract : async function(){ throw new Error(\"YouTube extractor not bundled\"); },\n\
+                extractPlaylist: typeof youtube !== \"undefined\" && youtube.extractPlaylist ? youtube.extractPlaylist : async function(){ throw new Error(\"YouTube playlist extractor not bundled\"); }\n\
+            } };\n"
+        );
         bundle
     }
 }
@@ -194,8 +203,11 @@ var ExtractionError = (function() {
 
 var extractors = {
     youtube: {
-        extract: async function(url, cookies) {
+        extract: async function() {
             throw new ExtractionError("YouTube extractor not bundled - build with esbuild", "youtube");
+        },
+        extractPlaylist: async function() {
+            throw new ExtractionError("YouTube playlist extractor not bundled - build with esbuild", "youtube");
         }
     }
 };

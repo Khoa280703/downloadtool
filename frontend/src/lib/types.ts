@@ -50,12 +50,18 @@ export interface ExtractResult {
 export interface BatchMessage {
 	/** Message type */
 	type: 'link' | 'done' | 'progress' | 'error';
+	/** Stable YouTube video ID */
+	videoId?: string;
 	/** Video URL */
 	url?: string;
 	/** Video title */
 	title?: string;
+	/** Thumbnail URL */
+	thumbnail?: string;
 	/** Index in batch (1-based) */
 	index?: number;
+	/** Current processed count for progress events */
+	current?: number;
 	/** Total videos in batch */
 	total?: number;
 	/** Error message (if type is 'error') */
@@ -92,10 +98,14 @@ export interface DownloadState {
 
 /** Batch item in queue */
 export interface BatchItem {
+	/** Stable YouTube video ID */
+	videoId: string;
 	/** Video URL */
-	url: string;
+	url?: string;
 	/** Video title */
 	title: string;
+	/** Thumbnail URL */
+	thumbnail?: string;
 	/** Current status */
 	status: 'pending' | 'downloading' | 'completed' | 'error';
 	/** Error message if failed */

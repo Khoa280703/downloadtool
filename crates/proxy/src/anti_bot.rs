@@ -168,8 +168,8 @@ impl AntiBotClient {
             // Build request
             let mut request = self.client.get(url);
 
-            // Add headers
-            let headers = self.header_builder.build_headers(self.cookie_store.platform(), None);
+            // Add headers — detects c=IOS URLs and uses iOS User-Agent automatically
+            let headers = self.header_builder.build_headers_for_url(url, self.cookie_store.platform(), None);
             request = request.headers(headers);
 
             // Add range if specified
@@ -193,13 +193,25 @@ impl AntiBotClient {
 
                     // Check for bot detection responses
                     if status == StatusCode::FORBIDDEN || status == StatusCode::TOO_MANY_REQUESTS {
+                        // YouTube CDN stream URLs (googlevideo.com) are IP-bound at extraction time.
+                        // Rotating proxies on 403 is counterproductive — the URL will always 403
+                        // from a different IP. Fail fast to surface the error without delay.
+                        let is_cdn_url = domain.contains("googlevideo.com");
+
                         warn!(
-                            "Received {} for {}, rotating proxy and retrying",
+                            "Received {} for {}{}",
                             status,
-                            url
+                            url,
+                            if is_cdn_url { " (CDN URL — not retrying)" } else { ", rotating proxy and retrying" }
                         );
 
-                        // Mark proxy as failed
+                        if is_cdn_url {
+                            return Err(AntiBotError::RequestFailed(
+                                response.error_for_status().unwrap_err(),
+                            ));
+                        }
+
+                        // Mark proxy as failed (non-CDN only)
                         if let Some(ref proxy) = current_proxy {
                             self.proxy_pool.mark_failed(proxy);
                         }

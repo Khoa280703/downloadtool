@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { isValidVideoUrl, subscribeBatch, buildStreamUrl } from '$lib/api';
+	import { onMount, onDestroy } from 'svelte';
+	import { isValidVideoUrl, subscribeBatch } from '$lib/api';
+	import BatchActiveState from '$components/BatchActiveState.svelte';
 	import {
 		batchQueue,
 		batchProgress,
-		isBatchActive,
 		setEventSource,
 		resetBatch,
 		addBatchItem,
@@ -11,7 +12,20 @@
 		startBatch,
 		completeBatch
 	} from '$stores/batch';
-	import { downloadPool } from '$lib/download-pool';
+	import {
+		type QueueEntry,
+		enqueueDownload,
+		pickSaveDirectory,
+		resetWorkerState,
+		setPreferredQuality
+	} from '$lib/playlist-download-worker';
+	import {
+		PLAYLIST_QUALITY_OPTIONS,
+		type PlaylistQuality,
+		getStoredPlaylistQuality
+	} from '$lib/playlist-download-stream-selection';
+
+	type BatchPhase = 'idle' | 'fetching' | 'ready' | 'downloading';
 
 	interface Props {
 		onStart?: () => void;
@@ -22,101 +36,210 @@
 
 	let url = $state('');
 	let error = $state('');
+	let phase = $state<BatchPhase>('idle');
+	let fsaaSupported = $state(false);
+	let dirPicked = $state(false);
+	let selectedQuality = $state<PlaylistQuality>(getStoredPlaylistQuality());
+	let stagedEntries = $state<QueueEntry[]>([]);
+	let completionNotified = $state(false);
 
-	/** Check if URL is a channel/playlist */
-	function isChannelOrPlaylist(input: string): boolean {
-		// YouTube playlist/channel patterns
-		if (/youtube\.com\/(playlist|channel|@|c\/|user\/)/.test(input)) return true;
+	const readyCount = $derived.by(() => $batchQueue.length);
+	const progressPercent = $derived.by(() => {
+		if ($batchProgress.total <= 0) return 0;
+		return Math.min(100, Math.round(($batchProgress.received / $batchProgress.total) * 100));
+	});
+
+	$effect(() => {
+		if (phase !== 'downloading' || completionNotified) return;
+		if ($batchQueue.length === 0) return;
+
+		const settled = $batchQueue.every(
+			(item) => item.status === 'completed' || item.status === 'error'
+		);
+		if (!settled) return;
+
+		completionNotified = true;
+		phase = 'ready';
+		completeBatch();
+		onComplete?.();
+	});
+
+	function isPlaylistUrl(input: string): boolean {
+		if (!input.includes('youtube.com') && !input.includes('youtu.be')) return false;
 		if (/[?&]list=/.test(input)) return true;
+		if (/youtube\.com\/playlist/.test(input)) return true;
 		return false;
 	}
 
-	/** Validate URL */
 	function validate(input: string): boolean {
 		if (!input.trim()) {
-			error = 'Please enter a URL';
+			error = 'Please paste a playlist URL.';
 			return false;
 		}
-		if (!isValidVideoUrl(input) && !isChannelOrPlaylist(input)) {
-			error = 'Please enter a valid YouTube URL';
+		if (!isValidVideoUrl(input)) {
+			error = 'This does not look like a valid YouTube URL.';
 			return false;
 		}
-		if (!isChannelOrPlaylist(input)) {
-			error = 'This appears to be a single video. Use the main input above.';
+		if (!isPlaylistUrl(input)) {
+			error = 'Use a playlist URL containing list=...';
 			return false;
 		}
 		error = '';
 		return true;
 	}
 
-	/** Start batch download */
-	async function handleSubmit(): Promise<void> {
+	function pushStagedEntry(entry: QueueEntry): void {
+		if (stagedEntries.some((item) => item.videoId === entry.videoId)) return;
+		stagedEntries = [...stagedEntries, entry];
+	}
+
+	onMount(() => {
+		const picker = (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker;
+		fsaaSupported = typeof picker === 'function';
+	});
+
+	async function handleFetchPlaylist(): Promise<void> {
 		if (!validate(url)) return;
 
+		completionNotified = false;
+		stagedEntries = [];
+		resetWorkerState();
 		resetBatch();
 		startBatch();
+		phase = 'fetching';
 		onStart?.();
 
 		const es = subscribeBatch(
 			url,
 			(data) => {
 				if (data.type === 'link') {
-					if (!data.url || !data.title || data.index == null || data.total == null) {
+					if (!data.videoId || !data.title) {
 						console.error('Invalid batch link payload:', data);
 						return;
 					}
 
-					addBatchItem({
-						url: data.url,
+					const entry: QueueEntry = {
+						videoId: data.videoId,
 						title: data.title,
+						thumbnail: data.thumbnail
+					};
+
+					pushStagedEntry(entry);
+					addBatchItem({
+						videoId: entry.videoId,
+						title: entry.title,
+						thumbnail: entry.thumbnail,
 						status: 'pending'
 					});
-					setBatchProgress(data.index, data.total);
 
-					// Add to download pool
-					const filename = `${data.title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
-					const streamUrl = buildStreamUrl(data.url, data.title);
-					downloadPool.add(streamUrl, filename);
-				} else if (data.type === 'done') {
-					completeBatch();
+					if (data.index != null && data.total != null) {
+						setBatchProgress(data.index, data.total);
+					}
+					return;
+				}
+
+				if (data.type === 'progress') {
+					if (data.current != null && data.total != null) {
+						setBatchProgress(data.current, data.total);
+					}
+					return;
+				}
+
+				if (data.type === 'done') {
 					es.close();
-					onComplete?.();
-				} else if (data.type === 'error') {
-					console.error('Batch item error:', data.message);
-					error = data.message || 'Batch extraction failed';
 					completeBatch();
+					phase = stagedEntries.length > 0 ? 'ready' : 'idle';
+					if (stagedEntries.length === 0) {
+						error = 'No downloadable videos were found in this playlist.';
+					}
+					return;
+				}
+
+				if (data.type === 'error') {
+					error = data.message || 'Could not process this playlist.';
 					es.close();
+					completeBatch();
+					phase = stagedEntries.length > 0 ? 'ready' : 'idle';
 				}
 			},
 			() => {
-				error = 'Connection error. Please try again.';
+				error = 'SSE connection failed. Please retry.';
 				completeBatch();
-				onComplete?.();
+				phase = stagedEntries.length > 0 ? 'ready' : 'idle';
 			}
 		);
+
 		setEventSource(es);
-
 	}
 
-	/** Cancel batch download */
+	function persistQuality(quality: PlaylistQuality): void {
+		if (typeof window === 'undefined') return;
+		try {
+			window.localStorage.setItem('fetchtube.playlist-quality.v1', quality);
+		} catch {
+			// Ignore localStorage failures.
+		}
+	}
+
+	function handleStartDownload(): void {
+		if (stagedEntries.length === 0) {
+			error = 'Playlist is empty. Fetch links first.';
+			return;
+		}
+
+		error = '';
+		completionNotified = false;
+		resetWorkerState();
+		setPreferredQuality(selectedQuality);
+		persistQuality(selectedQuality);
+		startBatch();
+		phase = 'downloading';
+
+		for (const entry of stagedEntries) {
+			enqueueDownload(entry);
+		}
+	}
+
+	async function handlePickDirectory(): Promise<void> {
+		dirPicked = await pickSaveDirectory();
+		if (!dirPicked) {
+			error = 'Folder picker unavailable. Fallback download mode will be used.';
+		}
+	}
+
 	function handleCancel(): void {
+		resetWorkerState();
 		resetBatch();
+		stagedEntries = [];
+		phase = 'idle';
+		error = '';
+		onComplete?.();
 	}
+
+	onDestroy(() => {
+		resetWorkerState();
+		resetBatch();
+	});
 </script>
 
 <div class="batch-input">
 	<div class="header">
-		<h3>Batch Download</h3>
-		<p class="subtitle">Download entire playlists or channels</p>
+		<h3>Paste Your YouTube Playlist URL</h3>
+		<p class="subtitle">Step 1: fetch all videos. Step 2: pick quality. Step 3: start download.</p>
 	</div>
 
-	{#if !$isBatchActive}
-		<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+	{#if phase === 'idle'}
+		<form
+			onsubmit={(event) => {
+				event.preventDefault();
+				void handleFetchPlaylist();
+			}}
+		>
 			<input
 				type="url"
-				placeholder="Paste playlist or channel URL..."
+				placeholder="https://www.youtube.com/playlist?list=..."
 				bind:value={url}
-				aria-label="Playlist or channel URL"
+				aria-label="Playlist URL"
 				class="url-field"
 			/>
 
@@ -124,194 +247,257 @@
 				<span class="error-text" role="alert">{error}</span>
 			{/if}
 
-			<button
-				type="submit"
-				class="submit-btn"
-				disabled={!url}
-			>
-				Start Batch Download
-			</button>
+			<button type="submit" class="submit-btn" disabled={!url}>Fetch Playlist Videos</button>
 		</form>
-	{:else}
-		<div class="active-batch">
-			<div class="progress-info">
-				<span class="progress-text">
-					{$batchProgress.received} of {$batchProgress.total} videos
-				</span>
-				{#if $batchProgress.total > 0}
-					<span class="progress-percent">
-						{Math.round(($batchProgress.received / $batchProgress.total) * 100)}%
-					</span>
-				{/if}
+	{:else if phase === 'fetching'}
+		<div class="phase-card">
+			<p class="phase-title">Scanning playlist links...</p>
+			<p class="phase-meta">{$batchProgress.received} / {$batchProgress.total || '...'} discovered</p>
+			<div class="phase-progress-track">
+				<div class="phase-progress-fill" style:width={`${progressPercent}%`}></div>
 			</div>
 
-			<div class="progress-bar">
-				<div
-					class="progress-fill"
-					style:width="{$batchProgress.total > 0 ? ($batchProgress.received / $batchProgress.total) * 100 : 0}%"
-				></div>
-			</div>
-
-			<div class="pool-status">
-				<span class="pool-text">
-					{#if downloadPool.getStatus().active > 0}
-						Downloading: {downloadPool.getStatus().active} / {downloadPool.getStatus().max} concurrent
-					{:else}
-						Waiting for downloads...
-					{/if}
-				</span>
-			</div>
-
-			<button
-				type="button"
-				class="cancel-btn"
-				onclick={handleCancel}
-			>
-				Cancel
-			</button>
+			<button type="button" class="ghost-btn" onclick={handleCancel}>Cancel</button>
 		</div>
+	{:else if phase === 'ready'}
+		<div class="phase-card">
+			<p class="phase-title">Playlist ready: {readyCount} videos</p>
+			<p class="phase-meta">Choose quality first, then start download.</p>
+
+			<label class="quality-label" for="playlist-quality">Preferred resolution</label>
+			<select
+				id="playlist-quality"
+				class="quality-select"
+				bind:value={selectedQuality}
+			>
+				{#each PLAYLIST_QUALITY_OPTIONS as option}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
+
+			<div class="actions-row">
+				{#if fsaaSupported}
+					<button type="button" class="folder-btn" onclick={() => void handlePickDirectory()}>
+						{dirPicked ? 'Save folder selected' : 'Choose save folder'}
+					</button>
+				{/if}
+				<button type="button" class="submit-btn" onclick={handleStartDownload}>
+					Start Playlist Download
+				</button>
+			</div>
+		</div>
+	{:else}
+		<BatchActiveState
+			{fsaaSupported}
+			{dirPicked}
+			onPickDirectory={handlePickDirectory}
+			onCancel={handleCancel}
+		/>
+	{/if}
+
+	{#if error && phase !== 'idle'}
+		<div class="error-inline" role="alert">{error}</div>
 	{/if}
 </div>
 
 <style>
 	.batch-input {
+		position: relative;
 		padding: 1.5rem;
-		background: var(--card-bg, #f9fafb);
-		border-radius: 1rem;
-		border: 1px solid var(--border-color, #e5e7eb);
+		background: linear-gradient(180deg, #ffffff 0%, #fff7fb 100%);
+		border-radius: 1.5rem;
+		border: 1px solid #ffd7e8;
+		box-shadow: 0 16px 35px -24px rgba(255, 77, 140, 0.55);
+		overflow: hidden;
+	}
+
+	.batch-input::before {
+		content: '';
+		position: absolute;
+		inset: 0 0 auto 0;
+		height: 4px;
+		background: linear-gradient(90deg, #ff4d8c 0%, #ffb938 100%);
 	}
 
 	.header {
-		margin-bottom: 1rem;
+		margin-bottom: 0.85rem;
 	}
 
 	h3 {
 		margin: 0;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: var(--text-color, #111827);
+		font-size: 1.02rem;
+		font-weight: 700;
+		color: #2d1b36;
 	}
 
 	.subtitle {
 		margin: 0.25rem 0 0;
-		font-size: 0.875rem;
-		color: var(--text-secondary, #6b7280);
+		font-size: 0.82rem;
+		color: rgba(45, 27, 54, 0.68);
+		font-weight: 600;
 	}
 
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.8rem;
 	}
 
-	.url-field {
+	.url-field,
+	.quality-select {
 		padding: 0.875rem 1rem;
-		font-size: 1rem;
-		border: 2px solid var(--border-color, #e5e7eb);
-		border-radius: 0.75rem;
-		background: var(--input-bg, #ffffff);
-		color: var(--text-color, #111827);
+		font-size: 0.95rem;
+		border: 1px solid #ffc8de;
+		border-radius: 999px;
+		background: #ffffff;
+		color: #2d1b36;
+		font-weight: 700;
+		transition: border-color 0.2s ease, box-shadow 0.2s ease;
 	}
 
-	.url-field:focus {
+	.url-field:focus,
+	.quality-select:focus {
 		outline: none;
-		border-color: var(--primary-color, #3b82f6);
+		border-color: #ff4d8c;
+		box-shadow: 0 0 0 4px rgba(255, 77, 140, 0.14);
 	}
 
-	.error-text {
-		color: var(--error-color, #ef4444);
-		font-size: 0.875rem;
+	.quality-select {
+		border-radius: 14px;
+	}
+
+	.quality-label {
+		display: block;
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: rgba(45, 27, 54, 0.74);
+		margin-bottom: 0.35rem;
+	}
+
+	.error-text,
+	.error-inline {
+		color: #dc2626;
+		font-size: 0.82rem;
+		font-weight: 700;
+	}
+
+	.error-inline {
+		margin-top: 0.7rem;
+	}
+
+	.phase-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+		padding: 1rem;
+		background: rgba(255, 255, 255, 0.72);
+		border: 1px solid #ffd6e8;
+		border-radius: 1rem;
+	}
+
+	.phase-title {
+		margin: 0;
+		font-size: 0.94rem;
+		font-weight: 800;
+		color: #2d1b36;
+	}
+
+	.phase-meta {
+		margin: 0;
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: rgba(45, 27, 54, 0.68);
+	}
+
+	.phase-progress-track {
+		height: 8px;
+		border-radius: 999px;
+		background: #ffe7f2;
+		overflow: hidden;
+	}
+
+	.phase-progress-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #ff4d8c 0%, #ffb938 100%);
+		transition: width 0.25s ease;
+	}
+
+	.actions-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.55rem;
+		align-items: center;
+	}
+
+	.submit-btn,
+	.ghost-btn,
+	.folder-btn {
+		padding: 0.82rem 1.2rem;
+		font-size: 0.88rem;
+		font-weight: 800;
+		border: none;
+		border-radius: 999px;
+		cursor: pointer;
+		transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, background 0.2s ease;
 	}
 
 	.submit-btn {
-		padding: 0.875rem 1.5rem;
-		font-size: 1rem;
-		font-weight: 600;
 		color: white;
-		background: var(--secondary-color, #8b5cf6);
-		border: none;
-		border-radius: 0.75rem;
-		cursor: pointer;
-		transition: background 0.2s;
-		min-height: 48px;
+		background: linear-gradient(90deg, #ff4d8c 0%, #ffb938 100%);
+		box-shadow: 0 14px 24px -18px rgba(255, 77, 140, 0.75);
 	}
 
-	.submit-btn:hover:not(:disabled) {
-		background: var(--secondary-hover, #7c3aed);
+	.submit-btn:hover:not(:disabled),
+	.ghost-btn:hover,
+	.folder-btn:hover {
+		filter: brightness(1.05);
+		transform: translateY(-1px);
 	}
 
 	.submit-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+		transform: none;
 	}
 
-	.active-batch {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
+	.ghost-btn {
+		color: #2d1b36;
+		background: #ffeaf4;
+		border: 1px solid #ffc9df;
 	}
 
-	.progress-info {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
+	.folder-btn {
+		color: #2d1b36;
+		background: #fff2f9;
+		border: 1px solid #ffcce1;
 	}
 
-	.progress-text {
-		font-size: 0.875rem;
-		color: var(--text-secondary, #6b7280);
+	:global(.page-root.theme-dark) .batch-input {
+		background: linear-gradient(180deg, rgba(30, 30, 42, 0.92) 0%, rgba(25, 25, 35, 0.92) 100%);
+		border-color: rgba(255, 77, 140, 0.22);
 	}
 
-	.progress-percent {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--primary-color, #3b82f6);
+	:global(.page-root.theme-dark) h3 {
+		color: #f3e8ff;
 	}
 
-	.progress-bar {
-		height: 8px;
-		background: var(--border-color, #e5e7eb);
-		border-radius: 4px;
-		overflow: hidden;
+	:global(.page-root.theme-dark) .subtitle,
+	:global(.page-root.theme-dark) .phase-meta,
+	:global(.page-root.theme-dark) .quality-label {
+		color: rgba(224, 208, 245, 0.78);
 	}
 
-	.progress-fill {
-		height: 100%;
-		background: var(--primary-color, #3b82f6);
-		border-radius: 4px;
-		transition: width 0.3s ease;
+	:global(.page-root.theme-dark) .url-field,
+	:global(.page-root.theme-dark) .quality-select,
+	:global(.page-root.theme-dark) .phase-card,
+	:global(.page-root.theme-dark) .folder-btn,
+	:global(.page-root.theme-dark) .ghost-btn {
+		background: rgba(255, 77, 140, 0.1);
+		color: #f9e8ff;
+		border-color: rgba(255, 77, 140, 0.3);
 	}
 
-	.pool-status {
-		font-size: 0.875rem;
-		color: var(--text-secondary, #6b7280);
-	}
-
-	.cancel-btn {
-		padding: 0.75rem 1.5rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text-secondary, #6b7280);
-		background: transparent;
-		border: 1px solid var(--border-color, #e5e7eb);
-		border-radius: 0.5rem;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.cancel-btn:hover {
-		background: var(--border-color, #e5e7eb);
-	}
-
-	@media (prefers-color-scheme: dark) {
-		.batch-input {
-			--card-bg: #1f2937;
-			--border-color: #374151;
-		}
-
-		.url-field {
-			--input-bg: #111827;
-			--text-color: #f9fafb;
-		}
+	:global(.page-root.theme-dark) .phase-title {
+		color: #f8ecff;
 	}
 </style>

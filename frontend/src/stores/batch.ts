@@ -37,7 +37,13 @@ export function resetBatch(): void {
  * Add item to batch queue
  */
 export function addBatchItem(item: BatchItem): void {
-	batchQueue.update((queue) => [...queue, item]);
+	batchQueue.update((queue) => {
+		const existingIndex = queue.findIndex((queued) => queued.videoId === item.videoId);
+		if (existingIndex === -1) return [...queue, item];
+		const next = [...queue];
+		next[existingIndex] = { ...next[existingIndex], ...item };
+		return next;
+	});
 }
 
 /**
@@ -46,6 +52,19 @@ export function addBatchItem(item: BatchItem): void {
 export function updateBatchItem(url: string, status: BatchItem['status'], error?: string): void {
 	batchQueue.update((queue) =>
 		queue.map((item) => (item.url === url ? { ...item, status, error } : item))
+	);
+}
+
+/**
+ * Update batch item status by stable video ID.
+ */
+export function updateBatchItemByVideoId(
+	videoId: string,
+	status: BatchItem['status'],
+	error?: string
+): void {
+	batchQueue.update((queue) =>
+		queue.map((item) => (item.videoId === videoId ? { ...item, status, error } : item))
 	);
 }
 

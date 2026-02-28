@@ -118,13 +118,14 @@ function buildApiUrl(path: string): string {
  * @returns Extracted video metadata and streams
  * @throws Error if extraction fails
  */
-export async function extract(url: string): Promise<ExtractResult> {
+export async function extract(url: string, signal?: AbortSignal): Promise<ExtractResult> {
 	const response = await fetch(buildApiUrl('/api/extract'), {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({ url })
+		body: JSON.stringify({ url }),
+		signal
 	});
 
 	if (!response.ok) {
@@ -139,7 +140,11 @@ export async function extract(url: string): Promise<ExtractResult> {
 			// Keep plain text body as-is when response is not JSON.
 		}
 
-		throw new Error(mapExtractErrorMessage(status, message, url));
+		const apiError = new Error(mapExtractErrorMessage(status, message, url)) as Error & {
+			status?: number;
+		};
+		apiError.status = status;
+		throw apiError;
 	}
 
 	const raw = await response.json();

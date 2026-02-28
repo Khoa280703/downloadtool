@@ -9,6 +9,7 @@
 import { Stream, ExtractionResult, ExtractionError } from "./types.ts";
 import { extractViaInnerTube } from "./youtube-innertube.ts";
 import { transformStreamUrls } from "./youtube-n-transform.ts";
+export { extractPlaylist } from "./youtube-playlist.ts";
 
 /** Extract video information from a YouTube URL */
 export async function extract(

@@ -457,10 +457,32 @@
 			</section>
 		{/if}
 
-		<section class="py-4 px-6 lg:px-20">
-			<div class="max-w-6xl mx-auto grid grid-cols-1 xl:grid-cols-[1.1fr,0.9fr] gap-4">
-				<BatchInput/>
-				<BatchProgress/>
+		<section class="py-10 px-6 lg:px-20 relative">
+			<div class="max-w-5xl mx-auto relative">
+				<div class="absolute -top-10 left-[8%] h-36 w-36 rounded-full bg-primary/20 blur-3xl"></div>
+				<div class="absolute -bottom-10 right-[10%] h-40 w-40 rounded-full bg-secondary/25 blur-3xl"></div>
+
+				<div class="relative rounded-[2.25rem] border border-white/70 bg-white/65 backdrop-blur-xl shadow-float p-6 md:p-8 overflow-hidden">
+					<div class="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(255,77,140,0.14),transparent_40%),radial-gradient(circle_at_85%_80%,rgba(255,185,56,0.16),transparent_42%)]"></div>
+					<div class="relative">
+						<div class="text-center mx-auto max-w-3xl">
+							<span class="inline-flex items-center rounded-full bg-white/80 px-4 py-1 text-xs font-bold uppercase tracking-wider text-primary shadow-sm">
+								Playlist Mode
+							</span>
+							<h2 class="mt-3 text-2xl md:text-4xl font-bold text-plum leading-tight">
+								Need the whole playlist, not just one video?
+							</h2>
+							<p class="mt-2 text-sm md:text-base text-plum/70 font-semibold">
+								Drop one playlist URL. FetchTube queues, prepares, and downloads each video automatically.
+							</p>
+						</div>
+
+						<div class="mt-6 grid grid-cols-1 lg:grid-cols-[1.05fr,0.95fr] gap-4">
+							<BatchInput/>
+							<BatchProgress/>
+						</div>
+					</div>
+				</div>
 			</div>
 		</section>
 

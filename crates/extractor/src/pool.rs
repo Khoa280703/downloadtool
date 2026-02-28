@@ -96,6 +96,59 @@ impl ExtractorPool {
         Ok(result)
     }
 
+    /// Extract playlist items from a URL.
+    pub async fn extract_playlist(
+        &self,
+        platform: &str,
+        url: &str,
+        cookies: Option<&str>,
+    ) -> Result<serde_json::Value, ExtractionError> {
+        let permit = Arc::clone(&self.semaphore)
+            .acquire_owned()
+            .await
+            .map_err(|e| ExtractionError::ScriptExecutionFailed(e.to_string()))?;
+
+        debug!("Acquired pool permit for {} playlist extraction", platform);
+
+        let bundle = Arc::clone(&self.js_bundle);
+        let platform = platform.to_string();
+        let url = url.to_string();
+        let cookies = cookies.map(String::from);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        std::thread::spawn(move || {
+            let _permit = permit;
+
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    let _ = tx.send(Err(ExtractionError::ScriptExecutionFailed(e.to_string())));
+                    return;
+                }
+            };
+
+            let local = tokio::task::LocalSet::new();
+            let result = local.block_on(&rt, async move {
+                let mut runtime = ExtractorRuntime::new(&bundle)?;
+                runtime
+                    .extract_playlist(&platform, &url, cookies.as_deref())
+                    .await
+            });
+
+            let _ = tx.send(result);
+        });
+
+        let result = rx
+            .await
+            .map_err(|e| ExtractionError::ScriptExecutionFailed(e.to_string()))??;
+
+        debug!("Completed playlist extraction");
+        Ok(result)
+    }
+
     /// Get the pool size
     pub fn size(&self) -> usize {
         self.pool_size
@@ -129,6 +182,16 @@ impl PoolHandle {
         cookies: Option<&str>,
     ) -> Result<VideoInfo, ExtractionError> {
         self.inner.extract(platform, url, cookies).await
+    }
+
+    /// Extract playlist items.
+    pub async fn extract_playlist(
+        &self,
+        platform: &str,
+        url: &str,
+        cookies: Option<&str>,
+    ) -> Result<serde_json::Value, ExtractionError> {
+        self.inner.extract_playlist(platform, url, cookies).await
     }
 
     /// Get pool size

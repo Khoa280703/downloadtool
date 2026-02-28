@@ -1,7 +1,8 @@
-//! Extractor crate - JavaScript-based video extraction using deno_core
+//! Extractor crate - video extraction via yt-dlp subprocess
 //!
-//! This crate provides video URL extraction capabilities using
-//! TypeScript extractor scripts running in a V8 isolate via deno_core.
+//! Primary extraction uses `yt-dlp -J` subprocess which handles PO Token,
+//! signature decryption, and throttle bypass automatically.
+//! The JS pool (deno_core) is kept for playlist extraction only.
 //!
 //! # Example
 //! ```rust,no_run
@@ -24,6 +25,7 @@ pub mod hot_reload;
 pub mod pool;
 pub mod runtime;
 pub mod types;
+pub mod ytdlp;
 
 pub use hot_reload::{HotReloader, ReloadableBundle};
 pub use pool::{ExtractorPool, PoolHandle};
@@ -62,45 +64,14 @@ pub async fn init(bundle_path: Option<&Path>) -> Result<(), ExtractionError> {
     Ok(())
 }
 
-/// Extract video information from a URL
+/// Extract video information from a URL via yt-dlp subprocess.
 ///
-/// This is the main public API for extracting video information.
-/// It automatically detects the platform from the URL.
-///
-/// # Arguments
-/// * `url` - The video URL to extract
-/// * `cookies` - Optional cookies string for authenticated requests
-///
-/// # Returns
-/// Video information including available formats
-///
-/// # Errors
-/// Returns an error if the URL is invalid, extraction fails, or
-/// the extractor encounters an error.
-///
-/// # Example
-/// ```rust,no_run
-/// use extractor::extract;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let info = extract("https://youtube.com/watch?v=dQw4w9WgXcQ", None).await?;
-/// println!("Found {} formats", info.formats.len());
-/// # Ok(())
-/// # }
-/// ```
-pub async fn extract(url: &str, cookies: Option<&str>) -> Result<VideoInfo, ExtractionError> {
-    // Detect platform from URL
-    let platform = detect_platform(url);
-    debug!("Detected platform '{}' for URL: {}", platform, url);
-
-    // Get or initialize global pool
-    let pool = GLOBAL_POOL.get().ok_or_else(|| {
-        ExtractionError::ScriptExecutionFailed(
-            "Extractor not initialized. Call extractor::init() first.".to_string(),
-        )
-    })?;
-
-    pool.extract(platform, url, cookies).await
+/// Uses `yt-dlp -J --no-playlist` which handles PO Token, signature decryption,
+/// and throttle bypass automatically. The `cookies` parameter is accepted for
+/// API compatibility but yt-dlp manages cookies internally.
+pub async fn extract(url: &str, _cookies: Option<&str>) -> Result<VideoInfo, ExtractionError> {
+    debug!("Extracting via yt-dlp: {}", url);
+    ytdlp::extract_via_ytdlp(url).await
 }
 
 /// Extract video information with a specific platform
@@ -125,17 +96,21 @@ pub async fn extract_with_platform(
     pool.extract(platform, url, cookies).await
 }
 
-/// Detect the platform from a URL
+/// Extract playlist items with a specific platform extractor.
 ///
-/// Returns the platform identifier string or "unknown" if not recognized.
-fn detect_platform(url: &str) -> &str {
-    let url_lower = url.to_lowercase();
+/// Returns raw JSON value from JavaScript extractor (expected array of entries).
+pub async fn extract_playlist(
+    platform: &str,
+    url: &str,
+    cookies: Option<&str>,
+) -> Result<serde_json::Value, ExtractionError> {
+    let pool = GLOBAL_POOL.get().ok_or_else(|| {
+        ExtractionError::ScriptExecutionFailed(
+            "Extractor not initialized. Call extractor::init() first.".to_string(),
+        )
+    })?;
 
-    if url_lower.contains("youtube.com") || url_lower.contains("youtu.be") {
-        "youtube"
-    } else {
-        "unknown"
-    }
+    pool.extract_playlist(platform, url, cookies).await
 }
 
 /// Create a new extractor pool with custom settings
@@ -158,24 +133,6 @@ pub fn default_bundle() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_detect_platform_youtube() {
-        assert_eq!(
-            detect_platform("https://youtube.com/watch?v=abc123"),
-            "youtube"
-        );
-        assert_eq!(detect_platform("https://youtu.be/abc123"), "youtube");
-        assert_eq!(
-            detect_platform("https://www.youtube.com/shorts/abc123"),
-            "youtube"
-        );
-    }
-
-    #[test]
-    fn test_detect_platform_unknown() {
-        assert_eq!(detect_platform("https://example.com/video"), "unknown");
-    }
 
     #[test]
     fn test_module_exports() {

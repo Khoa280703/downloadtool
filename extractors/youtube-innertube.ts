@@ -12,9 +12,31 @@ const INNERTUBE_ENDPOINT =
   "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 
 // Client definitions
-// IOS: returns plain URLs for 144p–4K (adaptive, video-only + audio tracks) — PRIMARY
-// ANDROID: fallback, may need API key on some regions
+// TV_EMBEDDED: PRIMARY — plain URLs, CDN uses c=TVHTML5, no PO Token required for Music Videos.
+//   Most lenient client for Music Video streams as of 2025.
+// ANDROID: SECONDARY — plain URLs, generally less scrutinized than IOS for Music content.
+// IOS: LAST RESORT — plain URLs but c=IOS CDN URLs for Music Videos now require PO Token,
+//   causing 403 when the proxy server fetches them (PO Token not transmitted).
 const CLIENTS = {
+  TV_EMBEDDED: {
+    context: {
+      client: {
+        clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+        clientVersion: "2.0",
+        hl: "en",
+        gl: "US",
+        utcOffsetMinutes: 0,
+      },
+    },
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent":
+        "Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/6.0 TV Safari/538.1",
+      "X-YouTube-Client-Name": "85",
+      "X-YouTube-Client-Version": "2.0",
+      Accept: "application/json",
+    } as Record<string, string>,
+  },
   IOS: {
     context: {
       client: {
@@ -249,8 +271,9 @@ export async function extractViaInnerTube(
 ): Promise<ExtractionResult> {
   let data: any = null;
 
-  // Attempt each client in order — IOS gives plain URLs for all resolutions
-  for (const clientName of ["IOS", "ANDROID"] as ClientName[]) {
+  // Attempt each client in order — TV_EMBEDDED first (no PO Token for Music Videos),
+  // fall back to ANDROID, then IOS (IOS c=IOS CDN URLs 403 on Music Videos without PO Token)
+  for (const clientName of ["TV_EMBEDDED", "ANDROID", "IOS"] as ClientName[]) {
     try {
       const res = await callInnerTube(videoId, clientName, cookies);
       if (hasStreams(res)) {

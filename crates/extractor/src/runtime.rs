@@ -117,22 +117,40 @@ impl ExtractorRuntime {
         url: &str,
         cookies: Option<&str>,
     ) -> Result<VideoInfo, ExtractionError> {
+        let platform_json = serde_json::to_string(platform).map_err(|e| {
+            ExtractionError::JavaScriptError(format!(
+                "Failed to serialize platform argument: {}",
+                e
+            ))
+        })?;
+        let url_json = serde_json::to_string(url).map_err(|e| {
+            ExtractionError::JavaScriptError(format!("Failed to serialize URL argument: {}", e))
+        })?;
+        let cookies_json = cookies
+            .map(serde_json::to_string)
+            .transpose()
+            .map_err(|e| {
+                ExtractionError::JavaScriptError(format!(
+                    "Failed to serialize cookies argument: {}",
+                    e
+                ))
+            })?
+            .unwrap_or_else(|| "undefined".to_string());
+
         let code = format!(
             r#"
             (async () => {{
-                const extractor = extractors["{}"];
+                const extractor = extractors[{}];
                 if (!extractor) {{
-                    throw new Error(`Extractor for '{}' not found`);
+                    throw new Error("Extractor not found");
                 }}
-                return await extractor.extract("{}", {});
+                if (typeof extractor.extract !== "function") {{
+                    throw new Error("extract function not found on extractor");
+                }}
+                return await extractor.extract({}, {});
             }})()
             "#,
-            platform,
-            platform,
-            url,
-            cookies
-                .map(|c| format!("\"{}\"", c.replace('"', "\\\"")))
-                .unwrap_or_else(|| "undefined".to_string())
+            platform_json, url_json, cookies_json
         );
 
         let result = self
@@ -160,6 +178,74 @@ impl ExtractorRuntime {
         })?;
 
         parse_extraction_result(value, url)
+    }
+
+    /// Extract playlist videos by calling the JS extractPlaylist function.
+    pub async fn extract_playlist(
+        &mut self,
+        platform: &str,
+        url: &str,
+        cookies: Option<&str>,
+    ) -> Result<serde_json::Value, ExtractionError> {
+        let platform_json = serde_json::to_string(platform).map_err(|e| {
+            ExtractionError::JavaScriptError(format!(
+                "Failed to serialize platform argument: {}",
+                e
+            ))
+        })?;
+        let url_json = serde_json::to_string(url).map_err(|e| {
+            ExtractionError::JavaScriptError(format!("Failed to serialize URL argument: {}", e))
+        })?;
+        let cookies_json = cookies
+            .map(serde_json::to_string)
+            .transpose()
+            .map_err(|e| {
+                ExtractionError::JavaScriptError(format!(
+                    "Failed to serialize cookies argument: {}",
+                    e
+                ))
+            })?
+            .unwrap_or_else(|| "undefined".to_string());
+
+        let code = format!(
+            r#"
+            (async () => {{
+                const extractor = extractors[{}];
+                if (!extractor) {{
+                    throw new Error("Extractor not found");
+                }}
+                if (typeof extractor.extractPlaylist !== "function") {{
+                    throw new Error("extractPlaylist function not found on extractor");
+                }}
+                return await extractor.extractPlaylist({}, {});
+            }})()
+            "#,
+            platform_json, url_json, cookies_json
+        );
+
+        let result = self
+            .runtime
+            .execute_script("extract_playlist_call.js", code)
+            .map_err(|e| {
+                ExtractionError::JavaScriptError(format!("Script execution failed: {}", e))
+            })?;
+
+        let resolve_fut = self.runtime.resolve(result);
+        let resolved = self
+            .runtime
+            .with_event_loop_promise(resolve_fut, PollEventLoopOptions::default())
+            .await
+            .map_err(|e| {
+                ExtractionError::JavaScriptError(format!("Promise resolution failed: {}", e))
+            })?;
+
+        let scope = &mut self.runtime.handle_scope();
+        let local = deno_core::v8::Local::new(scope, &resolved);
+        let value = deno_core::serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
+            ExtractionError::JavaScriptError(format!("Failed to deserialize result: {}", e))
+        })?;
+
+        Ok(value)
     }
 }
 

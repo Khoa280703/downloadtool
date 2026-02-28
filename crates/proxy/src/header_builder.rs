@@ -8,6 +8,23 @@ use reqwest::header::{
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// iOS YouTube app User-Agent (matches yt-dlp IOS client)
+/// Required when fetching YouTube CDN URLs with `c=IOS` parameter.
+const IOS_USER_AGENT: &str =
+    "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)";
+
+/// Check if a URL requires iOS-compatible headers (YouTube CDN `c=IOS` stream URLs)
+fn url_needs_ios_headers(url: &str) -> bool {
+    reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            u.query_pairs()
+                .find(|(k, _)| k == "c")
+                .map(|(_, v)| v.to_ascii_lowercase() == "ios")
+        })
+        .unwrap_or(false)
+}
+
 /// Current Chrome/Firefox user agents for rotation
 const USER_AGENTS: &[(&str, &str)] = &[
     (
@@ -113,6 +130,33 @@ impl HeaderBuilder {
             }
         }
 
+        headers
+    }
+
+    /// Build headers appropriate for a specific stream URL.
+    ///
+    /// Automatically detects YouTube CDN URLs with `c=IOS` and switches to
+    /// iOS-compatible User-Agent to avoid 403 Forbidden responses.
+    pub fn build_headers_for_url(
+        &self,
+        url: &str,
+        platform: Platform,
+        referer: Option<&str>,
+    ) -> HeaderMap {
+        if url_needs_ios_headers(url) {
+            self.build_ios_headers()
+        } else {
+            self.build_headers(platform, referer)
+        }
+    }
+
+    /// Build minimal iOS-compatible headers for YouTube CDN `c=IOS` stream URLs.
+    fn build_ios_headers(&self) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(USER_AGENT, HeaderValue::from_static(IOS_USER_AGENT));
+        headers.insert(ACCEPT, HeaderValue::from_static("*/*"));
+        headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
+        headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip, deflate, br"));
         headers
     }
 
