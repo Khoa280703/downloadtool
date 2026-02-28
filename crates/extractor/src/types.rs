@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Errors that can occur during video extraction.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum ExtractionError {
     /// The scripts directory was not found.
     #[error("Scripts directory not found: {0}")]
