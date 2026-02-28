@@ -16,6 +16,7 @@ use tracing::{debug, warn};
 const MAX_CONCURRENT_YTDLP: usize = 10;
 const EXTRACT_CACHE_MAX_CAPACITY: u64 = 500;
 const EXTRACT_CACHE_TTL_SECONDS: u64 = 300;
+const PRIMARY_PLAYER_CLIENT_ARGS: &str = "youtube:player_client=android,web";
 
 static YTDLP_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 static EXTRACT_CACHE: OnceLock<Cache<String, Arc<VideoInfo>>> = OnceLock::new();
@@ -111,7 +112,7 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
     })?;
 
-    let mut cmd = build_command(&url);
+    let mut cmd = build_command(&url, Some(PRIMARY_PLAYER_CLIENT_ARGS));
     let output = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -119,13 +120,46 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         .await
         .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e)))?;
 
-    if !output.status.success() {
+    let output = if output.status.success() {
+        output
+    } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        warn!("yt-dlp failed for {}: {}", url, stderr.trim());
-        return Err(ExtractionError::ScriptExecutionFailed(
-            format!("yt-dlp error: {}", stderr.trim())
-        ));
-    }
+        let stderr_trimmed = stderr.trim();
+        if should_retry_without_client_args(stderr_trimmed) {
+            warn!(
+                "yt-dlp failed with player_client args for {}: {}. Retrying without extractor args",
+                url, stderr_trimmed
+            );
+            let mut fallback_cmd = build_command(&url, None);
+            let fallback_output = fallback_cmd
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .await
+                .map_err(|e| {
+                    ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e))
+                })?;
+            if !fallback_output.status.success() {
+                let fallback_stderr = String::from_utf8_lossy(&fallback_output.stderr);
+                warn!(
+                    "yt-dlp fallback failed for {}: {}",
+                    url,
+                    fallback_stderr.trim()
+                );
+                return Err(ExtractionError::ScriptExecutionFailed(format!(
+                    "yt-dlp error: {}",
+                    fallback_stderr.trim()
+                )));
+            }
+            fallback_output
+        } else {
+            warn!("yt-dlp failed for {}: {}", url, stderr_trimmed);
+            return Err(ExtractionError::ScriptExecutionFailed(format!(
+                "yt-dlp error: {}",
+                stderr_trimmed
+            )));
+        }
+    };
 
     let json: Value = serde_json::from_slice(&output.stdout)
         .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e)))?;
@@ -135,16 +169,20 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
 }
 
 /// Build the yt-dlp Command with appropriate flags
-fn build_command(url: &str) -> Command {
+fn build_command(url: &str, extractor_args: Option<&str>) -> Command {
     let mut cmd = Command::new(resolve_ytdlp_binary());
     cmd.args([
-        "-J",                  // Dump JSON metadata to stdout
-        "--no-playlist",       // Single video only (ignore playlist)
-        "--no-warnings",       // Suppress non-fatal warnings
-        "--extractor-args", "youtube:player_client=android_embedded,web",
-        "--socket-timeout", "15",
+        "-J",            // Dump JSON metadata to stdout
+        "--no-playlist", // Single video only (ignore playlist)
+        "--no-warnings", // Suppress non-fatal warnings
+        "--socket-timeout",
+        "15",
         "--no-check-certificates",
     ]);
+
+    if let Some(extractor_args) = extractor_args {
+        cmd.args(["--extractor-args", extractor_args]);
+    }
 
     // Route through SOCKS5 proxy if configured
     if let Ok(proxy) = std::env::var("SOCKS5_PROXY_URL") {
@@ -156,6 +194,11 @@ fn build_command(url: &str) -> Command {
 
     cmd.arg(url);
     cmd
+}
+
+fn should_retry_without_client_args(stderr: &str) -> bool {
+    stderr.contains("Requested format is not available")
+        || stderr.contains("No video formats found")
 }
 
 /// Parse yt-dlp `-J` JSON output into VideoInfo
