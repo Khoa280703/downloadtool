@@ -9,10 +9,9 @@
 	import UserMenu from '$components/UserMenu.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
 	import type { ExtractResult, Stream } from '$lib/types';
-	import type { PageData } from './$types';
 	import { currentDownload } from '$stores/download';
 
-	let { data }: { data: PageData } = $props();
+	type AuthUser = { name?: string | null; email: string; image?: string | null };
 
 	let inputUrl = $state('');
 	let extractResult = $state<ExtractResult | null>(null);
@@ -26,17 +25,34 @@
 		previewThumbnailId ? `https://i.ytimg.com/vi/${previewThumbnailId}/hqdefault.jpg` : null
 	);
 	let authModalOpen = $state(false);
+	/** undefined = loading skeleton, null = unauthenticated, object = authenticated */
+	let authUser = $state<AuthUser | null | undefined>(undefined);
+	let redirectTo = $state('/');
 
-	$effect(() => {
-		if (data.authRequired && !data.user) {
-			authModalOpen = true;
-		}
-	});
+	function normalizeRedirectTo(value: string | null): string {
+		if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+		return value;
+	}
 
-	onMount(() => {
+	onMount(async () => {
 		const saved = localStorage.getItem('fetchtube-theme');
 		if (saved === 'dark') isDarkMode = true;
 		if (saved === 'light') isDarkMode = false;
+
+		// Fetch auth state client-side — page is prerendered so no SSR session access
+		try {
+			const resp = await fetch('/api/auth/get-session', { credentials: 'include' });
+			authUser = resp.ok ? ((await resp.json())?.user ?? null) : null;
+		} catch {
+			authUser = null;
+		}
+
+		// Handle ?auth=required&redirectTo= after auth state resolves
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('auth') === 'required' && !authUser) {
+			redirectTo = normalizeRedirectTo(params.get('redirectTo'));
+			authModalOpen = true;
+		}
 	});
 
 	$effect(() => {
@@ -129,8 +145,8 @@
 
 	async function closeAuthModal(): Promise<void> {
 		authModalOpen = false;
-
-		if (data.authRequired && !data.user) {
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('auth') === 'required' && !authUser) {
 			await goto('/', { replaceState: true, noScroll: true, invalidateAll: false });
 		}
 	}
@@ -145,7 +161,7 @@
 	<title>FetchTube - Vibrant Video Downloader</title>
 	<link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 	<link rel="preload" href="/fonts/nunito-normal-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
-	<link rel="preload" href="/fonts/material-symbols-outlined-subset.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	<link rel="preload" href="/fonts/material-symbols-outlined.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 	<style>
 		body {
 			font-family: 'Nunito', sans-serif;
@@ -338,8 +354,10 @@
 					<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#how-it-works">How it Works</a>
 					<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="#tools">Tools</a>
 				</nav>
-					{#if data.user}
-						<UserMenu user={data.user} />
+					{#if authUser === undefined}
+						<div class="h-10 w-24 rounded-full bg-plum/10 animate-pulse"></div>
+					{:else if authUser}
+						<UserMenu user={authUser} />
 					{:else}
 						<button
 							type="button"
@@ -351,7 +369,9 @@
 					{/if}
 				</div>
 				<div class="md:hidden">
-					{#if data.user}
+					{#if authUser === undefined}
+						<div class="h-10 w-10 rounded-full bg-plum/10 animate-pulse"></div>
+					{:else if authUser}
 						<a href="/account" class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors flex items-center">
 							<span class="material-symbols-outlined text-3xl">account_circle</span>
 						</a>
@@ -735,7 +755,7 @@
 
 		<AuthModal
 			open={authModalOpen}
-			redirectTo={data.redirectTo}
+			redirectTo={redirectTo}
 			onClose={closeAuthModal}
 			onSuccess={handleAuthSuccess}
 		/>
