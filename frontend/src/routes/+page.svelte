@@ -161,7 +161,7 @@
 	<title>FetchTube - Vibrant Video Downloader</title>
 	<link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 	<link rel="preload" href="/fonts/nunito-normal-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
-	<link rel="preload" href="/fonts/material-symbols-outlined.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	<link rel="preload" href="/fonts/material-symbols-outlined-subset.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 	<style>
 		body {
 			font-family: 'Nunito', sans-serif;
@@ -709,16 +709,16 @@
 						<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">Loved by Humans</h2>
 						<p class="text-base text-plum/60 font-semibold max-w-md mx-auto md:mx-0">Don't just take our word for it. Join thousands of happy fetchers who save time every day.</p>
 						<div class="hidden md:flex mt-6 -space-x-3">
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 1"><img alt="User 1" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr1s4gikAC15kJYl5qNBbsjOo7NvGwP-H5lCWIDqZKVOYU2h9j-E2_UZdlEnXou4LrtMM3Ff1HTyxqbnOiC9bvRpWEqowt71waDpEDOaw_zAIm6_-p4CwWDFdu2Vaf9JhVeubsZZxQ7z-0qXs69DyDWHKhhgJUQF_VsGt5GlM6pQEkGzjhF3F1hanb3N9naflxMGIE2BeHCcALu-TezlyNc54bWQTZbhdmC9ShcyTB-9jwh9b2qN9ix6CI63pHKHVAoW27bq2zkRc"/></div>
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 2"><img alt="User 2" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5xhTXOwEgpTaKXMTknZrIIzsx0AeA6BgE4MHNg7Mvuw2dyghH4DETumEU1BROmzX9S-GOeS3nO3MA96z7DuSbMVKMRLdptn0I6qoKXvwa-CdRMyOxI9Or3Sv4NTv7muyoitFAQBbN0zSbZzsXq09uM4W6k5mvTJr8TcolR6DLduFQK7qkVcwEJpHxpA9o8HYaYGG6ftflLPWobNeWxiHjNGfW9O2tomENUVaB0lF-MD6MDO6GM4OqlAM2IL8yP2wcvwk4kzkG9uM"/></div>
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 3"><img alt="User 3" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9wwmTlRqKsiXoYfLY2NAB9wPMkICqm-3zO7GvQPsEW4UgWCMp3uOisNRZukLdsGuYCj7gFNwNviQ-mzLlGQ4ewFpnKTJThORs18zDOOcN9LOKjjJJuVm9eNo3IyTNVOKClYaWzzuo_ObdhWgNZk7rAIFZ44BtDZQn5wkzRUilIzxRUUfItE6WvU0x_RJ429m-oSsKXUnAysF6Ngo6T0rSVYNZ4yr8ksti54vV6xGmVzHxIBMvC7Mr-jkT532iWU2Pe-1CFggyRLw"/></div>
+							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 1"><img alt="User 1" class="w-full h-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr1s4gikAC15kJYl5qNBbsjOo7NvGwP-H5lCWIDqZKVOYU2h9j-E2_UZdlEnXou4LrtMM3Ff1HTyxqbnOiC9bvRpWEqowt71waDpEDOaw_zAIm6_-p4CwWDFdu2Vaf9JhVeubsZZxQ7z-0qXs69DyDWHKhhgJUQF_VsGt5GlM6pQEkGzjhF3F1hanb3N9naflxMGIE2BeHCcALu-TezlyNc54bWQTZbhdmC9ShcyTB-9jwh9b2qN9ix6CI63pHKHVAoW27bq2zkRc"/></div>
+							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 2"><img alt="User 2" class="w-full h-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5xhTXOwEgpTaKXMTknZrIIzsx0AeA6BgE4MHNg7Mvuw2dyghH4DETumEU1BROmzX9S-GOeS3nO3MA96z7DuSbMVKMRLdptn0I6qoKXvwa-CdRMyOxI9Or3Sv4NTv7muyoitFAQBbN0zSbZzsXq09uM4W6k5mvTJr8TcolR6DLduFQK7qkVcwEJpHxpA9o8HYaYGG6ftflLPWobNeWxiHjNGfW9O2tomENUVaB0lF-MD6MDO6GM4OqlAM2IL8yP2wcvwk4kzkG9uM"/></div>
+							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 3"><img alt="User 3" class="w-full h-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9wwmTlRqKsiXoYfLY2NAB9wPMkICqm-3zO7GvQPsEW4UgWCMp3uOisNRZukLdsGuYCj7gFNwNviQ-mzLlGQ4ewFpnKTJThORs18zDOOcN9LOKjjJJuVm9eNo3IyTNVOKClYaWzzuo_ObdhWgNZk7rAIFZ44BtDZQn5wkzRUilIzxRUUfItE6WvU0x_RJ429m-oSsKXUnAysF6Ngo6T0rSVYNZ4yr8ksti54vV6xGmVzHxIBMvC7Mr-jkT532iWU2Pe-1CFggyRLw"/></div>
 							<div class="w-10 h-10 rounded-full border-2 border-white bg-plum text-white text-xs font-bold flex items-center justify-center">+9k</div>
 						</div>
 					</div>
 					<div class="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300">
 							<div class="flex items-center gap-3 mb-3">
-								<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt="Sarah" class="w-full h-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVFoqrmvbgSZf05UFx8xRHswErghnzjNOy7leL0xLeiMewdeCaInDrQHxNnvbjuxXsgrIWckkpM59VJug5wCYqRiVKPWIq1BfzsG4UP6Y8fOVTtQsRTXx_m1AD0IAcF2695QhAeGb2iMnEHrzeX38QZ9kwCa0ZUXXOWOwWGszBJTmF9uH2NPQxegbEAxrZoho7UsmyZQRVnVtJ_czTdESPKBrtI3geH5dWcj8GLJH8TQ8MQdUjj7pm0ciiCABSj1vZIieoe5fIzrk"/></div>
+								<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt="Sarah" class="w-full h-full" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVFoqrmvbgSZf05UFx8xRHswErghnzjNOy7leL0xLeiMewdeCaInDrQHxNnvbjuxXsgrIWckkpM59VJug5wCYqRiVKPWIq1BfzsG4UP6Y8fOVTtQsRTXx_m1AD0IAcF2695QhAeGb2iMnEHrzeX38QZ9kwCa0ZUXXOWOwWGszBJTmF9uH2NPQxegbEAxrZoho7UsmyZQRVnVtJ_czTdESPKBrtI3geH5dWcj8GLJH8TQ8MQdUjj7pm0ciiCABSj1vZIieoe5fIzrk"/></div>
 								<div>
 									<h4 class="font-bold text-plum text-sm">Sarah J.</h4>
 									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
@@ -728,7 +728,7 @@
 						</div>
 						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300 sm:translate-y-4">
 							<div class="flex items-center gap-3 mb-3">
-								<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt="Mike" class="w-full h-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5aEM0rZBPm42dz3OfS3JXRJzMD-riFsBxazw_V1sJmmRgLPSc35MBXlnCumxZYs_dmbgtm9g9P0_RU6A082cBKMEh9GIU2NTlkKeyj634aKYLSvflJq858W8NrUK840VaZHd_NE-GHp28czJWzQNC8h7sYVqI15ogdkMHQi9kPN_wzXAUAH-U9XMa051_n40aRPs19d_Z4QhX1l2e0rs8_bLM4FpGjjopXp0gDCiuk-HdbwNJ4C3bmuW58R2CXRieiwoH86RL-ZU"/></div>
+								<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt="Mike" class="w-full h-full" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5aEM0rZBPm42dz3OfS3JXRJzMD-riFsBxazw_V1sJmmRgLPSc35MBXlnCumxZYs_dmbgtm9g9P0_RU6A082cBKMEh9GIU2NTlkKeyj634aKYLSvflJq858W8NrUK840VaZHd_NE-GHp28czJWzQNC8h7sYVqI15ogdkMHQi9kPN_wzXAUAH-U9XMa051_n40aRPs19d_Z4QhX1l2e0rs8_bLM4FpGjjopXp0gDCiuk-HdbwNJ4C3bmuW58R2CXRieiwoH86RL-ZU"/></div>
 								<div>
 									<h4 class="font-bold text-plum text-sm">Chef Mike</h4>
 									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
