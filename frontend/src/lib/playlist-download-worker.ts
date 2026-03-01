@@ -262,9 +262,7 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 	const stream = video ?? audio;
 	if (!stream) throw new Error('No downloadable stream found');
 
-	const downloadUrl = useFsaa
-		? buildStreamUrl(stream.url, entry.title, stream.format || 'mp4')
-		: stream.url;
+	const downloadUrl = buildStreamUrl(stream.url, entry.title, stream.format || 'mp4');
 
 	return {
 		entry,
