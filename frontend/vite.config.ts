@@ -35,15 +35,15 @@ export default defineConfig({
 				'./src/stores/*.ts'
 			],
 			// Pre-compile SSR modules so first page render doesn't block on JIT compilation
-			ssrFiles: [
-				'./src/hooks.server.ts',
-				'./src/lib/server/auth.ts',
-				'./src/lib/server/auth-utils.ts',
-				'./src/routes/+page.server.ts',
-				'./src/routes/+layout.svelte',
-				'./src/routes/+page.svelte',
-				'./src/components/*.svelte'
-			]
-		}
+				ssrFiles: [
+					'./src/hooks.server.ts',
+					'./src/lib/server/auth.ts',
+					'./src/lib/server/auth-utils.ts',
+					'./src/routes/+page.ts',
+					'./src/routes/+layout.svelte',
+					'./src/routes/+page.svelte',
+					'./src/components/*.svelte'
+				]
+			}
 	}
 });
