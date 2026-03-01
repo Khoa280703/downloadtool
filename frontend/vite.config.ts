@@ -21,6 +21,16 @@ export default defineConfig({
 				'./src/lib/api.ts',
 				'./src/lib/types.ts',
 				'./src/stores/*.ts'
+			],
+			// Pre-compile SSR modules so first page render doesn't block on JIT compilation
+			ssrFiles: [
+				'./src/hooks.server.ts',
+				'./src/lib/server/auth.ts',
+				'./src/lib/server/auth-utils.ts',
+				'./src/routes/+page.server.ts',
+				'./src/routes/+layout.svelte',
+				'./src/routes/+page.svelte',
+				'./src/components/*.svelte'
 			]
 		}
 	}
