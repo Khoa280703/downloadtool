@@ -1,6 +1,6 @@
 # Code Standards & Codebase Structure
 
-**Last Updated:** 2026-02-28
+**Last Updated:** 2026-03-01
 
 ## Directory Structure
 
@@ -714,6 +714,23 @@ pub fn function(param: Type) -> Result<Output, Error> {
 export async function extract(url: string): Promise<ExtractionResult>
 ```
 
+## Internationalization (i18n) Standards [PLANNED Phase 10]
+
+**Framework:** Paraglide JS + Claude API → 34 languages
+
+**Message Key Pattern:** `page_section_element` (snake_case)
+- `homepage_hero_title`, `download_button_label`, `common_error_invalid_url`
+
+**File Location:** `frontend/src/lib/paraglide/messages/en.json`
+
+**Workflow:**
+1. Extract ~180 strings from Svelte → `messages/en.json`
+2. Claude API translation script → 34 language files
+3. LanguageSwitcher component + hreflang/sitemap.xml
+4. Test & deploy (see tasks #12-17 in plan)
+
+---
+
 ## Git Workflow & Commits
 
 ### Commit Message Format
@@ -770,5 +787,5 @@ cargo audit
 
 ---
 
-**Version:** 1.2
-**Last Updated:** 2026-02-24 (Added QuickTime Duration Fix, WebM Exclusion, Dual-Traf Muxer documentation)
+**Version:** 1.3
+**Last Updated:** 2026-03-01 (Added i18n Standards, Frontend Auth Modal patterns, Performance optimization guidelines)

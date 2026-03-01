@@ -1,6 +1,6 @@
 # Codebase Summary
 
-**Generated:** 2026-02-28
+**Generated:** 2026-03-01
 **Total Files:** 110 | **Total Tokens:** ~160,000
 
 ## Project Overview
@@ -197,6 +197,52 @@ The platform now reaches users via 4 independent channels:
 - `GET /userscript`: Serves userscript (compile-time embed via `include_str!`)
 - No new API endpoints required; uses existing `POST /api/extract` + `GET /api/stream/muxed`
 
+## Recent Changes (2026-03-01 — Frontend Auth & Performance)
+
+### 1. **Auth Flow Migration to Modal** ✅
+**Files:** `frontend/src/routes/(auth)/login/` (DELETED), `frontend/src/hooks.server.ts` (updated), `frontend/src/components/AuthModal.svelte` (NEW)
+
+**What changed:**
+- Login route removed entirely (no longer a separate page)
+- `hooks.server.ts` detects missing session → redirects to `/?auth=required`
+- AuthModal component renders on homepage, triggered by URL param
+- No page reload on login, modal pops up over homepage
+- Cookie check optimization: skips DB query if `better-auth` cookie absent
+
+**Why:** Better UX (no page flicker), reduced roundtrips, centralized auth UI
+
+### 2. **Font Optimization** ✅
+**File:** `frontend/src/app.html`
+
+**Optimization:**
+- Material Symbols font: 1.1 MB → 4.5 KB (27-icon subset)
+- Added `font-display: swap` for non-blocking text rendering
+- Preload CSS with `<link rel="preload">`
+- Lazy loading: `loading="lazy"` on external images
+
+**Impact:** LCP expected to improve (was 7.5s before), faster FCP
+
+### 3. **Homepage Prerendering** ✅
+**File:** `frontend/src/routes/+page.ts`
+
+**What changed:**
+- Added `export const prerender = true` for static generation
+- Removed `+page.server.ts` (no server-side data)
+- Homepage is now pure HTML, served from cache
+
+**Why:** Instant load, no server request, CDN cacheable
+
+### 4. **Batch Download URL Fix** ✅
+**File:** `frontend/src/lib/playlist-download-worker.ts`
+
+**Fix:**
+- Always use `buildStreamUrl()` for URL construction
+- Was using raw CDN URL in fallback, breaking downloads
+
+**Impact:** Batch downloads reliable across all formats
+
+---
+
 ## Recent Changes (2026-02-28)
 
 ### 1. **yt-dlp Subprocess Extractor** ✅
@@ -387,5 +433,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-02-28
-**Status:** Complete & Operational (yt-dlp + Auth System + Batch SSE Deployed)
+**Last Updated:** 2026-03-01
+**Status:** Complete & Operational (Frontend Auth Modal ✅ + Performance Optimizations ✅)

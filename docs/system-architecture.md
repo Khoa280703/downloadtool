@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2026-02-28
+**Last Updated:** 2026-03-01
 
 ## High-Level Architecture
 
@@ -13,7 +13,7 @@ Internet
         │
         ▼
    ┌────────────────────────────────────────────────┐
-   │   yt-dlp Subprocess Extractor (NEW 2026-02-28) │
+   │   yt-dlp Subprocess Extractor                  │
    │ • Call: yt-dlp -J --no-playlist {url}         │
    │ • Moka cache: 500 items, 300s TTL              │
    │ • Semaphore: max 10 concurrent processes       │
@@ -29,7 +29,7 @@ Internet
             │
             ▼
    ┌────────────────────────────────────────────────┐
-   │   JWT Middleware & Auth (NEW 2026-02-28)       │
+   │   JWT Middleware & Auth                        │
    │ • Validate X-Authorization: Bearer {jwt}       │
    │ • Extract user_id, tier from claims            │
    │ • Check rate limits (Free/Pro/Premium)         │
@@ -56,10 +56,11 @@ Internet
 │ Muxer│    │GPU       │        │SSE Batch │   │Frontend  │
 │(fMP4)│    │Pipeline  │        │Stream    │   │(Svelte)  │
 └──────┘    └──────────┘        └──────────┘   └──────────┘
-   │            │                    │
-   ▼            ▼                    ▼
-Stored File  Transcoded File    Browser UI
-             (tier-gated)       (JWT-protected)
+   │            │                    │              │
+   ▼            ▼                    ▼              ▼
+Stored File  Transcoded File    Browser UI   Auth Modal
+             (tier-gated)     (Prerendered  (BFF proxy)
+                              Homepage)
 ```
 
 ## Data Flow Diagrams
@@ -568,6 +569,43 @@ Output: Video files → CDN/S3 → Browser download
 | **GPU job fails** | Log error | Return error response |
 | **QuickTime playback (wrong duration)** | Now fixed in moov_merger | Both video & audio mdhd zeroed |
 
+## Frontend Architecture (Updated 2026-03-01)
+
+### Auth Modal Flow
+```
+User visits /
+      │
+      ▼
+Prerendered static HTML loads instantly
+      │
+      ▼
+hooks.server.ts runs (check better-auth cookie)
+      │
+      ├─► Cookie present? ──► Call auth.api.getSession() ──► Continue
+      │
+      └─► No cookie? ──► Skip DB query, treat as anonymous ──► Continue
+            │
+            ▼
+      Render homepage (?auth=required if redirected from /login)
+            │
+            ▼
+      AuthModal detects URL param, pops up
+            │
+            ▼
+      User logs in (JWT from server, stored in secure HTTP-only cookie)
+            │
+            ▼
+      Modal closes, homepage shows authenticated UI
+```
+
+### Performance Optimizations (2026-03-01)
+1. **Font Optimization:** Material Symbols 1.1 MB → 4.5 KB (27-icon subset)
+2. **Homepage Prerendering:** Static HTML, zero initial server request
+3. **Cookie Check:** Skips DB query for 95%+ unauthenticated visitors
+4. **Lazy Loading:** Images load on demand, `font-display: swap`
+
+**Expected LCP Improvement:** 7.5s → ~2-3s (pending full metrics)
+
 ---
 
-**Version:** 2.1 (Updated with QuickTime Duration Fix, WebM Exclusion, Dual-Traf Muxer)
+**Version:** 2.2 (Updated with Frontend Auth Modal, Performance Optimizations, i18n Planning)

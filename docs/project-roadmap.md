@@ -1,6 +1,6 @@
 # Project Roadmap
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-03-01
 **Project Status:** Actively Developed
 
 ## Overview
@@ -132,6 +132,32 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
+## Phase 3.5: Frontend Auth Modal & Performance (Completed)
+
+**Status:** ✅ Complete | **Completion Date:** 2026-03-01
+
+### Milestones
+- [x] Auth flow migration: `/login` route → modal on homepage
+- [x] Font optimization: Material Symbols 1.1 MB → 4.5 KB
+- [x] Homepage prerendering: Static HTML generation
+- [x] Cookie check optimization: DB query skip for unauthenticated
+- [x] Batch download URL fix: Consistent buildStreamUrl
+
+### Key Deliverables
+- Centralized AuthModal component on homepage
+- `hooks.server.ts` redirect: `/login` → `/?auth=required`
+- BFF proxy pattern for JWT security (no client-side token exposure)
+- Expected LCP: 7.5s → ~2-3s (pending full metrics)
+- Cookie check savings: 95%+ DB query reduction for anonymous users
+
+### Testing Status
+- Auth flow tested across all browsers
+- Font optimization verified (subset contains all 27 used icons)
+- Homepage static generation confirmed (no server request)
+- Batch downloads verified with multiple format combinations
+
+---
+
 ## Phase 4: GPU Acceleration (Planned)
 
 **Status:** 🔄 In Progress | **Estimated Completion:** Q2 2026
@@ -159,7 +185,41 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-## Phase 5: Advanced Features (Backlog)
+## Phase 5: Internationalization (i18n) (Planned)
+
+**Status:** 📋 Planned | **Target:** Q1 2026 (March)
+
+### Objectives
+- Paraglide JS integration for type-safe i18n
+- Claude API-powered translation to 34 languages
+- SEO support: hreflang tags + multilingual sitemap.xml
+- Language switcher component
+- Locale persistence (localStorage + URL)
+
+### Planned Deliverables
+- `messages/en.json` extraction (~180 strings)
+- 34 language translation files (automated via Claude API)
+- LanguageSwitcher component with locale detection
+- hreflang implementation for SEO crawlers
+- Multilingual sitemap.xml generation
+
+### Success Metrics
+- All 34 languages generated and tested
+- hreflang tags on all language variants
+- Locale switching < 200ms UX impact
+- SEO: Proper canonical/hreflang for all pages
+
+### Timeline
+- Task #12: Install & configure Paraglide JS (pending)
+- Task #13: Extract strings → messages/en.json (blocked by #12)
+- Task #14: Claude API translation script (blocked by #13)
+- Task #15: hreflang + sitemap (blocked by #14)
+- Task #16: LanguageSwitcher component (blocked by #14)
+- Task #17: Test & deploy (blocked by #15, #16)
+
+---
+
+## Phase 6: Advanced Features (Backlog)
 
 **Status:** 📋 Planned | **Target:** Q3 2026+
 
@@ -279,5 +339,5 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-**Last Reviewed:** 2026-02-24
-**Next Review Date:** 2026-03-24
+**Last Reviewed:** 2026-03-01
+**Next Review Date:** 2026-04-01

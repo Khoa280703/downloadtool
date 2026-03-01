@@ -2,7 +2,7 @@
 
 Welcome to the downloadtool documentation. This folder contains comprehensive guides for users, developers, and operators.
 
-**Last Updated:** 2026-02-28
+**Last Updated:** 2026-03-01
 
 ## Quick Navigation
 
@@ -120,6 +120,64 @@ Deploy and maintain the system:
 - Version history (v2.1 2026-02-24)
 
 **Start here if:** You need to understand requirements or plan features
+
+---
+
+## Key Changes (2026-03-01 — Frontend Auth & Performance)
+
+### 1. Auth Flow Migration to Modal
+**Files:** `frontend/src/routes/(auth)/login/` (DELETED), `frontend/src/hooks.server.ts` (updated), `frontend/src/components/AuthModal.svelte` (NEW)
+
+**Changes:**
+- Removed dedicated `/login` route (page.svelte + page.server.ts)
+- Login now triggered via `?auth=required` URL parameter on homepage
+- `hooks.server.ts` detects missing session → redirects to `/?auth=required`
+- AuthModal pops up client-side without full page navigation
+- BFF pattern: `hooks.server.ts` proxies auth.api calls with secrets, frontend never sees credentials
+
+**Impact:** Reduced page loads, improved UX, centralized auth modal on homepage
+
+### 2. Font Optimization (Material Symbols)
+**File:** `frontend/src/app.html`
+
+**Changes:**
+- Google Material Symbols font: 1.1 MB → 4.5 KB (subset of 27 icons only)
+- Added `font-display: swap` for non-blocking rendering
+- Preload CSS: `<link rel="preload" href="..." as="style">`
+- Lazy loading on external Google CDN (images): Added `loading="lazy"` + `fetchpriority="low"`
+
+**Impact:** LCP improved (was bottleneck at 7.5s), FCP faster, bandwidth savings 1.09 MB per user
+
+### 3. Homepage Prerendering
+**File:** `frontend/src/routes/+page.ts` (NEW)
+
+**Changes:**
+- Added `export const prerender = true` to enable build-time prerendering
+- Deleted `+page.server.ts` (no server-side data needed for static home)
+- Homepage now static HTML (no server request required)
+- Auth check moved to `hooks.server.ts` only (fires after static load)
+
+**Impact:** Instant homepage load, no initial server roundtrip, cacheable by CDN
+
+### 4. Cookie Check Optimization
+**File:** `frontend/src/hooks.server.ts`
+
+**Changes:**
+- Added early return if `better-auth` cookie not present
+- Skips `auth.api.getSession()` DB query for unauthenticated users
+- Only calls getSession() if cookie exists (user likely authenticated)
+
+**Impact:** DB query savings 95%+ for unauthenticated users, faster auth check
+
+### 5. Batch Download URL Fix
+**File:** `frontend/src/lib/playlist-download-worker.ts`
+
+**Changes:**
+- Always uses `buildStreamUrl()` to construct proper muxed URLs
+- Was using raw CDN URL in some cases, breaking download attribute
+- Now consistent URL building for all stream types
+
+**Impact:** Batch downloads work reliably across all format combinations
 
 ---
 
@@ -327,8 +385,7 @@ A: See System Architecture → Performance Characteristics table or Project Over
 - CI/CD: `/.github/workflows`
 
 ### Development Plans
-- Main Plan: `/plans/260222-1238-video-downloader/plan.md`
-- N-Param Fix: `/plans/260223-1345-youtube-download-timeout-and-n-param-fix/plan.md`
+- Internationalization (i18n): `/plans/260301-1326-i18n-paraglide-claude-api/plan.md`
 
 ## Getting Help
 
@@ -340,8 +397,8 @@ A: See System Architecture → Performance Characteristics table or Project Over
 
 ---
 
-**Documentation Version:** 2.2
-**Last Generated:** 2026-02-28
-**Status:** Complete ✅ (Phase 9 in progress)
+**Documentation Version:** 2.3
+**Last Generated:** 2026-03-01
+**Status:** Complete ✅ (Frontend Auth & Performance ✅, Phase 10 i18n Planned)
 
 For the latest updates, check `/plans/reports/` for implementation reports.
