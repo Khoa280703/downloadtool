@@ -60,9 +60,8 @@ export function pickBestStreams(
 ): { video: Stream | null; audio: Stream | null } {
 	const mp4Video = streams.filter((stream) => !stream.isAudioOnly && stream.format === 'mp4');
 
-	// In anchor-download mode (no FSAA), prefer muxed streams (video with embedded audio).
-	// This lets us use the direct CDN URL instead of routing through the Vite proxy,
-	// avoiding HTTP/1.1 connection pool exhaustion on non-localhost HTTP origins.
+	// When FSAA is not selected, prefer muxed streams (video with embedded audio)
+	// to avoid the separate mux step on the server.
 	if (options.preferMuxed) {
 		const muxed = mp4Video.filter((s) => s.hasAudio);
 		if (muxed.length > 0) {

@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-
-	import { authClient } from '$lib/auth-client';
+	import { signOutFromBrowser } from '$lib/auth-actions';
 
 	type MenuUser = {
 		name?: string | null;
@@ -22,13 +20,9 @@
 		signOutError = '';
 		signingOut = true;
 		try {
-			const response = await authClient.signOut();
-			if (response?.error) {
-				signOutError = response.error.message ?? 'Đăng xuất thất bại.';
-				return;
-			}
+			await signOutFromBrowser();
 			open = false;
-			await goto('/', { invalidateAll: true, replaceState: true });
+			window.location.assign('/');
 		} catch (error) {
 			signOutError = error instanceof Error ? error.message : 'Đăng xuất thất bại.';
 		} finally {
