@@ -12,7 +12,7 @@
     "dev:db": "docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml up -d postgres",
     "dev:down": "docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml down",
     "dev:be": "cargo run -p api --bin api-server",
-    "dev:fe": "bash -lc 'set -a; source .env; set +a; pnpm --filter frontend dev -- --host 0.0.0.0 --port 5168'",
+    "dev:fe": "bash -lc 'set -a; source .env; set +a; PG_CID=$(docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml ps -q postgres 2>/dev/null || true); PG_IP=\"\"; if [ -n \"$PG_CID\" ]; then PG_IP=$(docker inspect -f \"{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}\" \"$PG_CID\" 2>/dev/null || true); fi; DB_URL=\"$DATABASE_URL\"; if [ -n \"$PG_IP\" ]; then DB_URL=$(printf \"%s\" \"$DB_URL\" | sed -e \"s/@127\\\\.0\\\\.0\\\\.1:/@$PG_IP:/1\" -e \"s/@localhost:/@$PG_IP:/1\"); fi; DATABASE_URL=\"$DB_URL\" pnpm --filter frontend dev -- --host 0.0.0.0 --port 5168'",
     "logs:db": "docker logs -f downloadtool-postgres",
     "logs:api": "docker logs -f downloadtool-api",
     "logs:fe": "docker logs -f downloadtool-frontend",

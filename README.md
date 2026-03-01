@@ -56,7 +56,7 @@ pnpm dev:down
 ```bash
 pnpm dev:db    # start postgres container
 pnpm dev:be    # run rust api on host
-pnpm dev:fe    # run sveltekit on host (auto-load .env)
+pnpm dev:fe    # run sveltekit on host (auto-load .env + auto-resolve DB container IP)
 pnpm logs:db   # follow postgres container logs
 pnpm logs:api  # follow api container logs
 pnpm logs:fe   # follow frontend container logs
