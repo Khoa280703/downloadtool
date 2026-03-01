@@ -2,19 +2,19 @@
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
-	import AuthModal from '$components/AuthModal.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import SiteFooter from '$components/SiteFooter.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
-	import BatchInput from '$components/BatchInput.svelte';
-	import BatchProgress from '$components/BatchProgress.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
 	import * as m from '$lib/paraglide/messages';
 	import type { ExtractResult, Stream } from '$lib/types';
 	import { currentDownload } from '$stores/download';
 
 	type AuthUser = { name?: string | null; email: string; image?: string | null };
+	type AuthModalComponentType = typeof import('$components/AuthModal.svelte').default;
+	type BatchInputComponentType = typeof import('$components/BatchInput.svelte').default;
+	type BatchProgressComponentType = typeof import('$components/BatchProgress.svelte').default;
 
 	let inputUrl = $state('');
 	let extractResult = $state<ExtractResult | null>(null);
@@ -28,6 +28,10 @@
 		previewThumbnailId ? `https://i.ytimg.com/vi/${previewThumbnailId}/hqdefault.jpg` : null
 	);
 	let authModalOpen = $state(false);
+	let AuthModalComponent = $state<AuthModalComponentType | null>(null);
+	let BatchInputComponent = $state<BatchInputComponentType | null>(null);
+	let BatchProgressComponent = $state<BatchProgressComponentType | null>(null);
+	let playlistSectionElement = $state<HTMLElement | null>(null);
 	const hasInitialBetterAuthCookie = browser && document.cookie.includes('better-auth.');
 	const initialSessionRequest = hasInitialBetterAuthCookie
 		? fetch('/api/auth/get-session', { credentials: 'include' })
@@ -89,19 +93,69 @@
 		return value;
 	}
 
-	onMount(async () => {
+	async function ensureAuthModalLoaded(): Promise<void> {
+		if (AuthModalComponent) return;
+
+		const module = await import('$components/AuthModal.svelte');
+
+		AuthModalComponent = module.default;
+	}
+
+	async function ensurePlaylistComponentsLoaded(): Promise<void> {
+		if (BatchInputComponent && BatchProgressComponent) return;
+
+		const [batchInputModule, batchProgressModule] = await Promise.all([
+			import('$components/BatchInput.svelte'),
+			import('$components/BatchProgress.svelte')
+		]);
+
+		BatchInputComponent = batchInputModule.default;
+		BatchProgressComponent = batchProgressModule.default;
+	}
+
+	onMount(() => {
 		const saved = localStorage.getItem('fetchtube-theme');
 		if (saved === 'dark') isDarkMode = true;
 		if (saved === 'light') isDarkMode = false;
 
-		authUser = initialSessionRequest ? await initialSessionRequest : null;
+		void (async () => {
+			authUser = initialSessionRequest ? await initialSessionRequest : null;
 
-		// Handle ?auth=required&redirectTo= after auth state resolves
-		const params = new URLSearchParams(window.location.search);
-		if (params.get('auth') === 'required' && !authUser) {
-			redirectTo = normalizeRedirectTo(params.get('redirectTo'));
-			authModalOpen = true;
+			// Handle ?auth=required&redirectTo= after auth state resolves
+			const params = new URLSearchParams(window.location.search);
+			if (params.get('auth') === 'required' && !authUser) {
+				redirectTo = normalizeRedirectTo(params.get('redirectTo'));
+				await ensureAuthModalLoaded();
+				authModalOpen = true;
+			}
+		})();
+
+		let playlistObserver: IntersectionObserver | null = null;
+		if ('IntersectionObserver' in window && playlistSectionElement) {
+			playlistObserver = new IntersectionObserver(
+				(entries) => {
+					if (entries.some((entry) => entry.isIntersecting)) {
+						void ensurePlaylistComponentsLoaded();
+						playlistObserver?.disconnect();
+						playlistObserver = null;
+					}
+				},
+				{ rootMargin: '320px 0px' }
+			);
+			playlistObserver.observe(playlistSectionElement);
+		} else {
+			void ensurePlaylistComponentsLoaded();
 		}
+
+		// Fallback warmup so components are ready if user scrolls quickly on slow devices.
+		const playlistWarmupTimer = window.setTimeout(() => {
+			void ensurePlaylistComponentsLoaded();
+		}, 3500);
+
+		return () => {
+			playlistObserver?.disconnect();
+			window.clearTimeout(playlistWarmupTimer);
+		};
 	});
 
 	$effect(() => {
@@ -189,6 +243,7 @@
 	}
 
 	function openAuthModal(): void {
+		void ensureAuthModalLoaded();
 		authModalOpen = true;
 	}
 
@@ -214,8 +269,6 @@
 		<link rel="alternate" hreflang={link.hreflang} href={link.href} />
 	{/each}
 
-	<link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
-	<link rel="preload" href="/fonts/nunito-normal-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 	<link rel="preload" href="/fonts/material-symbols-outlined-subset.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 	<style>
 		body {
@@ -617,7 +670,7 @@
 			</section>
 		{/if}
 
-		<section class="py-10 px-6 lg:px-20 relative">
+		<section class="py-10 px-6 lg:px-20 relative" bind:this={playlistSectionElement}>
 			<div class="max-w-5xl mx-auto relative">
 				<div class="absolute -top-10 left-[8%] h-36 w-36 rounded-full bg-primary/20 blur-3xl"></div>
 				<div class="absolute -bottom-10 right-[10%] h-40 w-40 rounded-full bg-secondary/25 blur-3xl"></div>
@@ -638,8 +691,13 @@
 						</div>
 
 						<div class="mt-6 grid grid-cols-1 lg:grid-cols-[1.05fr,0.95fr] gap-4">
-							<BatchInput/>
-							<BatchProgress/>
+							{#if BatchInputComponent && BatchProgressComponent}
+								<BatchInputComponent />
+								<BatchProgressComponent />
+							{:else}
+								<div class="h-[220px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
+								<div class="h-[220px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -819,12 +877,14 @@
 		</section>
 		</main>
 
-		<AuthModal
-			open={authModalOpen}
-			redirectTo={redirectTo}
-			onClose={closeAuthModal}
-			onSuccess={handleAuthSuccess}
-		/>
+		{#if authModalOpen && AuthModalComponent}
+			<AuthModalComponent
+				open={authModalOpen}
+				redirectTo={redirectTo}
+				onClose={closeAuthModal}
+				onSuccess={handleAuthSuccess}
+			/>
+		{/if}
 
 	<SiteFooter />
 

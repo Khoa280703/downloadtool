@@ -7,7 +7,6 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import favicon from '$lib/assets/favicon.svg';
-	import AuthModal from '$components/AuthModal.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import SiteFooter from '$components/SiteFooter.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
@@ -16,12 +15,14 @@
 	let { children } = $props();
 
 	type AuthUser = { name?: string | null; email: string; image?: string | null };
+	type AuthModalComponentType = typeof import('$components/AuthModal.svelte').default;
 
 	/** GA4 Measurement ID from env */
 	const GA_MEASUREMENT_ID = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || '';
 
 	let isDarkMode = $state(false);
 	let authModalOpen = $state(false);
+	let AuthModalComponent = $state<AuthModalComponentType | null>(null);
 	const hasInitialBetterAuthCookie = browser && document.cookie.includes('better-auth.');
 	let authUser = $state<AuthUser | null | undefined>(hasInitialBetterAuthCookie ? undefined : null);
 	let redirectTo = $state('/');
@@ -36,6 +37,14 @@
 		if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
 
 		return value;
+	}
+
+	async function ensureAuthModalLoaded(): Promise<void> {
+		if (AuthModalComponent) return;
+
+		const module = await import('$components/AuthModal.svelte');
+
+		AuthModalComponent = module.default;
 	}
 
 	function hasExplicitLocalePrefix(pathname: string): boolean {
@@ -87,7 +96,16 @@
 		if (redirectedByPreferredLanguage) return;
 
 		if (GA_MEASUREMENT_ID) {
-			initGA(GA_MEASUREMENT_ID);
+			const startGA = () => initGA(GA_MEASUREMENT_ID);
+			const requestIdleCallbackFn = (window as Window & {
+				requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+			}).requestIdleCallback;
+
+			if (requestIdleCallbackFn) {
+				requestIdleCallbackFn(startGA, { timeout: 2500 });
+			} else {
+				window.setTimeout(startGA, 1200);
+			}
 		}
 
 		let serviceWorkerMessageHandler: ((event: MessageEvent) => void) | null = null;
@@ -132,6 +150,7 @@
 
 				if (params.get('auth') === 'required' && !authUser) {
 					redirectTo = normalizeRedirectTo(params.get('redirectTo'));
+					void ensureAuthModalLoaded();
 					authModalOpen = true;
 				}
 			})();
@@ -193,6 +212,7 @@
 
 	function openAuthModal(): void {
 		redirectTo = $page.url.pathname;
+		void ensureAuthModalLoaded();
 		authModalOpen = true;
 	}
 
@@ -217,15 +237,6 @@
 	<link rel="icon" href={favicon} />
 	<meta name="theme-color" content="#3b82f6" />
 	<meta name="color-scheme" content="light dark" />
-
-	{#if GA_MEASUREMENT_ID}
-		<!-- Google Analytics 4 -->
-
-		<script
-			async
-			src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"
-		></script>
-	{/if}
 </svelte:head>
 
 <div
@@ -252,12 +263,14 @@
 	{#if !isLocalizedHomePath($page.url.pathname)}
 		<SiteFooter />
 
-		<AuthModal
-			open={authModalOpen}
-			redirectTo={redirectTo}
-			onClose={closeAuthModal}
-			onSuccess={handleAuthSuccess}
-		/>
+		{#if authModalOpen && AuthModalComponent}
+			<AuthModalComponent
+				open={authModalOpen}
+				redirectTo={redirectTo}
+				onClose={closeAuthModal}
+				onSuccess={handleAuthSuccess}
+			/>
+		{/if}
 
 		<button
 			type="button"
