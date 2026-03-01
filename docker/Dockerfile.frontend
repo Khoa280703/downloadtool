@@ -18,6 +18,9 @@ ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 RUN test -n "$VITE_API_URL" || (echo "VITE_API_URL build arg is required" && exit 1)
 
+# Generate Paraglide runtime/messages from frontend/messages/* before Vite build
+RUN npm run paraglide:compile
+
 # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
 RUN node build-docker.mjs
 
