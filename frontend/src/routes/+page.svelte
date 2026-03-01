@@ -359,9 +359,7 @@
 			color: #ffffff !important;
 		}
 
-		.page-root.theme-dark [class*='text-plum/70'],
-		.page-root.theme-dark [class*='text-plum/80'],
-		.page-root.theme-dark [class*='text-plum/60'],
+		.page-root.theme-dark [class*='text-plum/'],
 		.page-root.theme-dark [class*='text-muted'] {
 			color: rgba(224, 208, 245, 0.7) !important;
 		}
@@ -418,65 +416,64 @@
 			border-color: rgba(255, 255, 255, 0.08) !important;
 		}
 
-			.page-root.theme-dark .step-paste-card {
-				background: linear-gradient(135deg, rgba(38, 34, 56, 0.95), rgba(29, 26, 43, 0.95)) !important;
-				border-color: rgba(255, 77, 140, 0.22) !important;
-				box-shadow: 0 0 20px rgba(255, 77, 140, 0.28) !important;
-			}
+		.page-root.theme-dark .step-paste-card {
+			background: linear-gradient(135deg, rgba(38, 34, 56, 0.95), rgba(29, 26, 43, 0.95)) !important;
+			border-color: rgba(255, 77, 140, 0.22) !important;
+			box-shadow: 0 0 20px rgba(255, 77, 140, 0.28) !important;
+		}
 
-			.page-root.theme-dark .download-result-card {
-				background: rgba(22, 22, 32, 0.92) !important;
-				border-color: rgba(255, 77, 140, 0.2) !important;
-			}
+		.page-root.theme-dark .download-result-card {
+			background: rgba(22, 22, 32, 0.92) !important;
+			border-color: rgba(255, 77, 140, 0.2) !important;
+		}
 
-			.page-root.theme-dark .download-result-meta {
-				background: linear-gradient(180deg, rgba(35, 31, 52, 0.88), rgba(26, 23, 39, 0.95)) !important;
-				border-right-color: rgba(255, 77, 140, 0.2) !important;
-			}
+		.page-root.theme-dark .download-result-meta {
+			background: linear-gradient(180deg, rgba(35, 31, 52, 0.88), rgba(26, 23, 39, 0.95)) !important;
+			border-right-color: rgba(255, 77, 140, 0.2) !important;
+		}
 
-			.page-root.theme-dark .download-result-title {
-				color: #ffffff !important;
-			}
+		.page-root.theme-dark .download-result-title {
+			color: #ffffff !important;
+		}
 
-			.page-root.theme-dark .download-result-chip-duration {
-				background: rgba(99, 102, 241, 0.2) !important;
-				color: #c7d2fe !important;
-			}
+		.page-root.theme-dark .download-result-chip-duration {
+			background: rgba(99, 102, 241, 0.2) !important;
+			color: #c7d2fe !important;
+		}
 
-			.page-root.theme-dark .download-result-chip-view {
-				background: rgba(236, 72, 153, 0.2) !important;
-				color: #fbcfe8 !important;
-			}
+		.page-root.theme-dark .download-result-chip-view {
+			background: rgba(236, 72, 153, 0.2) !important;
+			color: #fbcfe8 !important;
+		}
 
-			.page-root.theme-dark .download-result-chip-channel {
-				background: rgba(148, 163, 184, 0.2) !important;
-				color: #e2e8f0 !important;
-			}
+		.page-root.theme-dark .download-result-chip-channel {
+			background: rgba(148, 163, 184, 0.2) !important;
+			color: #e2e8f0 !important;
+		}
 
-			.page-root.theme-dark .download-result-description {
-				background: rgba(255, 255, 255, 0.05) !important;
-				border-color: rgba(255, 255, 255, 0.1) !important;
-				color: rgba(224, 208, 245, 0.88) !important;
-			}
+		.page-root.theme-dark .download-result-description {
+			background: rgba(255, 255, 255, 0.05) !important;
+			border-color: rgba(255, 255, 255, 0.1) !important;
+			color: rgba(224, 208, 245, 0.88) !important;
+		}
 
-			.page-root.theme-dark .download-result-description strong {
-				color: #ffffff !important;
-			}
+		.page-root.theme-dark .download-result-description strong {
+			color: #ffffff !important;
+		}
 
-			.page-root.theme-dark .download-result-hint {
-				color: rgba(224, 208, 245, 0.78) !important;
-			}
+		.page-root.theme-dark .download-result-hint {
+			color: rgba(224, 208, 245, 0.78) !important;
+		}
 
-			.page-root.theme-dark .download-result-actions {
-				background: rgba(20, 21, 30, 0.9) !important;
-			}
+		.page-root.theme-dark .download-result-actions {
+			background: rgba(20, 21, 30, 0.9) !important;
+		}
 
-			.page-root.theme-dark .download-result-download {
-				border-top-color: rgba(255, 77, 140, 0.2) !important;
-				background: rgba(99, 102, 241, 0.12) !important;
-			}
+		.page-root.theme-dark .download-result-download {
+			border-top-color: rgba(255, 77, 140, 0.2) !important;
+			background: rgba(99, 102, 241, 0.12) !important;
+		}
 
-		/* Remove bright horizontal separators between major sections in dark mode */
 		.page-root.theme-dark #tools {
 			border-top-color: transparent !important;
 			border-bottom-color: transparent !important;
@@ -492,6 +489,51 @@
 
 		.page-root.theme-dark footer a:hover {
 			color: #ff4d8c !important;
+		}
+
+		.defer-render-how-it-works {
+			content-visibility: auto;
+			contain-intrinsic-size: 580px;
+		}
+
+		.defer-render-tools {
+			content-visibility: auto;
+			contain-intrinsic-size: 760px;
+		}
+
+		.defer-render-testimonials {
+			content-visibility: auto;
+			contain-intrinsic-size: 640px;
+		}
+
+		.playlist-section-stable {
+			min-height: 620px;
+		}
+
+		.playlist-grid {
+			align-items: stretch;
+		}
+
+		.playlist-slot {
+			min-height: 260px;
+		}
+
+		.playlist-slot-input {
+			min-height: 300px;
+		}
+
+		.playlist-slot-progress {
+			min-height: 260px;
+		}
+
+		.playlist-skeleton {
+			box-shadow: 0 14px 28px -22px rgba(255, 77, 140, 0.45);
+		}
+
+		@media (max-width: 1024px) {
+			.playlist-section-stable {
+				min-height: 560px;
+			}
 		}
 	</style>
 </svelte:head>
@@ -667,7 +709,7 @@
 			</section>
 		{/if}
 
-		<section class="py-10 px-6 lg:px-20 relative" bind:this={playlistSectionElement}>
+		<section class="playlist-section-stable py-10 px-6 lg:px-20 relative" bind:this={playlistSectionElement}>
 			<div class="max-w-5xl mx-auto relative">
 				<div class="absolute -top-10 left-[8%] h-36 w-36 rounded-full bg-primary/20 blur-3xl"></div>
 				<div class="absolute -bottom-10 right-[10%] h-40 w-40 rounded-full bg-secondary/25 blur-3xl"></div>
@@ -687,13 +729,21 @@
 							</p>
 						</div>
 
-						<div class="mt-6 grid grid-cols-1 lg:grid-cols-[1.05fr,0.95fr] gap-4">
+						<div class="playlist-grid mt-6 grid grid-cols-1 lg:grid-cols-[1.05fr,0.95fr] gap-4">
 							{#if BatchInputComponent && BatchProgressComponent}
-								<BatchInputComponent />
-								<BatchProgressComponent />
+								<div class="playlist-slot playlist-slot-input">
+									<BatchInputComponent />
+								</div>
+								<div class="playlist-slot playlist-slot-progress">
+									<BatchProgressComponent />
+								</div>
 							{:else}
-								<div class="h-[300px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
-								<div class="h-[240px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
+								<div class="playlist-slot playlist-slot-input">
+									<div class="playlist-skeleton h-full rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
+								</div>
+								<div class="playlist-slot playlist-slot-progress">
+									<div class="playlist-skeleton h-full rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
+								</div>
 							{/if}
 						</div>
 					</div>
@@ -701,7 +751,7 @@
 			</div>
 		</section>
 
-		<section class="py-8 px-6 lg:px-20 relative z-20" id="how-it-works">
+		<section class="defer-render-how-it-works py-8 px-6 lg:px-20 relative z-20" id="how-it-works">
 			<div class="max-w-6xl mx-auto">
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
 					<div class="relative group">
@@ -744,7 +794,7 @@
 			</div>
 		</section>
 
-		<section class="py-10 px-6 lg:px-20 bg-white/40 border-y border-white/60" id="tools">
+		<section class="defer-render-tools py-10 px-6 lg:px-20 bg-white/40 border-y border-white/60" id="tools">
 			<div class="max-w-7xl mx-auto">
 				<div class="mb-8">
 					<div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
@@ -818,7 +868,7 @@
 			</div>
 		</section>
 
-		<section class="py-12 px-6 lg:px-20 relative overflow-hidden">
+		<section class="defer-render-testimonials py-12 px-6 lg:px-20 relative overflow-hidden">
 			<div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
 				<div class="absolute top-20 left-[10%] w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
 				<div class="absolute bottom-10 right-[10%] w-64 h-64 bg-secondary/5 rounded-full blur-3xl"></div>
