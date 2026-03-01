@@ -21,6 +21,73 @@ pub struct Config {
 }
 
 impl Config {
+    fn command_stdout_trimmed(command: &mut Command) -> Option<String> {
+        let output = command.output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if stdout.is_empty() {
+            return None;
+        }
+
+        Some(stdout)
+    }
+
+    fn inspect_container_ip(container_ref: &str) -> Option<String> {
+        let mut inspect = Command::new("docker");
+        inspect.args([
+            "inspect",
+            "-f",
+            "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+            container_ref,
+        ]);
+        Self::command_stdout_trimmed(&mut inspect)
+    }
+
+    fn resolve_postgres_container_ip() -> Option<String> {
+        // Preferred path: ask docker compose for postgres service container id.
+        let mut compose_ps = Command::new("docker");
+        compose_ps.args([
+            "compose",
+            "--project-directory",
+            ".",
+            "--env-file",
+            ".env",
+            "-f",
+            "docker/docker-compose.server.yml",
+            "ps",
+            "-q",
+            "postgres",
+        ]);
+
+        if let Some(container_id) = Self::command_stdout_trimmed(&mut compose_ps)
+            .and_then(|stdout| stdout.lines().next().map(str::trim).map(str::to_string))
+            .filter(|id| !id.is_empty())
+        {
+            if let Some(ip) = Self::inspect_container_ip(&container_id) {
+                return Some(ip);
+            }
+        }
+
+        // Fallback for environments where container names are prefixed by project id.
+        let mut ps_filter = Command::new("docker");
+        ps_filter.args(["ps", "-q", "--filter", "name=downloadtool-postgres"]);
+
+        if let Some(container_id) = Self::command_stdout_trimmed(&mut ps_filter)
+            .and_then(|stdout| stdout.lines().next().map(str::trim).map(str::to_string))
+            .filter(|id| !id.is_empty())
+        {
+            if let Some(ip) = Self::inspect_container_ip(&container_id) {
+                return Some(ip);
+            }
+        }
+
+        // Last fallback for exact container name.
+        Self::inspect_container_ip("downloadtool-postgres")
+    }
+
     fn resolve_local_database_url(raw_url: &str) -> String {
         let uses_localhost =
             raw_url.contains("@127.0.0.1:") || raw_url.contains("@localhost:");
@@ -28,27 +95,9 @@ impl Config {
             return raw_url.to_string();
         }
 
-        let output = Command::new("docker")
-            .args([
-                "inspect",
-                "-f",
-                "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
-                "downloadtool-postgres",
-            ])
-            .output();
-
-        let Ok(output) = output else {
+        let Some(ip) = Self::resolve_postgres_container_ip() else {
             return raw_url.to_string();
         };
-
-        if !output.status.success() {
-            return raw_url.to_string();
-        }
-
-        let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if ip.is_empty() {
-            return raw_url.to_string();
-        }
 
         if raw_url.contains("@127.0.0.1:") {
             return raw_url.replacen("@127.0.0.1:", &format!("@{}:", ip), 1);
