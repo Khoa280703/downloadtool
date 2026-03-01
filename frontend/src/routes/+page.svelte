@@ -2,6 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
+	import BatchInput from '$components/BatchInput.svelte';
+	import BatchProgress from '$components/BatchProgress.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
@@ -17,8 +19,6 @@
 
 	type AuthUser = { name?: string | null; email: string; image?: string | null };
 	type AuthModalComponentType = typeof import('$components/AuthModal.svelte').default;
-	type BatchInputComponentType = typeof import('$components/BatchInput.svelte').default;
-	type BatchProgressComponentType = typeof import('$components/BatchProgress.svelte').default;
 
 	let inputUrl = $state('');
 	let extractResult = $state<ExtractResult | null>(null);
@@ -33,9 +33,6 @@
 	);
 	let authModalOpen = $state(false);
 	let AuthModalComponent = $state<AuthModalComponentType | null>(null);
-	let BatchInputComponent = $state<BatchInputComponentType | null>(null);
-	let BatchProgressComponent = $state<BatchProgressComponentType | null>(null);
-	let playlistSectionElement = $state<HTMLElement | null>(null);
 	const hasInitialBetterAuthCookie = browser && document.cookie.includes('better-auth.');
 	const initialSessionRequest = hasInitialBetterAuthCookie
 		? fetch('/api/auth/get-session', { credentials: 'include' })
@@ -105,18 +102,6 @@
 		AuthModalComponent = module.default;
 	}
 
-	async function ensurePlaylistComponentsLoaded(): Promise<void> {
-		if (BatchInputComponent && BatchProgressComponent) return;
-
-		const [batchInputModule, batchProgressModule] = await Promise.all([
-			import('$components/BatchInput.svelte'),
-			import('$components/BatchProgress.svelte')
-		]);
-
-		BatchInputComponent = batchInputModule.default;
-		BatchProgressComponent = batchProgressModule.default;
-	}
-
 	onMount(() => {
 		const saved = localStorage.getItem('fetchtube-theme');
 		if (saved === 'dark') isDarkMode = true;
@@ -133,27 +118,6 @@
 				authModalOpen = true;
 			}
 		})();
-
-		let playlistObserver: IntersectionObserver | null = null;
-		if ('IntersectionObserver' in window && playlistSectionElement) {
-			playlistObserver = new IntersectionObserver(
-				(entries) => {
-					if (entries.some((entry) => entry.isIntersecting)) {
-						void ensurePlaylistComponentsLoaded();
-						playlistObserver?.disconnect();
-						playlistObserver = null;
-					}
-				},
-				{ rootMargin: '120px 0px' }
-			);
-			playlistObserver.observe(playlistSectionElement);
-		} else {
-			void ensurePlaylistComponentsLoaded();
-		}
-
-		return () => {
-			playlistObserver?.disconnect();
-		};
 	});
 
 	$effect(() => {
@@ -526,10 +490,6 @@
 			min-height: 260px;
 		}
 
-		.playlist-skeleton {
-			box-shadow: 0 14px 28px -22px rgba(255, 77, 140, 0.45);
-		}
-
 		@media (max-width: 1024px) {
 			.playlist-section-stable {
 				min-height: 560px;
@@ -709,7 +669,7 @@
 			</section>
 		{/if}
 
-		<section class="playlist-section-stable py-10 px-6 lg:px-20 relative" bind:this={playlistSectionElement}>
+		<section class="playlist-section-stable py-10 px-6 lg:px-20 relative">
 			<div class="max-w-5xl mx-auto relative">
 				<div class="absolute -top-10 left-[8%] h-36 w-36 rounded-full bg-primary/20 blur-3xl"></div>
 				<div class="absolute -bottom-10 right-[10%] h-40 w-40 rounded-full bg-secondary/25 blur-3xl"></div>
@@ -730,21 +690,12 @@
 						</div>
 
 						<div class="playlist-grid mt-6 grid grid-cols-1 lg:grid-cols-[1.05fr,0.95fr] gap-4">
-							{#if BatchInputComponent && BatchProgressComponent}
-								<div class="playlist-slot playlist-slot-input">
-									<BatchInputComponent />
-								</div>
-								<div class="playlist-slot playlist-slot-progress">
-									<BatchProgressComponent />
-								</div>
-							{:else}
-								<div class="playlist-slot playlist-slot-input">
-									<div class="playlist-skeleton h-full rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
-								</div>
-								<div class="playlist-slot playlist-slot-progress">
-									<div class="playlist-skeleton h-full rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
-								</div>
-							{/if}
+							<div class="playlist-slot playlist-slot-input">
+								<BatchInput />
+							</div>
+							<div class="playlist-slot playlist-slot-progress">
+								<BatchProgress />
+							</div>
 						</div>
 					</div>
 				</div>
