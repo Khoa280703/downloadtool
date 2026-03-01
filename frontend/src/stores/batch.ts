@@ -39,9 +39,13 @@ export function resetBatch(): void {
 export function addBatchItem(item: BatchItem): void {
 	batchQueue.update((queue) => {
 		const existingIndex = queue.findIndex((queued) => queued.videoId === item.videoId);
-		if (existingIndex === -1) return [...queue, item];
+		if (existingIndex === -1) return [...queue, { ...item, selected: item.selected ?? true }];
 		const next = [...queue];
-		next[existingIndex] = { ...next[existingIndex], ...item };
+		next[existingIndex] = {
+			...next[existingIndex],
+			...item,
+			selected: item.selected ?? next[existingIndex].selected ?? true
+		};
 		return next;
 	});
 }
@@ -65,6 +69,24 @@ export function updateBatchItemByVideoId(
 ): void {
 	batchQueue.update((queue) =>
 		queue.map((item) => (item.videoId === videoId ? { ...item, status, error } : item))
+	);
+}
+
+/**
+ * Toggle selection for a batch item.
+ */
+export function setBatchItemSelected(videoId: string, selected: boolean): void {
+	batchQueue.update((queue) =>
+		queue.map((item) => (item.videoId === videoId ? { ...item, selected } : item))
+	);
+}
+
+/**
+ * Set selection for all pending batch items.
+ */
+export function setAllPendingBatchItemsSelected(selected: boolean): void {
+	batchQueue.update((queue) =>
+		queue.map((item) => (item.status === 'pending' ? { ...item, selected } : item))
 	);
 }
 

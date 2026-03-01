@@ -4,14 +4,16 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
+		"paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy url cookie globalVariable baseLocale",
+		"dev": "pnpm run paraglide:compile && vite dev",
+		"build": "pnpm run paraglide:compile && vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check": "pnpm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "pnpm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
+		"@inlang/paraglide-js": "^2.10.0",
 		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
 		"@sveltejs/adapter-node": "^5.2.9",
@@ -30,7 +32,7 @@
 		"vite": "^6.0.0"
 	},
 	"dependencies": {
-		"better-auth": "^1.4.20",
+		"better-auth": "1.4.20",
 		"pg": "^8.19.0"
 	}
 }

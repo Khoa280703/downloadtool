@@ -17,11 +17,15 @@
 		enqueueDownload,
 		pickSaveDirectory,
 		resetWorkerState,
+		setPreferredDownloadMode,
 		setPreferredQuality
 	} from '$lib/playlist-download-worker';
 	import {
+		PLAYLIST_DOWNLOAD_MODE_OPTIONS,
 		PLAYLIST_QUALITY_OPTIONS,
+		type PlaylistDownloadMode,
 		type PlaylistQuality,
+		getStoredPlaylistDownloadMode,
 		getStoredPlaylistQuality
 	} from '$lib/playlist-download-stream-selection';
 
@@ -39,11 +43,15 @@
 	let phase = $state<BatchPhase>('idle');
 	let fsaaSupported = $state(false);
 	let dirPicked = $state(false);
+	let selectedDownloadMode = $state<PlaylistDownloadMode>(getStoredPlaylistDownloadMode());
 	let selectedQuality = $state<PlaylistQuality>(getStoredPlaylistQuality());
 	let stagedEntries = $state<QueueEntry[]>([]);
 	let completionNotified = $state(false);
 
 	const readyCount = $derived.by(() => $batchQueue.length);
+	const selectedCount = $derived.by(
+		() => $batchQueue.filter((item) => item.selected !== false).length
+	);
 	const progressPercent = $derived.by(() => {
 		if ($batchProgress.total <= 0) return 0;
 		return Math.min(100, Math.round(($batchProgress.received / $batchProgress.total) * 100));
@@ -53,7 +61,8 @@
 		if (phase !== 'downloading' || completionNotified) return;
 		if ($batchQueue.length === 0) return;
 
-		const settled = $batchQueue.every(
+		const selectedItems = $batchQueue.filter((item) => item.selected !== false);
+		const settled = selectedItems.every(
 			(item) => item.status === 'completed' || item.status === 'error'
 		);
 		if (!settled) return;
@@ -181,21 +190,40 @@
 		}
 	}
 
+	function persistDownloadMode(mode: PlaylistDownloadMode): void {
+		if (typeof window === 'undefined') return;
+		try {
+			window.localStorage.setItem('fetchtube.playlist-download-mode.v1', mode);
+		} catch {
+			// Ignore localStorage failures.
+		}
+	}
+
 	function handleStartDownload(): void {
 		if (stagedEntries.length === 0) {
 			error = 'Playlist is empty. Fetch links first.';
+			return;
+		}
+		const selectedVideoIds = new Set(
+			$batchQueue.filter((item) => item.selected !== false).map((item) => item.videoId)
+		);
+		const selectedEntries = stagedEntries.filter((entry) => selectedVideoIds.has(entry.videoId));
+		if (selectedEntries.length === 0) {
+			error = 'Please select at least one video.';
 			return;
 		}
 
 		error = '';
 		completionNotified = false;
 		resetWorkerState();
+		setPreferredDownloadMode(selectedDownloadMode);
 		setPreferredQuality(selectedQuality);
+		persistDownloadMode(selectedDownloadMode);
 		persistQuality(selectedQuality);
 		startBatch();
 		phase = 'downloading';
 
-		for (const entry of stagedEntries) {
+		for (const entry of selectedEntries) {
 			enqueueDownload(entry);
 		}
 	}
@@ -225,7 +253,7 @@
 <div class="batch-input">
 	<div class="header">
 		<h3>Paste Your YouTube Playlist URL</h3>
-		<p class="subtitle">Step 1: fetch all videos. Step 2: pick quality. Step 3: start download.</p>
+		<p class="subtitle">Step 1: fetch all videos. Step 2: pick type/quality. Step 3: start download.</p>
 	</div>
 
 	{#if phase === 'idle'}
@@ -262,18 +290,34 @@
 	{:else if phase === 'ready'}
 		<div class="phase-card">
 			<p class="phase-title">Playlist ready: {readyCount} videos</p>
-			<p class="phase-meta">Choose quality first, then start download.</p>
+			<p class="phase-meta">Choose type and quality, then start download.</p>
+			<p class="phase-meta">Selected: {selectedCount} / {readyCount}</p>
 
-			<label class="quality-label" for="playlist-quality">Preferred resolution</label>
+			<label class="quality-label" for="playlist-download-mode">Download type</label>
 			<select
-				id="playlist-quality"
-				class="quality-select"
-				bind:value={selectedQuality}
+				id="playlist-download-mode"
+				class="mode-select"
+				bind:value={selectedDownloadMode}
 			>
-				{#each PLAYLIST_QUALITY_OPTIONS as option}
+				{#each PLAYLIST_DOWNLOAD_MODE_OPTIONS as option}
 					<option value={option.value}>{option.label}</option>
 				{/each}
 			</select>
+
+			{#if selectedDownloadMode === 'video'}
+				<label class="quality-label" for="playlist-quality">Preferred resolution</label>
+				<select
+					id="playlist-quality"
+					class="quality-select"
+					bind:value={selectedQuality}
+				>
+					{#each PLAYLIST_QUALITY_OPTIONS as option}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
+			{:else}
+				<p class="phase-meta">Audio only uses best available audio bitrate.</p>
+			{/if}
 
 			<div class="actions-row">
 				{#if fsaaSupported}
@@ -344,7 +388,8 @@
 	}
 
 	.url-field,
-	.quality-select {
+	.quality-select,
+	.mode-select {
 		padding: 0.875rem 1rem;
 		font-size: 0.95rem;
 		border: 1px solid #ffc8de;
@@ -356,13 +401,15 @@
 	}
 
 	.url-field:focus,
-	.quality-select:focus {
+	.quality-select:focus,
+	.mode-select:focus {
 		outline: none;
 		border-color: #ff4d8c;
 		box-shadow: 0 0 0 4px rgba(255, 77, 140, 0.14);
 	}
 
-	.quality-select {
+	.quality-select,
+	.mode-select {
 		border-radius: 14px;
 	}
 
@@ -488,6 +535,7 @@
 	}
 
 	:global(.page-root.theme-dark) .url-field,
+	:global(.page-root.theme-dark) .mode-select,
 	:global(.page-root.theme-dark) .quality-select,
 	:global(.page-root.theme-dark) .phase-card,
 	:global(.page-root.theme-dark) .folder-btn,

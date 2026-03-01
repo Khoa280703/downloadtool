@@ -625,6 +625,114 @@
 		margin: 0;
 	}
 
+	:global(.page-root.theme-dark) .tabs {
+		background: #1a2130;
+		border-color: rgba(129, 140, 248, 0.22);
+	}
+
+	:global(.page-root.theme-dark) .tab-btn {
+		color: #b8c4da;
+	}
+
+	:global(.page-root.theme-dark) .tab-btn:hover {
+		background: #263147;
+		color: #dbe7ff;
+	}
+
+	:global(.page-root.theme-dark) .tab-btn-active {
+		background: linear-gradient(135deg, #6366f1, #8b5cf6);
+		color: #ffffff;
+		box-shadow: 0 10px 24px -14px rgba(129, 140, 248, 0.9);
+	}
+
+	:global(.page-root.theme-dark) .list-scroll {
+		scrollbar-color: #5b6e99 #182033;
+	}
+
+	:global(.page-root.theme-dark) .list-scroll::-webkit-scrollbar-track {
+		background: #182033;
+	}
+
+	:global(.page-root.theme-dark) .list-scroll::-webkit-scrollbar-thumb {
+		background: linear-gradient(180deg, #6366f1 0%, #a855f7 100%);
+		border-color: #182033;
+	}
+
+	:global(.page-root.theme-dark) .option-card {
+		border-color: #33415f;
+		background: #151d2b;
+	}
+
+	:global(.page-root.theme-dark) .option-card:hover {
+		border-color: #6d81bf;
+		box-shadow: 0 14px 28px -22px rgba(129, 140, 248, 0.9);
+	}
+
+	:global(.page-root.theme-dark) .option-card-selected {
+		border-color: #7c8bff;
+		background: #1f2a42;
+		box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.24);
+	}
+
+	:global(.page-root.theme-dark) .option-title {
+		color: #f8faff;
+	}
+
+	:global(.page-root.theme-dark) .option-submeta {
+		color: #aab6cd;
+	}
+
+	:global(.page-root.theme-dark) .fmt-chip {
+		background: #2a344c;
+		color: #d8e2ff;
+	}
+
+	:global(.page-root.theme-dark) .size-pill {
+		border-color: #3d4f7a;
+		background: #111828;
+		color: #c7d2fe;
+	}
+
+	:global(.page-root.theme-dark) .check-pill {
+		border-color: #5f6f90;
+		background: #111828;
+	}
+
+	:global(.page-root.theme-dark) .check-pill-active {
+		border-color: #7c8bff;
+		background: #6366f1;
+	}
+
+	:global(.page-root.theme-dark) .empty-state {
+		border-color: #475569;
+		color: #aab6cd;
+	}
+
+	:global(.page-root.theme-dark) .accent-indigo {
+		background: #273560;
+		color: #c7d2fe;
+	}
+
+	:global(.page-root.theme-dark) .accent-pink {
+		background: #4a2846;
+		color: #f9a8d4;
+	}
+
+	:global(.page-root.theme-dark) .accent-cyan {
+		background: #1d3d4a;
+		color: #67e8f9;
+	}
+
+	:global(.page-root.theme-dark) .accent-purple {
+		background: #3a2d5a;
+		color: #c4b5fd;
+	}
+
+	:global(.page-root.theme-dark) .accent-slate {
+		background: #2b364a;
+		color: #cbd5e1;
+	}
+
 	@media (max-width: 860px) {
 		.size-pill {
 			display: none;

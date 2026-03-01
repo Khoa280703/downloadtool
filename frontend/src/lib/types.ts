@@ -108,6 +108,8 @@ export interface BatchItem {
 	thumbnail?: string;
 	/** Current status */
 	status: 'pending' | 'downloading' | 'completed' | 'error';
+	/** Whether this item is selected for playlist download */
+	selected?: boolean;
 	/** Error message if failed */
 	error?: string;
 }

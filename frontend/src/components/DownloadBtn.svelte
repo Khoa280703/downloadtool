@@ -2,6 +2,7 @@
 	import { buildStreamUrl, buildMuxedStreamUrl } from '$lib/api';
 	import { currentDownload, setDownloading, downloadProgress } from '$stores/download';
 	import { trackDownloadStarted } from '$lib/analytics';
+	import * as m from '$lib/paraglide/messages';
 	import type { Stream } from '$lib/types';
 
 	interface Props {
@@ -39,10 +40,11 @@
 	}
 
 	function ctaLabel(): string {
-		if (!stream) return 'Select format to continue';
+		if (!stream) return m.download_btn_select_format();
 		const size = formatSize(stream.size);
-		if (size) return `Download Now (${size})`;
-		return `Download ${stream.quality || 'Now'}`;
+		if (size) return m.download_btn_download_now_size({ size });
+		if (stream.quality) return m.download_btn_download_quality({ quality: stream.quality });
+		return m.download_btn_download_now_plain();
 	}
 
 	/** Trigger browser download */
@@ -95,11 +97,13 @@
 		class="download-cta"
 		onclick={handleDownload}
 		disabled={disabled || !stream || isLoading || $currentDownload.isDownloading}
-		aria-label={isLoading ? 'Preparing download...' : 'Download selected format'}
+		aria-label={
+			isLoading ? m.download_btn_aria_preparing() : m.download_btn_aria_download_selected()
+		}
 	>
 		{#if isLoading || $currentDownload.isDownloading}
 			<span class="spinner"></span>
-			<span>Preparing download...</span>
+			<span>{m.download_btn_preparing()}</span>
 		{:else}
 			<span class="material-symbols-outlined icon">download</span>
 			<span>{ctaLabel()}</span>
@@ -115,7 +119,7 @@
 		</div>
 	{:else}
 		<p class="legal-note">
-			By using FetchTube, you accept our <a href="/privacy">Privacy Policy</a>.
+			{m.download_btn_legal_prefix()} <a href="/privacy">{m.download_btn_legal_privacy_link()}</a>.
 		</p>
 	{/if}
 </div>

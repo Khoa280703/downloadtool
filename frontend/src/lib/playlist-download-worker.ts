@@ -1,10 +1,12 @@
 import { buildMuxedStreamUrl, buildStreamUrl, extract } from '$lib/api';
 import { updateBatchItemByVideoId } from '$stores/batch';
 import {
+	getStoredPlaylistDownloadMode,
 	getStoredPlaylistQuality,
 	pickBestStreams,
 	safeFilename,
 	toWatchUrl,
+	type PlaylistDownloadMode,
 	type PlaylistQuality
 } from './playlist-download-stream-selection';
 import {
@@ -41,7 +43,9 @@ let activeCount = 0;
 let prefetchActive = false;
 let processActive = false;
 let preferredQuality: PlaylistQuality = getStoredPlaylistQuality();
+let preferredDownloadMode: PlaylistDownloadMode = getStoredPlaylistDownloadMode();
 let hasManualQuality = false;
+let hasManualMode = false;
 let strictFsaaMode = false;
 let circuitOpenUntil = 0;
 let circuitResumeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -61,6 +65,11 @@ export function setPreferredQuality(quality: PlaylistQuality): void {
 	hasManualQuality = true;
 }
 
+export function setPreferredDownloadMode(mode: PlaylistDownloadMode): void {
+	preferredDownloadMode = mode;
+	hasManualMode = true;
+}
+
 export function setStrictFsaaMode(enabled: boolean): void {
 	strictFsaaMode = enabled;
 }
@@ -71,7 +80,9 @@ export function resetWorkerState(): void {
 	prefetchActive = false;
 	processActive = false;
 	preferredQuality = getStoredPlaylistQuality();
+	preferredDownloadMode = getStoredPlaylistDownloadMode();
 	hasManualQuality = false;
+	hasManualMode = false;
 }
 
 export function enqueueDownload(entry: QueueEntry): void {
@@ -244,11 +255,15 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 	if (!hasManualQuality) {
 		preferredQuality = getStoredPlaylistQuality();
 	}
+	if (!hasManualMode) {
+		preferredDownloadMode = getStoredPlaylistDownloadMode();
+	}
 
 	const result = await extract(toWatchUrl(entry.videoId), signal);
 	const useFsaa = hasSelectedSaveDirectory();
 	const { video, audio } = pickBestStreams(result.streams, preferredQuality, {
-		preferMuxed: !useFsaa
+		preferMuxed: !useFsaa,
+		mode: preferredDownloadMode
 	});
 
 	if (video && !video.hasAudio && audio) {

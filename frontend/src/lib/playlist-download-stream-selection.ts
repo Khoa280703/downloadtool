@@ -10,9 +10,16 @@ export const PLAYLIST_QUALITY_OPTIONS = [
 	{ value: '360', label: '360p' }
 ] as const;
 
+export const PLAYLIST_DOWNLOAD_MODE_OPTIONS = [
+	{ value: 'video', label: 'Video + audio' },
+	{ value: 'audio', label: 'Audio only' }
+] as const;
+
 export type PlaylistQuality = (typeof PLAYLIST_QUALITY_OPTIONS)[number]['value'];
+export type PlaylistDownloadMode = (typeof PLAYLIST_DOWNLOAD_MODE_OPTIONS)[number]['value'];
 
 const PLAYLIST_QUALITY_KEY = 'fetchtube.playlist-quality.v1';
+const PLAYLIST_DOWNLOAD_MODE_KEY = 'fetchtube.playlist-download-mode.v1';
 const PREFERRED_FORMAT_KEY = 'fetchtube.preferred-format.v1';
 
 interface StoredPreferredFormat {
@@ -53,45 +60,68 @@ export function getStoredPlaylistQuality(): PlaylistQuality {
 	}
 }
 
+export function getStoredPlaylistDownloadMode(): PlaylistDownloadMode {
+	if (typeof window === 'undefined') return 'video';
+
+	try {
+		const explicit = window.localStorage.getItem(PLAYLIST_DOWNLOAD_MODE_KEY);
+		if (isPlaylistDownloadMode(explicit)) return explicit;
+
+		const raw = window.localStorage.getItem(PREFERRED_FORMAT_KEY);
+		if (!raw) return 'video';
+
+		const parsed = JSON.parse(raw) as StoredPreferredFormat;
+		return parsed.mode === 'audio' ? 'audio' : 'video';
+	} catch {
+		return 'video';
+	}
+}
+
 export function pickBestStreams(
 	streams: Stream[],
 	quality: PlaylistQuality,
-	options: { preferMuxed?: boolean } = {}
+	options: { preferMuxed?: boolean; mode?: PlaylistDownloadMode } = {}
 ): { video: Stream | null; audio: Stream | null } {
-	const mp4Video = streams.filter((stream) => !stream.isAudioOnly && stream.format === 'mp4');
+	const mode = options.mode ?? 'video';
+	const audio = selectBestAudioStream(streams);
 
-	// When FSAA is not selected, prefer muxed streams (video with embedded audio)
-	// to avoid the separate mux step on the server.
-	if (options.preferMuxed) {
-		const muxed = mp4Video.filter((s) => s.hasAudio);
-		if (muxed.length > 0) {
-			const sorted = [...muxed].sort(
-				(a, b) => resolutionScore(b.quality) - resolutionScore(a.quality)
-			);
-			return { video: selectByTargetCeiling(sorted, quality), audio: null };
-		}
-		// No muxed stream available — fall through to normal selection
+	if (mode === 'audio') {
+		return { video: null, audio };
 	}
 
-	const sortedVideo = [...mp4Video].sort((a, b) => {
+	// Keep all video streams except WebM video-only (cannot be muxed by /api/stream/muxed).
+	// This ensures "Best available" can still pick the highest compatible quality
+	// instead of being locked to low progressive (muxed) streams.
+	const compatibleVideo = streams.filter((stream) => isCompatibleVideoStream(stream));
+
+	const sortedVideo = [...compatibleVideo].sort((a, b) => {
 		const resolutionDiff = resolutionScore(b.quality) - resolutionScore(a.quality);
 		if (resolutionDiff !== 0) return resolutionDiff;
-		if (a.hasAudio !== b.hasAudio) return a.hasAudio ? 1 : -1;
+
+		// If asked to prefer muxed, only use it as a tie-breaker at same resolution.
+		if (options.preferMuxed && a.hasAudio !== b.hasAudio) return a.hasAudio ? -1 : 1;
+
+		// Prefer MP4 over others when resolution is equal for better compatibility.
+		const formatDiff = formatRank(a.format) - formatRank(b.format);
+		if (formatDiff !== 0) return formatDiff;
+
 		return (b.bitrate ?? 0) - (a.bitrate ?? 0);
 	});
 
-	const videoOnly = sortedVideo.filter((stream) => !stream.hasAudio);
-	const videoPool = videoOnly.length > 0 ? videoOnly : sortedVideo;
-	const video = selectByTargetCeiling(videoPool, quality);
-
-	const audio = [...streams]
-		.filter((stream) => stream.isAudioOnly)
-		.sort((a, b) => {
-			if (a.format !== b.format) return a.format === 'mp4' ? -1 : 1;
-			return (b.bitrate ?? 0) - (a.bitrate ?? 0);
-		})[0] ?? null;
+	const video = selectByTargetCeiling(sortedVideo, quality);
 
 	return { video, audio };
+}
+
+function selectBestAudioStream(streams: Stream[]): Stream | null {
+	return (
+		[...streams]
+			.filter((stream) => stream.isAudioOnly)
+			.sort((a, b) => {
+				if (a.format !== b.format) return a.format === 'mp4' ? -1 : 1;
+				return (b.bitrate ?? 0) - (a.bitrate ?? 0);
+			})[0] ?? null
+	);
 }
 
 function selectByTargetCeiling(
@@ -107,6 +137,17 @@ function selectByTargetCeiling(
 	const eligible = videoStreams.filter((stream) => resolutionScore(stream.quality) >= target);
 	if (eligible.length > 0) return eligible[eligible.length - 1];
 	return videoStreams[0];
+}
+
+function isCompatibleVideoStream(stream: Stream): boolean {
+	if (stream.isAudioOnly) return false;
+	// /api/stream/muxed currently rejects WebM video-only streams.
+	if (!stream.hasAudio && stream.format.toLowerCase() === 'webm') return false;
+	return true;
+}
+
+function formatRank(format: string): number {
+	return format.toLowerCase() === 'mp4' ? 0 : 1;
 }
 
 function resolutionScore(label: string): number {
@@ -132,4 +173,8 @@ function qualityFromScore(score: number): PlaylistQuality {
 
 function isPlaylistQuality(value: string | null): value is PlaylistQuality {
 	return PLAYLIST_QUALITY_OPTIONS.some((option) => option.value === value);
+}
+
+function isPlaylistDownloadMode(value: string | null): value is PlaylistDownloadMode {
+	return PLAYLIST_DOWNLOAD_MODE_OPTIONS.some((option) => option.value === value);
 }

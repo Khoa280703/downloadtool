@@ -1,26 +1,96 @@
 <script lang="ts">
+	import { getLocale, locales, localizeHref } from '$lib/paraglide/runtime';
+	import * as m from '$lib/paraglide/messages';
 	import '../app.css';
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 	import favicon from '$lib/assets/favicon.svg';
+	import AuthModal from '$components/AuthModal.svelte';
+	import SiteHeader from '$components/SiteHeader.svelte';
+	import SiteFooter from '$components/SiteFooter.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
 	import { initGA } from '$lib/analytics';
-	import { browser } from '$app/environment';
 
 	let { children } = $props();
+
+	type AuthUser = { name?: string | null; email: string; image?: string | null };
 
 	/** GA4 Measurement ID from env */
 	const GA_MEASUREMENT_ID = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || '';
 
-	/** Deferred install prompt for PWA "Add to Home Screen" */
-	let deferredInstallPrompt = $state<BeforeInstallPromptEvent | null>(null);
-	let showInstallBtn = $state(false);
+	let isDarkMode = $state(false);
+	let authModalOpen = $state(false);
+	const hasInitialBetterAuthCookie = browser && document.cookie.includes('better-auth.');
+	let authUser = $state<AuthUser | null | undefined>(hasInitialBetterAuthCookie ? undefined : null);
+	let redirectTo = $state('/');
+
+	function syncThemeFromStorage(): void {
+		if (!browser) return;
+
+		isDarkMode = window.localStorage.getItem('fetchtube-theme') === 'dark';
+	}
+
+	function normalizeRedirectTo(value: string | null): string {
+		if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+
+		return value;
+	}
+
+	function hasExplicitLocalePrefix(pathname: string): boolean {
+		return locales.some((locale) => {
+			if (locale === 'en') return false;
+			return pathname === `/${locale}` || pathname.startsWith(`/${locale}/`);
+		});
+	}
+
+	function isLocalizedHomePath(pathname: string): boolean {
+		if (pathname === '/') return true;
+		return locales.some((locale) => {
+			if (locale === 'en') return false;
+			return pathname === `/${locale}` || pathname === `/${locale}/`;
+		});
+	}
+
+	function isKnownLocale(value: string): value is (typeof locales)[number] {
+		return (locales as readonly string[]).includes(value);
+	}
+
+	function applyPreferredLanguageRedirect(): boolean {
+		if (!browser) return false;
+
+		const preferred = window.localStorage.getItem('preferred-lang');
+		if (!preferred || !isKnownLocale(preferred)) return false;
+		if (hasExplicitLocalePrefix(window.location.pathname)) return false;
+
+		const currentLocale = getLocale();
+		if (preferred === currentLocale) return false;
+
+		const currentHref = `${$page.url.pathname}${$page.url.search}${$page.url.hash}`;
+		const targetHref = localizeHref(currentHref, { locale: preferred });
+		const activeHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+		if (targetHref !== activeHref) {
+			void goto(targetHref, { replaceState: true, noScroll: true, invalidateAll: false });
+			return true;
+		}
+
+		return false;
+	}
 
 	onMount(() => {
 		if (!browser) return;
 
-		// GA
-		if (GA_MEASUREMENT_ID) initGA(GA_MEASUREMENT_ID);
+		syncThemeFromStorage();
+		const redirectedByPreferredLanguage = applyPreferredLanguageRedirect();
+		if (redirectedByPreferredLanguage) return;
+
+		if (GA_MEASUREMENT_ID) {
+			initGA(GA_MEASUREMENT_ID);
+		}
+
+		let serviceWorkerMessageHandler: ((event: MessageEvent) => void) | null = null;
 
 		// Register service worker (production only — skip in dev to avoid breaking HMR)
 		if (import.meta.env.PROD && 'serviceWorker' in navigator) {
@@ -29,30 +99,62 @@
 			});
 
 			// Handle Background Fetch completion: trigger <a> download
-			navigator.serviceWorker.addEventListener('message', (e) => {
-				if (e.data?.type === 'bg-fetch-complete' && e.data.url) {
-					const a = document.createElement('a');
-					a.href = e.data.url;
-					a.download = e.data.title ?? 'video.mp4';
-					a.click();
+			serviceWorkerMessageHandler = (event) => {
+				if (event.data?.type === 'bg-fetch-complete' && event.data.url) {
+					const anchor = document.createElement('a');
+
+					anchor.href = event.data.url;
+					anchor.download = event.data.title ?? 'video.mp4';
+					anchor.click();
 				}
-			});
+			};
+
+			navigator.serviceWorker.addEventListener('message', serviceWorkerMessageHandler);
 		}
 
-		// PWA install prompt
-		const installHandler = (e: Event) => {
-			e.preventDefault();
-			deferredInstallPrompt = e as BeforeInstallPromptEvent;
-			showInstallBtn = true;
+		// Homepage already resolves auth in +page.svelte; skip duplicate session fetch in layout.
+		if (!isLocalizedHomePath(window.location.pathname)) {
+			void (async () => {
+				const hasBetterAuthCookie = document.cookie.includes('better-auth.');
+				if (hasBetterAuthCookie) {
+					try {
+						const resp = await fetch('/api/auth/get-session', { credentials: 'include' });
+
+						authUser = resp.ok ? (await resp.json())?.user ?? null : null;
+					} catch {
+						authUser = null;
+					}
+				} else {
+					authUser = null;
+				}
+
+				const params = new URLSearchParams(window.location.search);
+
+				if (params.get('auth') === 'required' && !authUser) {
+					redirectTo = normalizeRedirectTo(params.get('redirectTo'));
+					authModalOpen = true;
+				}
+			})();
+		} else {
+			authUser = null;
+		}
+
+		const storageHandler = (event: StorageEvent) => {
+			if (event.key !== 'fetchtube-theme') return;
+
+			isDarkMode = event.newValue === 'dark';
 		};
-		window.addEventListener('beforeinstallprompt', installHandler);
+
+		window.addEventListener('storage', storageHandler);
 
 		// Clipboard auto-read: detect YouTube URL when user returns to tab
 		const visibilityHandler = async () => {
 			if (document.visibilityState !== 'visible') return;
 			if (!navigator.clipboard?.readText) return;
+
 			try {
 				const text = await navigator.clipboard.readText();
+
 				if (text && (text.includes('youtube.com/watch') || text.includes('youtu.be/'))) {
 					window.dispatchEvent(new CustomEvent('yturl-detected', { detail: { url: text } }));
 				}
@@ -60,19 +162,54 @@
 				// Clipboard permission denied — ignore silently
 			}
 		};
+
 		document.addEventListener('visibilitychange', visibilityHandler);
 
 		return () => {
-			window.removeEventListener('beforeinstallprompt', installHandler);
+			window.removeEventListener('storage', storageHandler);
 			document.removeEventListener('visibilitychange', visibilityHandler);
+
+			if (serviceWorkerMessageHandler && 'serviceWorker' in navigator) {
+				navigator.serviceWorker.removeEventListener('message', serviceWorkerMessageHandler);
+			}
 		};
 	});
 
-	async function handleInstall() {
-		if (!deferredInstallPrompt) return;
-		await deferredInstallPrompt.prompt();
-		deferredInstallPrompt = null;
-		showInstallBtn = false;
+	// Keep layout theme in sync when navigating from pages that write localStorage in-tab.
+	$effect(() => {
+		if (!browser) return;
+
+		$page.url.pathname;
+		syncThemeFromStorage();
+	});
+
+	function toggleTheme(): void {
+		isDarkMode = !isDarkMode;
+
+		if (!browser) return;
+
+		window.localStorage.setItem('fetchtube-theme', isDarkMode ? 'dark' : 'light');
+	}
+
+	function openAuthModal(): void {
+		redirectTo = $page.url.pathname;
+		authModalOpen = true;
+	}
+
+	async function closeAuthModal(): Promise<void> {
+		authModalOpen = false;
+
+		const params = new URLSearchParams(window.location.search);
+
+		if (params.get('auth') === 'required' && !authUser) {
+			const homeHref = localizeHref('/', { locale: getLocale() });
+			await goto(homeHref, { replaceState: true, noScroll: true, invalidateAll: false });
+		}
+	}
+
+	async function handleAuthSuccess(target: string): Promise<void> {
+		authModalOpen = false;
+		await goto(target, { invalidateAll: true, replaceState: true });
 	}
 </script>
 
@@ -83,6 +220,7 @@
 
 	{#if GA_MEASUREMENT_ID}
 		<!-- Google Analytics 4 -->
+
 		<script
 			async
 			src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"
@@ -90,126 +228,72 @@
 	{/if}
 </svelte:head>
 
-<div class="app">
-	{#if $page.url.pathname !== '/'}
-		<header class="header">
-			<nav class="nav">
-				<a href="/" class="logo">
-					<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-						<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-					</svg>
-					<span>VideoDL</span>
-				</a>
-				{#if showInstallBtn}
-					<button class="install-btn" onclick={handleInstall}>⬇ Install App</button>
-				{/if}
-			</nav>
-		</header>
+<div
+	class="app page-root bg-bg-page min-h-screen flex flex-col overflow-x-hidden text-plum selection:bg-primary/20"
+	class:theme-dark={isDarkMode}
+	class:theme-light={!isDarkMode}
+>
+	{#if !isLocalizedHomePath($page.url.pathname)}
+		<SiteHeader
+			authUser={authUser}
+			onOpenAuthModal={openAuthModal}
+			homeHref="/#home"
+			howItWorksHref="/#how-it-works"
+			toolsHref="/#tools"
+		/>
 	{/if}
 
-	<main class={$page.url.pathname === '/' ? 'main-home' : 'main'}>
-		{@render children()}
+	<main class={isLocalizedHomePath($page.url.pathname) ? 'main-home' : 'main'}>
+		{#key $page.url.pathname}
+			{@render children()}
+		{/key}
 	</main>
 
-	{#if $page.url.pathname !== '/'}
-		<footer class="footer">
-			<p>&copy; {new Date().getFullYear()} VideoDL. Free video downloader.</p>
-			<div class="footer-links">
-				<a href="/privacy">Privacy Policy</a>
-				<a href="#terms">Terms</a>
-			</div>
-		</footer>
+	{#if !isLocalizedHomePath($page.url.pathname)}
+		<SiteFooter />
+
+		<AuthModal
+			open={authModalOpen}
+			redirectTo={redirectTo}
+			onClose={closeAuthModal}
+			onSuccess={handleAuthSuccess}
+		/>
+
+		<button
+			type="button"
+			class="theme-toggle fixed bottom-5 right-5 z-[70] flex h-12 min-w-[120px] items-center justify-center gap-2 rounded-full px-4 text-sm font-bold shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 backdrop-blur-md"
+			onclick={toggleTheme}
+			aria-label={isDarkMode ? m.common_theme_switch_to_light() : m.common_theme_switch_to_dark()}
+		>
+			<span class="material-symbols-outlined text-[18px]">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
+			<span>{isDarkMode ? m.common_theme_light_mode() : m.common_theme_dark_mode()}</span>
+		</button>
 	{/if}
 </div>
 
 <!-- Cookie Consent Banner -->
 <CookieConsent />
 
+<div style="display:none">
+	{#each locales as locale}
+		<a href={localizeHref($page.url.pathname, { locale })}>{locale}</a>
+	{/each}
+</div>
+
 <style>
-	:global(*) {
-		box-sizing: border-box;
-		margin: 0;
-		padding: 0;
-	}
-
-	:global(:root) {
-		--primary-color: #3b82f6;
-		--primary-hover: #2563eb;
-		--primary-alpha: rgba(59, 130, 246, 0.1);
-		--secondary-color: #8b5cf6;
-		--secondary-hover: #7c3aed;
-		--success-color: #22c55e;
-		--success-hover: #16a34a;
-		--error-color: #ef4444;
-		--error-bg: rgba(239, 68, 68, 0.1);
-		--text-color: #111827;
-		--text-secondary: #6b7280;
-		--bg-color: #ffffff;
-		--card-bg: #f9fafb;
-		--input-bg: #ffffff;
-		--border-color: #e5e7eb;
-		--shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-	}
-
 	:global(body) {
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-		background: var(--bg-color);
-		color: var(--text-color);
+		margin: 0;
+		font-family: 'Nunito', sans-serif;
 		line-height: 1.5;
 		min-height: 100vh;
 	}
 
-	.app {
-		display: flex;
-		flex-direction: column;
-		min-height: 100vh;
-	}
-
-	.header {
-		border-bottom: 1px solid var(--border-color);
-		background: var(--bg-color);
-		position: sticky;
-		top: 0;
-		z-index: 100;
-	}
-
-	.nav {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 1rem 1.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-
-	.logo {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		color: var(--primary-color);
-		text-decoration: none;
-		font-size: 1.25rem;
-		font-weight: 700;
-	}
-
-	.install-btn {
-		padding: 0.4rem 1rem;
-		background: var(--primary-color);
-		color: #fff;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		cursor: pointer;
-	}
-	.install-btn:hover { background: var(--primary-hover); }
-
 	.main {
 		flex: 1;
-		max-width: 800px;
+		max-width: 1100px;
 		width: 100%;
 		margin: 0 auto;
-		padding: 2rem 1.5rem;
+		padding: 2rem 1.5rem 2.6rem;
 	}
 
 	.main-home {
@@ -219,32 +303,60 @@
 		padding: 0;
 	}
 
-	.footer {
-		border-top: 1px solid var(--border-color);
-		padding: 1.5rem;
-		text-align: center;
-		color: var(--text-secondary);
-		font-size: 0.875rem;
-		background: var(--bg-color);
+	.page-root {
+		background-color: #fff5f9;
+		color: #2d1b36;
+		transition: background-color 220ms ease, color 220ms ease;
 	}
 
-	.footer p {
-		margin-bottom: 0.5rem;
+	.page-root.theme-dark {
+		background-color: #12121a;
+		color: #e0d0f5;
 	}
 
-	.footer-links {
-		display: flex;
-		justify-content: center;
-		gap: 1rem;
+	:global(.glass-header) {
+		background: rgba(255, 245, 249, 0.8);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
 	}
 
-	.footer-links a {
-		color: var(--text-secondary);
-		text-decoration: none;
+	:global(.bg-gradient-primary) {
+		background: linear-gradient(135deg, #ff4d8c 0%, #ffb938 100%);
 	}
 
-	.footer-links a:hover {
-		color: var(--primary-color);
+	.theme-toggle {
+		background: rgba(45, 27, 54, 0.08);
+		border: 1px solid rgba(45, 27, 54, 0.14);
+		color: #2d1b36;
+	}
+
+	:global(.page-root.theme-dark .glass-header) {
+		background: rgba(18, 18, 26, 0.7);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	}
+
+	.page-root.theme-dark .theme-toggle {
+		background: rgba(255, 255, 255, 0.1);
+		border-color: rgba(255, 255, 255, 0.12);
+		color: #ffffff;
+	}
+
+	:global(.page-root.theme-dark .text-plum),
+	:global(.page-root.theme-dark .text-text-main) {
+		color: #ffffff !important;
+	}
+
+	:global(.page-root.theme-dark footer) {
+		border-top-color: transparent !important;
+		background: rgba(18, 18, 26, 0.72);
+	}
+
+	:global(.page-root.theme-dark footer a) {
+		color: rgba(224, 208, 245, 0.55) !important;
+	}
+
+	:global(.page-root.theme-dark footer a:hover) {
+		color: #ff4d8c !important;
 	}
 
 	@media (min-width: 768px) {
@@ -255,23 +367,8 @@
 
 	@media (max-width: 640px) {
 		.main {
-			padding: 1rem;
+			padding: 1rem 0.9rem 1.7rem;
 			padding-bottom: 2rem;
-		}
-
-		.nav {
-			padding: 0.75rem 1rem;
-		}
-	}
-
-	@media (prefers-color-scheme: dark) {
-		:global(:root) {
-			--text-color: #f9fafb;
-			--text-secondary: #9ca3af;
-			--bg-color: #111827;
-			--card-bg: #1f2937;
-			--input-bg: #1f2937;
-			--border-color: #374151;
 		}
 	}
 </style>

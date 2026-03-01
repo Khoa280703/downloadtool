@@ -1,291 +1,337 @@
 <script lang="ts">
 	import { trackPageView } from '$lib/analytics';
+	import * as m from '$lib/paraglide/messages';
 	import { onMount } from 'svelte';
 
 	onMount(() => {
-		trackPageView('/privacy', 'Privacy Policy');
+		trackPageView('/privacy', m.privacy_meta_title());
 	});
 </script>
 
 <svelte:head>
-	<title>Privacy Policy | VideoDL</title>
-	<meta name="description" content="Privacy policy for VideoDL - free online video downloader. Learn how we handle your data and protect your privacy." />
+	<title>{m.privacy_meta_title()}</title>
+	<meta name="description" content={m.privacy_meta_description()} />
 </svelte:head>
 
 <div class="privacy-page">
-	<h1>Privacy Policy</h1>
-	<p class="last-updated">Last updated: February 22, 2026</p>
+	<h1>{m.privacy_title()}</h1>
+	<p class="last-updated">{m.privacy_last_updated()}</p>
 
 	<section>
-		<h2>1. Introduction</h2>
-		<p>
-			Welcome to VideoDL. We respect your privacy and are committed to protecting your personal data.
-			This privacy policy explains how we collect, use, and safeguard your information when you use our video downloader service.
-		</p>
+		<h2>{m.privacy_section_1_title()}</h2>
+		<p>{m.privacy_section_1_body()}</p>
 	</section>
 
 	<section>
-		<h2>2. Information We Collect</h2>
-		<h3>2.1 Information You Provide</h3>
+		<h2>{m.privacy_section_2_title()}</h2>
+		<h3>{m.privacy_section_2_subtitle_1()}</h3>
 		<ul>
 			<li>
-				<strong>Video URLs:</strong> When you use our service, we temporarily process the video URLs you submit
-				to extract download information. These URLs are not stored permanently on our servers.
+				<strong>{m.privacy_info_video_urls_label()}</strong>
+				{m.privacy_info_video_urls_body()}
 			</li>
 		</ul>
 
-		<h3>2.2 Information Collected Automatically</h3>
+		<h3>{m.privacy_section_2_subtitle_2()}</h3>
 		<ul>
 			<li>
-				<strong>Usage Data:</strong> We collect anonymous usage statistics including pages visited,
-				features used, and error reports to improve our service.
+				<strong>{m.privacy_info_usage_data_label()}</strong>
+				{m.privacy_info_usage_data_body()}
 			</li>
 			<li>
-				<strong>Device Information:</strong> We collect technical information such as browser type,
-				operating system, and device type to optimize your experience.
+				<strong>{m.privacy_info_device_info_label()}</strong>
+				{m.privacy_info_device_info_body()}
 			</li>
 			<li>
-				<strong>Cookies:</strong> We use cookies and similar technologies to enhance your browsing
-				experience and improve site performance. See our Cookie Policy below for details.
+				<strong>{m.privacy_info_cookies_label()}</strong>
+				{m.privacy_info_cookies_body()}
 			</li>
 		</ul>
 	</section>
 
 	<section>
-		<h2>3. How We Use Your Information</h2>
-		<p>We use the collected information for the following purposes:</p>
+		<h2>{m.privacy_section_3_title()}</h2>
+		<p>{m.privacy_section_3_intro()}</p>
 		<ul>
-			<li>To provide and maintain our video downloading service</li>
-			<li>To improve and optimize our website performance</li>
-			<li>To analyze usage patterns and trends</li>
-			<li>To detect and prevent abuse of our service</li>
-			<li>To comply with legal obligations</li>
+			<li>{m.privacy_section_3_item_1()}</li>
+			<li>{m.privacy_section_3_item_2()}</li>
+			<li>{m.privacy_section_3_item_3()}</li>
+			<li>{m.privacy_section_3_item_4()}</li>
+			<li>{m.privacy_section_3_item_5()}</li>
 		</ul>
 	</section>
 
 	<section>
-		<h2>4. Cookies and Tracking Technologies</h2>
-		<p>
-			We use cookies and similar tracking technologies to track activity on our service and hold certain information.
-			Cookies are files with a small amount of data that may include an anonymous unique identifier.
-		</p>
+		<h2>{m.privacy_section_4_title()}</h2>
+		<p>{m.privacy_section_4_body_1()}</p>
 
-		<h3>Types of Cookies We Use:</h3>
+		<h3>{m.privacy_section_4_subtitle()}</h3>
 		<ul>
 			<li>
-				<strong>Essential Cookies:</strong> Required for the website to function properly.
-				These cannot be disabled.
+				<strong>{m.privacy_cookie_essential_label()}</strong>
+				{m.privacy_cookie_essential_body()}
 			</li>
 			<li>
-				<strong>Analytics Cookies:</strong> Help us understand how visitors interact with our website
-				by collecting and reporting information anonymously.
+				<strong>{m.privacy_cookie_analytics_label()}</strong>
+				{m.privacy_cookie_analytics_body()}
 			</li>
 			<li>
-				<strong>Preference Cookies:</strong> Remember your settings and provide a more
-				consistent experience across visits.
+				<strong>{m.privacy_cookie_preference_label()}</strong>
+				{m.privacy_cookie_preference_body()}
 			</li>
 		</ul>
 
-		<p>
-			You can manage your cookie preferences through the consent banner that appears when you first visit our site,
-			or by clearing your browser cookies.
-		</p>
+		<p>{m.privacy_section_4_body_2()}</p>
 	</section>
 
 	<section>
-		<h2>5. Third-Party Services</h2>
-		<p>We use the following third-party services:</p>
+		<h2>{m.privacy_section_5_title()}</h2>
+		<p>{m.privacy_section_5_intro()}</p>
 		<ul>
 			<li>
-				<strong>Google Analytics:</strong> For website analytics and usage statistics.
-				<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>
+				<strong>{m.privacy_service_google_label()}</strong>
+				{m.privacy_service_google_body()}
+				<a href="https://policies.google.com/privacy" target="_blank" rel="noopener"
+					>{m.privacy_service_google_link()}</a
+				>
 			</li>
 			<li>
-				<strong>Cloudflare:</strong> For website security and performance optimization.
-				<a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare Privacy Policy</a>
+				<strong>{m.privacy_service_cloudflare_label()}</strong>
+				{m.privacy_service_cloudflare_body()}
+				<a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener"
+					>{m.privacy_service_cloudflare_link()}</a
+				>
 			</li>
-		</ul>
-	</section>
-
-	<section>
-		<h2>6. Data Security</h2>
-		<p>
-			We implement appropriate technical and organizational measures to protect your personal data
-			against unauthorized access, alteration, disclosure, or destruction. However, no method of
-			transmission over the Internet is 100% secure, and we cannot guarantee absolute security.
-		</p>
-	</section>
-
-	<section>
-		<h2>7. Data Retention</h2>
-		<p>
-			We retain your information only for as long as necessary to fulfill the purposes outlined in this policy:
-		</p>
-		<ul>
-			<li>Video URLs are processed in real-time and not stored permanently</li>
-			<li>Analytics data is retained for up to 26 months</li>
-			<li>Cookie consent preferences are stored until you clear your browser data</li>
 		</ul>
 	</section>
 
 	<section>
-		<h2>8. Your Rights</h2>
-		<p>Depending on your location, you may have the following rights regarding your personal data:</p>
+		<h2>{m.privacy_section_6_title()}</h2>
+		<p>{m.privacy_section_6_body()}</p>
+	</section>
+
+	<section>
+		<h2>{m.privacy_section_7_title()}</h2>
+		<p>{m.privacy_section_7_intro()}</p>
 		<ul>
-			<li><strong>Right to Access:</strong> Request a copy of your personal data</li>
-			<li><strong>Right to Rectification:</strong> Request correction of inaccurate data</li>
-			<li><strong>Right to Erasure:</strong> Request deletion of your personal data</li>
-			<li><strong>Right to Restrict Processing:</strong> Request limitation of data processing</li>
-			<li><strong>Right to Data Portability:</strong> Request transfer of your data</li>
-			<li><strong>Right to Object:</strong> Object to processing of your personal data</li>
-		</ul>
-		<p>
-			To exercise these rights, please contact us using the information provided below.
-		</p>
-	</section>
-
-	<section>
-		<h2>9. Children's Privacy</h2>
-		<p>
-			Our service is not intended for use by children under the age of 13. We do not knowingly
-			collect personal information from children under 13. If you become aware that a child
-			has provided us with personal information, please contact us.
-		</p>
-	</section>
-
-	<section>
-		<h2>10. Changes to This Policy</h2>
-		<p>
-			We may update our Privacy Policy from time to time. We will notify you of any changes by
-			posting the new Privacy Policy on this page and updating the "Last updated" date.
-			You are advised to review this Privacy Policy periodically for any changes.
-		</p>
-	</section>
-
-	<section>
-		<h2>11. Contact Us</h2>
-		<p>
-			If you have any questions about this Privacy Policy or our data practices, please contact us:
-		</p>
-		<ul>
-			<li>By email: privacy@videodl.app</li>
-			<li>Through our website contact form</li>
+			<li>{m.privacy_section_7_item_1()}</li>
+			<li>{m.privacy_section_7_item_2()}</li>
+			<li>{m.privacy_section_7_item_3()}</li>
 		</ul>
 	</section>
 
 	<section>
-		<h2>12. GDPR Compliance</h2>
-		<p>
-			For users in the European Economic Area (EEA), we comply with the General Data Protection
-			Regulation (GDPR). Our legal basis for processing personal data is:
-		</p>
+		<h2>{m.privacy_section_8_title()}</h2>
+		<p>{m.privacy_section_8_intro()}</p>
 		<ul>
 			<li>
-				<strong>Legitimate Interest:</strong> For essential service functionality and security
+				<strong>{m.privacy_right_access_label()}</strong>
+				{m.privacy_right_access_body()}
 			</li>
 			<li>
-				<strong>Consent:</strong> For analytics and preference cookies
+				<strong>{m.privacy_right_rectification_label()}</strong>
+				{m.privacy_right_rectification_body()}
+			</li>
+			<li>
+				<strong>{m.privacy_right_erasure_label()}</strong>
+				{m.privacy_right_erasure_body()}
+			</li>
+			<li>
+				<strong>{m.privacy_right_restrict_label()}</strong>
+				{m.privacy_right_restrict_body()}
+			</li>
+			<li>
+				<strong>{m.privacy_right_portability_label()}</strong>
+				{m.privacy_right_portability_body()}
+			</li>
+			<li>
+				<strong>{m.privacy_right_object_label()}</strong>
+				{m.privacy_right_object_body()}
 			</li>
 		</ul>
-		<p>
-			You have the right to lodge a complaint with a supervisory authority if you believe
-			our processing of your personal data violates applicable law.
-		</p>
+		<p>{m.privacy_section_8_outro()}</p>
+	</section>
+
+	<section>
+		<h2>{m.privacy_section_9_title()}</h2>
+		<p>{m.privacy_section_9_body()}</p>
+	</section>
+
+	<section>
+		<h2>{m.privacy_section_10_title()}</h2>
+		<p>{m.privacy_section_10_body()}</p>
+	</section>
+
+	<section id="contact">
+		<h2>{m.privacy_section_11_title()}</h2>
+		<p>{m.privacy_section_11_intro()}</p>
+		<ul>
+			<li>{m.privacy_contact_email()}</li>
+			<li>{m.privacy_contact_form()}</li>
+		</ul>
+	</section>
+
+	<section>
+		<h2>{m.privacy_section_12_title()}</h2>
+		<p>{m.privacy_section_12_intro()}</p>
+		<ul>
+			<li>
+				<strong>{m.privacy_gdpr_legitimate_interest_label()}</strong>
+				{m.privacy_gdpr_legitimate_interest_body()}
+			</li>
+			<li>
+				<strong>{m.privacy_gdpr_consent_label()}</strong>
+				{m.privacy_gdpr_consent_body()}
+			</li>
+		</ul>
+		<p>{m.privacy_section_12_outro()}</p>
 	</section>
 </div>
 
 <style>
 	.privacy-page {
-		max-width: 800px;
+		max-width: 980px;
 		margin: 0 auto;
-		padding: 2rem 1.5rem;
+		padding: 0.25rem 0.25rem 1.6rem;
 	}
 
-	h1 {
-		font-size: 2rem;
-		font-weight: 700;
-		color: var(--text-color, #111827);
-		margin-bottom: 0.5rem;
+	.privacy-page h1 {
+		font-size: clamp(1.95rem, 4vw, 2.6rem);
+		font-weight: 800;
+		color: #2d1b36;
+		letter-spacing: -0.02em;
+		margin-bottom: 0.75rem;
 	}
 
 	.last-updated {
-		font-size: 0.875rem;
-		color: var(--text-secondary, #6b7280);
-		margin-bottom: 2rem;
+		display: inline-flex;
+		align-items: center;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 77, 140, 0.2);
+		background: rgba(255, 255, 255, 0.8);
+		padding: 0.35rem 0.8rem;
+		font-size: 0.83rem;
+		font-weight: 700;
+		color: #7b3f61;
+		margin-bottom: 1.4rem;
 	}
 
-	section {
-		margin-bottom: 2rem;
+	.privacy-page section {
+		margin-bottom: 0.95rem;
+		padding: 1rem 1.1rem;
+		border-radius: 1.05rem;
+		border: 1px solid rgba(255, 77, 140, 0.12);
+		background: rgba(255, 255, 255, 0.72);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		box-shadow: 0 20px 28px -26px rgba(255, 77, 140, 0.45);
 	}
 
-	h2 {
-		font-size: 1.25rem;
-		font-weight: 600;
-		color: var(--text-color, #111827);
+	.privacy-page h2 {
+		font-size: 1.14rem;
+		font-weight: 800;
+		color: #2d1b36;
 		margin-bottom: 1rem;
 		padding-bottom: 0.5rem;
-		border-bottom: 1px solid var(--border-color, #e5e7eb);
+		border-bottom: 1px solid rgba(255, 77, 140, 0.14);
 	}
 
-	h3 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text-color, #111827);
+	.privacy-page h3 {
+		font-size: 0.98rem;
+		font-weight: 800;
+		color: #5b2547;
 		margin: 1.5rem 0 0.75rem;
 	}
 
-	p {
+	.privacy-page p {
 		font-size: 0.9375rem;
 		line-height: 1.7;
-		color: var(--text-secondary, #4b5563);
+		color: #6d4f64;
 		margin-bottom: 1rem;
 	}
 
-	ul {
+	.privacy-page ul {
 		list-style: disc;
 		padding-left: 1.5rem;
 		margin-bottom: 1rem;
 	}
 
-	li {
+	.privacy-page li {
 		font-size: 0.9375rem;
 		line-height: 1.7;
-		color: var(--text-secondary, #4b5563);
+		color: #6d4f64;
 		margin-bottom: 0.5rem;
 	}
 
-	li strong {
-		color: var(--text-color, #111827);
+	.privacy-page li strong {
+		color: #2d1b36;
 	}
 
-	a {
-		color: var(--primary-color, #3b82f6);
+	.privacy-page a {
+		color: #ff4d8c;
+		font-weight: 700;
 		text-decoration: none;
 	}
 
-	a:hover {
+	.privacy-page a:hover {
 		text-decoration: underline;
 	}
 
 	@media (max-width: 640px) {
 		.privacy-page {
-			padding: 1.5rem 1rem;
+			padding: 0.15rem 0 1rem;
 		}
 
-		h1 {
+		.privacy-page h1 {
 			font-size: 1.5rem;
 		}
 
-		h2 {
+		.privacy-page h2 {
 			font-size: 1.125rem;
 		}
 	}
 
+	:global(.app.theme-dark) .privacy-page h1 {
+		color: #ffffff;
+	}
+
+	:global(.app.theme-dark) .privacy-page .last-updated {
+		border-color: rgba(255, 77, 140, 0.3);
+		background: rgba(29, 26, 43, 0.86);
+		color: rgba(255, 218, 233, 0.92);
+	}
+
+	:global(.app.theme-dark) .privacy-page section {
+		border-color: rgba(255, 77, 140, 0.2);
+		background: rgba(28, 27, 40, 0.72);
+		box-shadow: 0 16px 24px -22px rgba(255, 77, 140, 0.42);
+	}
+
+	:global(.app.theme-dark) .privacy-page h2 {
+		color: #ffffff;
+		border-bottom-color: rgba(255, 77, 140, 0.22);
+	}
+
+	:global(.app.theme-dark) .privacy-page h3 {
+		color: #ffc1dd;
+	}
+
+	:global(.app.theme-dark) .privacy-page p,
+	:global(.app.theme-dark) .privacy-page li {
+		color: rgba(224, 208, 245, 0.85);
+	}
+
+	:global(.app.theme-dark) .privacy-page li strong {
+		color: #ffffff;
+	}
+
+	:global(.app.theme-dark) .privacy-page a {
+		color: #ff7caf;
+	}
+
 	@media (prefers-color-scheme: dark) {
 		.privacy-page {
-			--text-color: #f9fafb;
-			--text-secondary: #d1d5db;
-			--border-color: #374151;
+			color-scheme: dark;
 		}
 	}
 </style>
