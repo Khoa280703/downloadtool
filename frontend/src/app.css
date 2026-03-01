@@ -64,3 +64,31 @@
 	font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 	-webkit-font-smoothing: antialiased;
 }
+
+.app.theme-dark .language-switcher-trigger {
+	border-color: rgba(255, 77, 140, 0.28);
+	background: rgba(18, 18, 26, 0.72);
+	color: rgba(245, 232, 255, 0.95);
+}
+
+.app.theme-dark .language-switcher-trigger:hover {
+	border-color: rgba(255, 124, 175, 0.45);
+	color: #ff8cbc;
+}
+
+.app.theme-dark .language-switcher-menu {
+	border-color: rgba(255, 77, 140, 0.28);
+	background: rgba(28, 27, 40, 0.95);
+}
+
+.app.theme-dark .language-switcher-menu button {
+	color: rgba(245, 232, 255, 0.9);
+}
+
+.app.theme-dark .language-switcher-menu button:hover {
+	background: rgba(255, 77, 140, 0.16);
+}
+
+.app.theme-dark .language-switcher-menu button.text-primary {
+	color: #ff8cbc !important;
+}

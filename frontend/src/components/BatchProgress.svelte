@@ -84,78 +84,78 @@
 	});
 </script>
 
-{#if $isBatchActive || $batchQueue.length > 0}
-	<div class="batch-progress">
-		<div class="header">
-			<h4>Playlist Progress</h4>
-			<span class="count">{$batchProgress.received} / {$batchProgress.total}</span>
-		</div>
+<div class="batch-progress" class:is-idle={!$isBatchActive && $batchQueue.length === 0}>
+	<div class="header">
+		<h4>Playlist Progress</h4>
+		<span class="count">{$batchProgress.received} / {$batchProgress.total}</span>
+	</div>
 
-		<div class="progress-bar">
-			<div
-				class="progress-fill"
-				style:width="{$batchProgress.total > 0 ? ($batchProgress.received / $batchProgress.total) * 100 : 0}%"
-				class:complete={$batchProgress.received >= $batchProgress.total && $batchProgress.total > 0}
-			></div>
-		</div>
+	<div class="progress-bar">
+		<div
+			class="progress-fill"
+			style:width="{$batchProgress.total > 0 ? ($batchProgress.received / $batchProgress.total) * 100 : 0}%"
+			class:complete={$batchProgress.received >= $batchProgress.total && $batchProgress.total > 0}
+		></div>
+	</div>
 
-		{#if $batchQueue.length > 0}
-			<div class="pool-indicator">
-				<div class="slots">
-					{#each Array(workerStatus.max) as _, i}
-						<span class="slot" class:active={i < workerStatus.active} title="Download slot {i + 1}"></span>
-					{/each}
-				</div>
-				<span class="pool-text">{formatSummary()}</span>
-			</div>
-			{#if workerStatus.circuitOpen}
-				<div class="cooldown-note">Rate-limited, retry in {formatCooldown(workerStatus.cooldownMs)}</div>
-			{/if}
-
-			<div class="summary-row">
-				<span class="summary-pill neutral">Selected: {selectedCount}</span>
-				<span class="summary-pill success">Done: {completedCount}</span>
-				<span class="summary-pill error">Errors: {errorCount}</span>
-			</div>
-
-			{#if canEditSelection}
-				<div class="selection-actions">
-					<button type="button" class="selection-btn" onclick={selectAllPending}>Select all</button>
-					<button type="button" class="selection-btn" onclick={clearAllPending}>Clear all</button>
-				</div>
-			{/if}
-		{/if}
-
-		{#if $batchQueue.length > 0}
-			<div class="queue-list" role="list">
-				{#each $batchQueue as item}
-					<div class="queue-item" role="listitem">
-						{#if item.status === 'pending'}
-							<button
-								type="button"
-								class="item-toggle"
-								class:is-selected={item.selected !== false}
-								disabled={!canEditSelection}
-								onclick={() => toggleItemSelection(item.videoId, item.selected === false)}
-								aria-label={item.selected === false ? 'Select video' : 'Deselect video'}
-								aria-pressed={item.selected !== false}
-								title={item.selected === false ? 'Select video' : 'Deselect video'}
-							>
-								<span class="material-symbols-outlined toggle-icon">
-									{item.selected !== false ? 'check' : 'add'}
-								</span>
-							</button>
-						{:else}
-							<span class="item-toggle-spacer"></span>
-						{/if}
-						<span class="item-title" title={item.title}>{truncate(item.title)}</span>
-						<span class={`item-status ${getItemStatusClass(item)}`}>{getItemStatusLabel(item)}</span>
-					</div>
+	{#if $batchQueue.length > 0}
+		<div class="pool-indicator">
+			<div class="slots">
+				{#each Array(workerStatus.max) as _, i}
+					<span class="slot" class:active={i < workerStatus.active} title="Download slot {i + 1}"></span>
 				{/each}
 			</div>
+			<span class="pool-text">{formatSummary()}</span>
+		</div>
+		{#if workerStatus.circuitOpen}
+			<div class="cooldown-note">Rate-limited, retry in {formatCooldown(workerStatus.cooldownMs)}</div>
 		{/if}
-	</div>
-{/if}
+
+		<div class="summary-row">
+			<span class="summary-pill neutral">Selected: {selectedCount}</span>
+			<span class="summary-pill success">Done: {completedCount}</span>
+			<span class="summary-pill error">Errors: {errorCount}</span>
+		</div>
+
+		{#if canEditSelection}
+			<div class="selection-actions">
+				<button type="button" class="selection-btn" onclick={selectAllPending}>Select all</button>
+				<button type="button" class="selection-btn" onclick={clearAllPending}>Clear all</button>
+			</div>
+		{/if}
+
+		<div class="queue-list" role="list">
+			{#each $batchQueue as item}
+				<div class="queue-item" role="listitem">
+					{#if item.status === 'pending'}
+						<button
+							type="button"
+							class="item-toggle"
+							class:is-selected={item.selected !== false}
+							disabled={!canEditSelection}
+							onclick={() => toggleItemSelection(item.videoId, item.selected === false)}
+							aria-label={item.selected === false ? 'Select video' : 'Deselect video'}
+							aria-pressed={item.selected !== false}
+							title={item.selected === false ? 'Select video' : 'Deselect video'}
+						>
+							<span class="material-symbols-outlined toggle-icon">
+								{item.selected !== false ? 'check' : 'add'}
+							</span>
+						</button>
+					{:else}
+						<span class="item-toggle-spacer"></span>
+					{/if}
+					<span class="item-title" title={item.title}>{truncate(item.title)}</span>
+					<span class={`item-status ${getItemStatusClass(item)}`}>{getItemStatusLabel(item)}</span>
+				</div>
+			{/each}
+		</div>
+	{:else}
+		<div class="idle-note">
+			Fetch Playlist Videos để xem tiến trình tải và trạng thái từng video.
+		</div>
+	{/if}
+</div>
 
 <style>
 	.batch-progress {
@@ -166,6 +166,7 @@
 		box-shadow: 0 22px 40px -26px rgba(45, 27, 54, 0.9);
 		position: relative;
 		overflow: hidden;
+		min-height: 240px;
 	}
 
 	.batch-progress::after {
@@ -267,6 +268,20 @@
 		font-size: 0.75rem;
 		color: rgba(255, 255, 255, 0.82);
 		font-weight: 700;
+	}
+
+	.idle-note {
+		margin-top: 0.75rem;
+		padding: 0.85rem 0.9rem;
+		border-radius: 0.75rem;
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		background: rgba(255, 255, 255, 0.12);
+		color: rgba(255, 242, 250, 0.9);
+		font-size: 0.78rem;
+		font-weight: 700;
+		line-height: 1.45;
+		position: relative;
+		z-index: 1;
 	}
 
 	.cooldown-note {
@@ -462,6 +477,12 @@
 	:global(.page-root.theme-dark) .queue-item {
 		background: rgba(255, 77, 140, 0.1);
 		border-color: rgba(255, 77, 140, 0.22);
+	}
+
+	:global(.page-root.theme-dark) .idle-note {
+		background: rgba(255, 77, 140, 0.12);
+		border-color: rgba(255, 77, 140, 0.24);
+		color: rgba(250, 234, 255, 0.95);
 	}
 
 	:global(.page-root.theme-dark) .item-toggle {

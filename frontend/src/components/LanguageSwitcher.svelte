@@ -117,33 +117,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-	:global(.app.theme-dark) .language-switcher-trigger {
-		border-color: rgba(255, 77, 140, 0.28);
-		background: rgba(18, 18, 26, 0.72);
-		color: rgba(245, 232, 255, 0.95);
-	}
-
-	:global(.app.theme-dark) .language-switcher-trigger:hover {
-		border-color: rgba(255, 124, 175, 0.45);
-		color: #ff8cbc;
-	}
-
-	:global(.app.theme-dark) .language-switcher-menu {
-		border-color: rgba(255, 77, 140, 0.28);
-		background: rgba(28, 27, 40, 0.95);
-	}
-
-	:global(.app.theme-dark) .language-switcher-menu button {
-		color: rgba(245, 232, 255, 0.9);
-	}
-
-	:global(.app.theme-dark) .language-switcher-menu button:hover {
-		background: rgba(255, 77, 140, 0.16);
-	}
-
-	:global(.app.theme-dark) .language-switcher-menu button.text-primary {
-		color: #ff8cbc !important;
-	}
-</style>

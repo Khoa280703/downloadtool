@@ -144,21 +144,15 @@
 						playlistObserver = null;
 					}
 				},
-				{ rootMargin: '320px 0px' }
+				{ rootMargin: '120px 0px' }
 			);
 			playlistObserver.observe(playlistSectionElement);
 		} else {
 			void ensurePlaylistComponentsLoaded();
 		}
 
-		// Fallback warmup so components are ready if user scrolls quickly on slow devices.
-		const playlistWarmupTimer = window.setTimeout(() => {
-			void ensurePlaylistComponentsLoaded();
-		}, 3500);
-
 		return () => {
 			playlistObserver?.disconnect();
-			window.clearTimeout(playlistWarmupTimer);
 		};
 	});
 
@@ -698,8 +692,8 @@
 								<BatchInputComponent />
 								<BatchProgressComponent />
 							{:else}
-								<div class="h-[220px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
-								<div class="h-[220px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
+								<div class="h-[300px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
+								<div class="h-[240px] rounded-[1.5rem] border border-pink-100 bg-white/70 animate-pulse"></div>
 							{/if}
 						</div>
 					</div>
@@ -808,9 +802,9 @@
 							</div>
 							<h3 class="text-lg font-bold mb-1">{m.home_tool_script_title()}</h3>
 							<p class="text-white/80 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_script_desc()}</p>
-							<div class="w-full bg-black/40 rounded-lg p-3 font-mono text-[10px] text-accent mb-2 border border-white/5 shadow-inner">
+							<div class="w-full bg-black/45 rounded-lg p-3 font-mono text-[11px] text-white/95 mb-2 border border-white/10 shadow-inner">
 								<p class="opacity-85">// install.js</p>
-								<p class="truncate"><span class="text-secondary">const</span> <span class="text-white">q</span> = <span class="text-primary">'4k'</span>;</p>
+								<p class="truncate">const q = '4k';</p>
 							</div>
 						</div>
 						<div class="mt-auto z-10 relative w-full">
@@ -891,9 +885,9 @@
 
 	<footer class="bg-white border-t border-pink-100 py-6 px-6">
 		<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-			<div class="flex items-center gap-2 opacity-60 grayscale hover:grayscale-0 transition-all">
-				<span class="material-symbols-outlined text-xl">smart_toy</span>
-				<span class="font-bold text-sm">{m.footer_copyright({ year: String(new Date().getFullYear()) })}</span>
+			<div class="flex items-center gap-2 transition-all">
+				<span class="material-symbols-outlined text-xl text-plum/75 grayscale hover:grayscale-0">smart_toy</span>
+				<span class="font-bold text-sm text-plum/90">{m.footer_copyright({ year: String(new Date().getFullYear()) })}</span>
 			</div>
 			<div class="flex gap-4 text-plum/80 font-semibold text-xs">
 				<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/privacy">{m.footer_privacy_policy()}</a>
