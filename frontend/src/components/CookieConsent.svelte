@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import { slide } from 'svelte/transition';
 	import { consent, hasDecided } from '$stores/consent';
 	import { trackConsent } from '$lib/analytics';
 
@@ -37,22 +36,21 @@
 {#if browser && isClientReady && !$hasDecided}
 	<div
 		class="cookie-banner"
-		transition:slide={{ duration: 300 }}
 		role="region"
 		aria-label="Cookie consent"
 	>
 		<div class="cookie-content">
 			<div class="cookie-text">
-				<h4>We value your privacy</h4>
+				<h2 class="cookie-title">We value your privacy</h2>
 				<p>
 					We use cookies to enhance your browsing experience,
 					and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.
-					<a href="/privacy">Learn more</a>
+					<a href="/privacy" aria-label="Read our privacy policy">Read our Privacy Policy</a>
 				</p>
 			</div>
 
 			{#if showDetails}
-				<div class="cookie-details" transition:slide={{ duration: 200 }}>
+				<div class="cookie-details">
 					<ul>
 						<li>
 							<strong>Essential:</strong> Required for the site to function properly.
@@ -100,6 +98,8 @@
 		box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
 		z-index: 999;
 		padding: 1rem;
+		will-change: transform, opacity;
+		animation: cookie-banner-enter 220ms ease-out;
 	}
 
 	.cookie-content {
@@ -107,7 +107,7 @@
 		margin: 0 auto;
 	}
 
-	.cookie-text h4 {
+	.cookie-title {
 		font-size: 1rem;
 		font-weight: 600;
 		color: var(--text-color, #111827);
@@ -116,18 +116,20 @@
 
 	.cookie-text p {
 		font-size: 0.875rem;
-		color: var(--text-secondary, #6b7280);
+		color: var(--text-secondary, #4b5563);
 		margin: 0 0 1rem;
 		line-height: 1.5;
 	}
 
 	.cookie-text a {
-		color: var(--primary-color, #3b82f6);
-		text-decoration: none;
+		color: var(--primary-color, #1d4ed8);
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 
 	.cookie-text a:hover {
-		text-decoration: underline;
+		color: var(--primary-hover, #1e40af);
 	}
 
 	.cookie-details {
@@ -183,12 +185,12 @@
 	}
 
 	.btn-accept {
-		background: var(--primary-color, #3b82f6);
+		background: var(--primary-color, #1d4ed8);
 		color: white;
 	}
 
 	.btn-accept:hover {
-		background: var(--primary-hover, #2563eb);
+		background: var(--primary-hover, #1e40af);
 	}
 
 	.btn-reject {
@@ -249,7 +251,25 @@
 			--card-bg: #1f2937;
 			--border-color: #374151;
 			--text-color: #f9fafb;
-			--text-secondary: #9ca3af;
+			--text-secondary: #d1d5db;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.cookie-banner {
+			animation: none;
+		}
+	}
+
+	@keyframes cookie-banner-enter {
+		from {
+			transform: translateY(14px);
+			opacity: 0;
+		}
+
+		to {
+			transform: translateY(0);
+			opacity: 1;
 		}
 	}
 </style>

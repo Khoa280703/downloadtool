@@ -3,12 +3,16 @@
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
-	import SiteFooter from '$components/SiteFooter.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
+	import mikeAvatar from '$lib/assets/testimonials/mike.webp';
 	import * as m from '$lib/paraglide/messages';
+	import sarahAvatar from '$lib/assets/testimonials/sarah.webp';
 	import type { ExtractResult, Stream } from '$lib/types';
+	import user1Avatar from '$lib/assets/testimonials/user-1.webp';
+	import user2Avatar from '$lib/assets/testimonials/user-2.webp';
+	import user3Avatar from '$lib/assets/testimonials/user-3.webp';
 	import { currentDownload } from '$stores/download';
 
 	type AuthUser = { name?: string | null; email: string; image?: string | null };
@@ -269,7 +273,6 @@
 		<link rel="alternate" hreflang={link.hreflang} href={link.href} />
 	{/each}
 
-	<link rel="preload" href="/fonts/material-symbols-outlined-subset.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
 	<style>
 		body {
 			font-family: 'Nunito', sans-serif;
@@ -714,7 +717,7 @@
 								<span class="material-symbols-outlined text-3xl text-primary">search</span>
 							</div>
 							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step1_title()}</h3>
-							<p class="text-plum/60 text-sm font-medium leading-snug">{m.home_step1_desc()}</p>
+							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step1_desc()}</p>
 						</div>
 						<div class="md:hidden flex justify-center py-2 text-plum/20">
 							<span class="material-symbols-outlined">arrow_downward</span>
@@ -727,7 +730,7 @@
 								<span class="material-symbols-outlined text-3xl">content_paste_go</span>
 							</div>
 							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step2_title()}</h3>
-							<p class="text-plum/60 text-sm font-medium leading-snug">{m.home_step2_desc()}</p>
+							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step2_desc()}</p>
 						</div>
 						<div class="md:hidden flex justify-center py-2 text-plum/20">
 							<span class="material-symbols-outlined">arrow_downward</span>
@@ -740,7 +743,7 @@
 								<span class="material-symbols-outlined text-3xl text-accent">download_for_offline</span>
 							</div>
 							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step3_title()}</h3>
-							<p class="text-plum/60 text-sm font-medium leading-snug">{m.home_step3_desc()}</p>
+							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step3_desc()}</p>
 						</div>
 					</div>
 				</div>
@@ -752,7 +755,7 @@
 				<div class="mb-8">
 					<div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
 						<div class="text-left">
-							<span class="text-xs font-bold text-primary uppercase tracking-wider mb-1 block">{m.home_tools_badge()}</span>
+							<span class="text-xs font-bold text-plum/80 uppercase tracking-wider mb-1 block">{m.home_tools_badge()}</span>
 							<h2 class="text-2xl md:text-3xl lg:text-4xl font-bold text-plum leading-tight">
 								{m.home_tools_title()}
 								<span class="inline-block animate-bounce text-2xl" style="animation-duration: 3s;">😴</span>
@@ -765,16 +768,16 @@
 				</div>
 				<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
 					<div class="bento-card group relative flex flex-col bg-white rounded-2xl p-5 border border-pink-50 shadow-sm overflow-hidden min-h-[300px]">
-						<div class="absolute top-4 right-4 bg-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 tracking-widest uppercase">{m.home_tool_recommended_badge()}</div>
+						<div class="absolute top-4 right-4 bg-plum text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 tracking-widest uppercase">{m.home_tool_recommended_badge()}</div>
 						<div class="flex-1 flex flex-col items-start z-10 mt-2">
 							<div class="size-14 mb-3 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
 								<span class="material-symbols-outlined text-3xl">extension</span>
 							</div>
 							<h3 class="text-lg font-bold text-plum mb-1">{m.home_tool_extension_title()}</h3>
-							<p class="text-plum/60 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_extension_desc()}</p>
+							<p class="text-plum/75 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_extension_desc()}</p>
 						</div>
 						<div class="mt-auto z-10 w-full">
-							<button class="w-full h-10 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-candy flex items-center justify-center gap-2 transition-all hover:scale-[1.02] tracking-wide uppercase text-[11px]">
+							<button class="w-full h-10 bg-plum hover:bg-plum/90 text-white font-bold rounded-xl shadow-candy flex items-center justify-center gap-2 transition-all hover:scale-[1.02] tracking-wide uppercase text-[11px]">
 								<span class="material-symbols-outlined text-base">add_to_queue</span>
 								{m.home_tool_extension_cta()}
 							</button>
@@ -787,7 +790,7 @@
 									<span class="material-symbols-outlined text-3xl">bookmarks</span>
 								</div>
 								<h3 class="text-lg font-bold text-plum mb-1">{m.home_tool_bookmarklet_title()}</h3>
-								<p class="text-plum/60 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_bookmarklet_desc()}</p>
+								<p class="text-plum/75 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_bookmarklet_desc()}</p>
 								<div class="w-full py-3 px-2 bg-white rounded-lg border border-pink-200 border-dashed mb-2 flex justify-center items-center relative overflow-hidden group-hover:border-primary/30 transition-colors">
 									<a class="cursor-grab active:cursor-grabbing inline-flex items-center gap-1.5 bg-gradient-to-r from-primary to-secondary text-white font-bold py-1.5 px-4 rounded-full shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 transition-all select-none z-10 text-xs" href="https://download.khoadangbui.online">
 										<span class="material-symbols-outlined text-base">touch_app</span>
@@ -804,9 +807,9 @@
 								<span class="material-symbols-outlined text-3xl">terminal</span>
 							</div>
 							<h3 class="text-lg font-bold mb-1">{m.home_tool_script_title()}</h3>
-							<p class="text-white/60 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_script_desc()}</p>
+							<p class="text-white/80 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_script_desc()}</p>
 							<div class="w-full bg-black/40 rounded-lg p-3 font-mono text-[10px] text-accent mb-2 border border-white/5 shadow-inner">
-								<p class="opacity-60">// install.js</p>
+								<p class="opacity-85">// install.js</p>
 								<p class="truncate"><span class="text-secondary">const</span> <span class="text-white">q</span> = <span class="text-primary">'4k'</span>;</p>
 							</div>
 						</div>
@@ -831,39 +834,39 @@
 					<div class="flex-1 text-center md:text-left">
 						<span class="inline-block py-1 px-3 rounded-full bg-green-100 text-green-700 font-bold text-xs uppercase mb-3 tracking-wider">{m.home_testimonials_badge()}</span>
 						<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">{m.home_testimonials_title()}</h2>
-						<p class="text-base text-plum/60 font-semibold max-w-md mx-auto md:mx-0">{m.home_testimonials_subtitle()}</p>
+						<p class="text-base text-plum/75 font-semibold max-w-md mx-auto md:mx-0">{m.home_testimonials_subtitle()}</p>
 						<div class="hidden md:flex mt-6 -space-x-3">
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 1"><img alt="User 1" class="w-full h-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr1s4gikAC15kJYl5qNBbsjOo7NvGwP-H5lCWIDqZKVOYU2h9j-E2_UZdlEnXou4LrtMM3Ff1HTyxqbnOiC9bvRpWEqowt71waDpEDOaw_zAIm6_-p4CwWDFdu2Vaf9JhVeubsZZxQ7z-0qXs69DyDWHKhhgJUQF_VsGt5GlM6pQEkGzjhF3F1hanb3N9naflxMGIE2BeHCcALu-TezlyNc54bWQTZbhdmC9ShcyTB-9jwh9b2qN9ix6CI63pHKHVAoW27bq2zkRc"/></div>
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 2"><img alt="User 2" class="w-full h-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5xhTXOwEgpTaKXMTknZrIIzsx0AeA6BgE4MHNg7Mvuw2dyghH4DETumEU1BROmzX9S-GOeS3nO3MA96z7DuSbMVKMRLdptn0I6qoKXvwa-CdRMyOxI9Or3Sv4NTv7muyoitFAQBbN0zSbZzsXq09uM4W6k5mvTJr8TcolR6DLduFQK7qkVcwEJpHxpA9o8HYaYGG6ftflLPWobNeWxiHjNGfW9O2tomENUVaB0lF-MD6MDO6GM4OqlAM2IL8yP2wcvwk4kzkG9uM"/></div>
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 3"><img alt="User 3" class="w-full h-full object-cover" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9wwmTlRqKsiXoYfLY2NAB9wPMkICqm-3zO7GvQPsEW4UgWCMp3uOisNRZukLdsGuYCj7gFNwNviQ-mzLlGQ4ewFpnKTJThORs18zDOOcN9LOKjjJJuVm9eNo3IyTNVOKClYaWzzuo_ObdhWgNZk7rAIFZ44BtDZQn5wkzRUilIzxRUUfItE6WvU0x_RJ429m-oSsKXUnAysF6Ngo6T0rSVYNZ4yr8ksti54vV6xGmVzHxIBMvC7Mr-jkT532iWU2Pe-1CFggyRLw"/></div>
+							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 1"><img alt="User 1" class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user1Avatar}/></div>
+							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 2"><img alt="User 2" class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user2Avatar}/></div>
+							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 3"><img alt="User 3" class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user3Avatar}/></div>
 							<div class="w-10 h-10 rounded-full border-2 border-white bg-plum text-white text-xs font-bold flex items-center justify-center">+9k</div>
 						</div>
 					</div>
 					<div class="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300">
 							<div class="flex items-center gap-3 mb-3">
-								<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt="Sarah" class="w-full h-full" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVFoqrmvbgSZf05UFx8xRHswErghnzjNOy7leL0xLeiMewdeCaInDrQHxNnvbjuxXsgrIWckkpM59VJug5wCYqRiVKPWIq1BfzsG4UP6Y8fOVTtQsRTXx_m1AD0IAcF2695QhAeGb2iMnEHrzeX38QZ9kwCa0ZUXXOWOwWGszBJTmF9uH2NPQxegbEAxrZoho7UsmyZQRVnVtJ_czTdESPKBrtI3geH5dWcj8GLJH8TQ8MQdUjj7pm0ciiCABSj1vZIieoe5fIzrk"/></div>
+								<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt="Sarah" class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={sarahAvatar}/></div>
 								<div>
-									<h4 class="font-bold text-plum text-sm">Sarah J.</h4>
+									<p class="font-bold text-plum text-sm">Sarah J.</p>
 									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
 								</div>
 							</div>
-							<p class="text-plum/70 font-medium italic text-xs leading-relaxed">{m.home_testimonial_sarah_quote()}</p>
+							<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_sarah_quote()}</p>
 						</div>
 						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300 sm:translate-y-4">
 							<div class="flex items-center gap-3 mb-3">
-								<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt="Mike" class="w-full h-full" loading="lazy" decoding="async" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5aEM0rZBPm42dz3OfS3JXRJzMD-riFsBxazw_V1sJmmRgLPSc35MBXlnCumxZYs_dmbgtm9g9P0_RU6A082cBKMEh9GIU2NTlkKeyj634aKYLSvflJq858W8NrUK840VaZHd_NE-GHp28czJWzQNC8h7sYVqI15ogdkMHQi9kPN_wzXAUAH-U9XMa051_n40aRPs19d_Z4QhX1l2e0rs8_bLM4FpGjjopXp0gDCiuk-HdbwNJ4C3bmuW58R2CXRieiwoH86RL-ZU"/></div>
+								<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt="Mike" class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={mikeAvatar}/></div>
 								<div>
-									<h4 class="font-bold text-plum text-sm">Chef Mike</h4>
+									<p class="font-bold text-plum text-sm">Chef Mike</p>
 									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
 								</div>
 							</div>
-							<p class="text-plum/70 font-medium italic text-xs leading-relaxed">{m.home_testimonial_mike_quote()}</p>
+							<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_mike_quote()}</p>
 						</div>
 						<div class="col-span-1 sm:col-span-2 mt-2 bg-gradient-to-r from-primary/10 to-secondary/10 p-4 rounded-2xl border border-white/50 flex items-center justify-between">
 							<div class="flex-1">
-								<h4 class="font-bold text-plum text-sm mb-1">{m.home_join_party_title()}</h4>
-								<p class="text-plum/60 text-xs">{m.home_join_party_subtitle()}</p>
+								<p class="font-bold text-plum text-sm mb-1">{m.home_join_party_title()}</p>
+								<p class="text-plum/75 text-xs">{m.home_join_party_subtitle()}</p>
 							</div>
 							<button class="bg-plum text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2">
 								<span>{m.home_join_party_cta()}</span>
@@ -886,7 +889,19 @@
 			/>
 		{/if}
 
-	<SiteFooter />
+	<footer class="bg-white border-t border-pink-100 py-6 px-6">
+		<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+			<div class="flex items-center gap-2 opacity-60 grayscale hover:grayscale-0 transition-all">
+				<span class="material-symbols-outlined text-xl">smart_toy</span>
+				<span class="font-bold text-sm">{m.footer_copyright({ year: String(new Date().getFullYear()) })}</span>
+			</div>
+			<div class="flex gap-4 text-plum/80 font-semibold text-xs">
+				<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/privacy">{m.footer_privacy_policy()}</a>
+				<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/privacy">{m.footer_terms_of_service()}</a>
+				<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/privacy#contact">{m.footer_contact()}</a>
+			</div>
+		</div>
+	</footer>
 
 	<button
 		type="button"

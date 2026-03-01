@@ -1,4 +1,0 @@
-# allow crawling everything by default
-User-agent: *
-Disallow:
-Sitemap: https://download.khoadangbui.online/sitemap.xml

@@ -68,3 +68,4 @@ pnpm dev:down  # stop docker compose services
 - `frontend` currently proxies to Rust API by `RUST_API_URL`.
 - If you run full Docker stack (`api` + `frontend` containers), requests go to API container.
 - If you run `pnpm dev:be` + `pnpm dev:fe`, requests go to host API and logs appear in Terminal B.
+- For SEO audits: disable Cloudflare "Managed robots/content signals" for `robots.txt`, otherwise Cloudflare injects `Content-Signal` lines that Lighthouse flags as invalid robots directives.
