@@ -1,9 +1,16 @@
 import {
+	buildMuxedStreamUrl,
 	buildStreamUrl,
 	createMuxedDownloadJob,
 	extract,
 	waitForMuxedDownloadJobReady
 } from '$lib/api';
+import {
+	decideMuxedDownloadRoute,
+	getActiveSyncMuxedDownloads,
+	isTimeoutLikeMuxedSyncError,
+	withSyncMuxedDownloadSlot
+} from '$lib/muxed-download-routing-policy';
 import { updateBatchItemByVideoId } from '$stores/batch';
 import {
 	getStoredPlaylistDownloadMode,
@@ -31,6 +38,13 @@ type ReadyEntry = {
 	entry: QueueEntry;
 	downloadUrl: string;
 	filename: string;
+	muxSyncPayload?: {
+		videoUrl: string;
+		audioUrl: string;
+		sourceUrl?: string;
+		videoFormatId?: string;
+		audioFormatId?: string;
+	};
 };
 
 const MAX_CONCURRENT = 1;
@@ -221,7 +235,7 @@ async function processDownloadSlots(): Promise<void> {
 
 async function startDownload(ready: ReadyEntry): Promise<void> {
 	const epoch = workerEpoch;
-	const { entry, downloadUrl, filename } = ready;
+	const { entry, filename } = ready;
 	activeCount += 1;
 	activeEntries.set(entry.videoId, entry);
 
@@ -231,10 +245,7 @@ async function startDownload(ready: ReadyEntry): Promise<void> {
 	activeControllers.set(entry.videoId, controller);
 
 	try {
-		await saveDownload(downloadUrl, filename, controller.signal, {
-			requireFsaa: strictFsaaMode,
-			allowAnchorFallback: true
-		});
+		await saveReadyEntry(ready, controller.signal);
 		if (epoch !== workerEpoch) return;
 		updateBatchItemByVideoId(entry.videoId, 'completed');
 	} catch (error) {
@@ -256,6 +267,41 @@ async function startDownload(ready: ReadyEntry): Promise<void> {
 	}
 }
 
+async function saveReadyEntry(ready: ReadyEntry, signal: AbortSignal): Promise<void> {
+	const saveOptions = {
+		requireFsaa: strictFsaaMode,
+		allowAnchorFallback: true
+	} as const;
+
+	if (ready.muxSyncPayload) {
+		try {
+			await withSyncMuxedDownloadSlot(() =>
+				saveDownload(ready.downloadUrl, ready.filename, signal, saveOptions)
+			);
+			return;
+		} catch (error) {
+			if (!isTimeoutLikeMuxedSyncError(error)) throw error;
+
+			const { jobId } = await createMuxedDownloadJob(
+				ready.muxSyncPayload.videoUrl,
+				ready.muxSyncPayload.audioUrl,
+				ready.entry.title,
+				{
+					sourceUrl: ready.muxSyncPayload.sourceUrl,
+					videoFormatId: ready.muxSyncPayload.videoFormatId,
+					audioFormatId: ready.muxSyncPayload.audioFormatId
+				},
+				signal
+			);
+			const fallbackMuxedUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
+			await saveDownload(fallbackMuxedUrl, ready.filename, signal, saveOptions);
+			return;
+		}
+	}
+
+	await saveDownload(ready.downloadUrl, ready.filename, signal, saveOptions);
+}
+
 async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promise<ReadyEntry> {
 	if (!hasManualQuality) {
 		preferredQuality = getStoredPlaylistQuality();
@@ -272,23 +318,57 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 	});
 
 	if (video && !video.hasAudio && audio) {
-		const { jobId } = await createMuxedDownloadJob(
-			video.url,
-			audio.url,
+		const muxPayload = {
+			videoUrl: video.url,
+			audioUrl: audio.url,
+			sourceUrl: result.originalUrl,
+			videoFormatId: video.formatId,
+			audioFormatId: audio.formatId
+		};
+		const routeDecision = decideMuxedDownloadRoute({
+			videoStream: video,
+			audioStream: audio,
+			durationSeconds: result.duration,
+			activeSyncMuxed: getActiveSyncMuxedDownloads()
+		});
+
+		if (routeDecision.route === 'jobs') {
+			const { jobId } = await createMuxedDownloadJob(
+				muxPayload.videoUrl,
+				muxPayload.audioUrl,
+				entry.title,
+				{
+					sourceUrl: muxPayload.sourceUrl,
+					videoFormatId: muxPayload.videoFormatId,
+					audioFormatId: muxPayload.audioFormatId
+				},
+				signal
+			);
+			const muxedFileUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
+
+			return {
+				entry,
+				downloadUrl: muxedFileUrl,
+				filename: safeFilename(entry.title, 'mp4')
+			};
+		}
+
+		const muxedSyncUrl = buildMuxedStreamUrl(
+			muxPayload.videoUrl,
+			muxPayload.audioUrl,
 			entry.title,
 			{
-				sourceUrl: result.originalUrl,
-				videoFormatId: video.formatId,
-				audioFormatId: audio.formatId
-			},
-			signal
+				sourceUrl: muxPayload.sourceUrl,
+				videoFormatId: muxPayload.videoFormatId,
+				audioFormatId: muxPayload.audioFormatId
+			}
 		);
-		const muxedFileUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
 
 		return {
 			entry,
-			downloadUrl: muxedFileUrl,
-			filename: safeFilename(entry.title, 'mp4')
+			downloadUrl: muxedSyncUrl,
+			filename: safeFilename(entry.title, 'mp4'),
+			muxSyncPayload: muxPayload
 		};
 	}
 

@@ -1,8 +1,19 @@
 <script lang="ts">
-	import { buildStreamUrl, createMuxedDownloadJob, waitForMuxedDownloadJobReady } from '$lib/api';
+	import {
+		buildMuxedStreamUrl,
+		buildStreamUrl,
+		createMuxedDownloadJob,
+		waitForMuxedDownloadJobReady
+	} from '$lib/api';
 	import { currentDownload, setDownloading, downloadProgress } from '$stores/download';
 	import { trackDownloadStarted } from '$lib/analytics';
 	import { saveDownload } from '$lib/playlist-download-file-saver';
+	import {
+		decideMuxedDownloadRoute,
+		getActiveSyncMuxedDownloads,
+		isTimeoutLikeMuxedSyncError,
+		withSyncMuxedDownloadSlot
+	} from '$lib/muxed-download-routing-policy';
 	import * as m from '$lib/paraglide/messages';
 	import type { Stream } from '$lib/types';
 
@@ -12,12 +23,39 @@
 		audioStream?: Stream | null;
 		/** Canonical source/watch URL for refresh-on-auth-failure on backend. */
 		sourceUrl?: string | null;
+		/** Duration in seconds used for sync-vs-jobs routing. */
+		durationSeconds?: number | null;
 		title: string;
 		disabled?: boolean;
 	}
 
-	let { stream, audioStream = null, sourceUrl = null, title, disabled = false }: Props = $props();
+	let {
+		stream,
+		audioStream = null,
+		sourceUrl = null,
+		durationSeconds = null,
+		title,
+		disabled = false
+	}: Props = $props();
 	let isLoading = $state(false);
+
+	async function resolveMuxedJobUrl(controller: AbortController): Promise<string> {
+		if (!stream || !audioStream) throw new Error('Missing muxed stream payload');
+
+		const { jobId } = await createMuxedDownloadJob(
+			stream.url,
+			audioStream.url,
+			title,
+			{
+				sourceUrl: sourceUrl ?? undefined,
+				videoFormatId: stream.formatId,
+				audioFormatId: audioStream.formatId
+			},
+			controller.signal
+		);
+
+		return waitForMuxedDownloadJobReady(jobId, undefined, controller.signal);
+	}
 
 	function enforceHttps(url: string): string {
 		if (
@@ -65,20 +103,26 @@
 			const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
 			const controller = new AbortController();
 			let downloadUrl: string;
+			let canFallbackToJobsAfterTimeout = false;
 
 			if (useMux) {
-				const { jobId } = await createMuxedDownloadJob(
-					stream.url,
-					audioStream!.url,
-					title,
-					{
+				const routeDecision = decideMuxedDownloadRoute({
+					videoStream: stream,
+					audioStream: audioStream!,
+					durationSeconds,
+					activeSyncMuxed: getActiveSyncMuxedDownloads()
+				});
+
+				if (routeDecision.route === 'jobs') {
+					downloadUrl = await resolveMuxedJobUrl(controller);
+				} else {
+					downloadUrl = buildMuxedStreamUrl(stream.url, audioStream!.url, title, {
 						sourceUrl: sourceUrl ?? undefined,
 						videoFormatId: stream.formatId,
 						audioFormatId: audioStream?.formatId
-					},
-					controller.signal
-				);
-				downloadUrl = await waitForMuxedDownloadJobReady(jobId, undefined, controller.signal);
+					});
+					canFallbackToJobsAfterTimeout = true;
+				}
 			} else {
 				downloadUrl = buildStreamUrl(stream.url, title, stream.format, {
 					sourceUrl: sourceUrl ?? undefined,
@@ -93,11 +137,33 @@
 			}, 200);
 
 			try {
-				await saveDownload(secureDownloadUrl, filename, controller.signal, {
+				const saveOpts = {
 					requireFsaa: false,
 					allowAnchorFallback: true,
 					preflightAnchor: true
-				});
+				} as const;
+
+				const saveSyncOrNormal = async (url: string): Promise<void> => {
+					if (useMux && canFallbackToJobsAfterTimeout) {
+						await withSyncMuxedDownloadSlot(() =>
+							saveDownload(url, filename, controller.signal, saveOpts)
+						);
+						return;
+					}
+					await saveDownload(url, filename, controller.signal, saveOpts);
+				};
+
+				try {
+					await saveSyncOrNormal(secureDownloadUrl);
+				} catch (error) {
+					const shouldFallbackToJobs =
+						useMux && canFallbackToJobsAfterTimeout && isTimeoutLikeMuxedSyncError(error);
+					if (!shouldFallbackToJobs) throw error;
+
+					const fallbackJobUrl = enforceHttps(await resolveMuxedJobUrl(controller));
+					await saveDownload(fallbackJobUrl, filename, controller.signal, saveOpts);
+				}
+
 				downloadProgress.set(100);
 				currentDownload.update((state) => ({ ...state, error: null }));
 			} finally {
