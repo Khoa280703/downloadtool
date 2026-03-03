@@ -214,8 +214,8 @@ where
 fn patch_tfhd_track_id(moof: &mut [u8], track_id: u32) -> Result<(), MuxerError> {
     use crate::box_parser::{iter_boxes, read_box_header, write_u32_be};
 
-    let hdr = read_box_header(moof)
-        .ok_or_else(|| MuxerError::InvalidInput("Invalid moof".into()))?;
+    let hdr =
+        read_box_header(moof).ok_or_else(|| MuxerError::InvalidInput("Invalid moof".into()))?;
     let moof_content = hdr.header_size as usize;
 
     let traf_abs: Option<usize> = iter_boxes(&moof[moof_content..])
@@ -248,8 +248,8 @@ fn patch_tfhd_track_id(moof: &mut [u8], track_id: u32) -> Result<(), MuxerError>
 fn patch_mfhd_sequence(moof: &mut [u8], seq: u32) -> Result<(), MuxerError> {
     use crate::box_parser::{iter_boxes, read_box_header, write_u32_be};
 
-    let hdr = read_box_header(moof)
-        .ok_or_else(|| MuxerError::InvalidInput("Invalid moof".into()))?;
+    let hdr =
+        read_box_header(moof).ok_or_else(|| MuxerError::InvalidInput("Invalid moof".into()))?;
     let content_start = hdr.header_size as usize;
 
     let mfhd_abs: Option<usize> = iter_boxes(&moof[content_start..])
@@ -347,7 +347,11 @@ mod tests {
         }
 
         // Should produce at least 2 merged fragments (one per video fragment)
-        assert!(outputs.len() >= 2, "Expected at least 2 outputs, got {}", outputs.len());
+        assert!(
+            outputs.len() >= 2,
+            "Expected at least 2 outputs, got {}",
+            outputs.len()
+        );
 
         // Each output should contain moof
         for (i, output) in outputs.iter().enumerate() {

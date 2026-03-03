@@ -5,9 +5,38 @@ import type { RequestHandler } from './$types';
 import { auth } from '$lib/server/auth';
 import { getJwtForRequest } from '$lib/server/auth-utils';
 
+const RETRYABLE_UPSTREAM_STATUS = new Set([429, 502, 503, 504]);
+const MAX_UPSTREAM_ATTEMPTS = 4;
+const RETRY_BASE_DELAY_MS = 300;
+const RETRY_MAX_DELAY_MS = 2_000;
+
 function normalizeBaseUrl(url: string | undefined): string {
 	if (!url) return 'http://127.0.0.1:3068';
 	return url.trim().replace(/\/+$/, '');
+}
+
+function parseRetryAfterMs(value: string | null): number | undefined {
+	if (!value) return undefined;
+	const seconds = Number.parseInt(value, 10);
+	if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+
+	const asDate = Date.parse(value);
+	if (!Number.isNaN(asDate)) {
+		const diff = asDate - Date.now();
+		if (diff > 0) return diff;
+	}
+	return undefined;
+}
+
+function computeBackoffWithJitter(attempt: number): number {
+	const base = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1), RETRY_MAX_DELAY_MS);
+	const jitter = Math.floor(Math.random() * Math.min(200, Math.floor(base * 0.25)));
+	return Math.min(RETRY_MAX_DELAY_MS, base + jitter);
+}
+
+async function sleep(ms: number): Promise<void> {
+	if (ms <= 0) return;
+	await new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 export const POST: RequestHandler = async ({ request, locals, fetch }) => {
@@ -25,16 +54,45 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		}
 	}
 
-	let upstream: Response;
-	try {
-		upstream = await fetch(`${rustApiUrl}/api/extract`, {
-			method: 'POST',
-			headers: upstreamHeaders,
-			body
-		});
-	} catch (upstreamError) {
-		console.error('BFF proxy extract upstream error:', upstreamError);
-		throw error(502, 'Upstream API unavailable');
+	let upstream: Response | null = null;
+	let lastUpstreamError: unknown = null;
+
+	for (let attempt = 1; attempt <= MAX_UPSTREAM_ATTEMPTS; attempt += 1) {
+		try {
+			const response = await fetch(`${rustApiUrl}/api/extract`, {
+				method: 'POST',
+				headers: upstreamHeaders,
+				body,
+				signal: request.signal
+			});
+
+			if (
+				response.ok ||
+				!RETRYABLE_UPSTREAM_STATUS.has(response.status) ||
+				attempt >= MAX_UPSTREAM_ATTEMPTS
+			) {
+				upstream = response;
+				break;
+			}
+
+			const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'));
+			const delayMs = retryAfterMs ?? computeBackoffWithJitter(attempt);
+			try {
+				await response.arrayBuffer();
+			} catch {
+				// Ignore body drain errors before retry.
+			}
+			await sleep(delayMs);
+		} catch (upstreamError) {
+			lastUpstreamError = upstreamError;
+			if (attempt >= MAX_UPSTREAM_ATTEMPTS) break;
+			await sleep(computeBackoffWithJitter(attempt));
+		}
+	}
+
+	if (!upstream) {
+		console.error('BFF proxy extract upstream error after retries:', lastUpstreamError);
+		throw error(502, 'Upstream API unavailable after retries');
 	}
 
 	const responseHeaders = new Headers();

@@ -13,10 +13,7 @@ use crate::MuxerError;
 /// `mvhd.next_track_id` is set to 3.
 ///
 /// Returns `(merged_moov_bytes, video_timescale, audio_timescale)`.
-pub fn merge_moov(
-    video_moov: &[u8],
-    audio_moov: &[u8],
-) -> Result<(Vec<u8>, u32, u32), MuxerError> {
+pub fn merge_moov(video_moov: &[u8], audio_moov: &[u8]) -> Result<(Vec<u8>, u32, u32), MuxerError> {
     // Read timescales and durations before borrowing slices.
     // NOTE: YouTube DASH init segments set mvhd.duration = 0 per DASH spec.
     // The actual media duration lives in mdhd boxes (track-level media headers).
@@ -83,8 +80,8 @@ pub fn merge_moov(
 /// mvhd v0: `next_track_id` at content offset 96 (= box offset 104).
 /// mvhd v1: `next_track_id` at content offset 108.
 fn patch_mvhd_next_track_id(mvhd: &mut [u8], next_track_id: u32) -> Result<(), MuxerError> {
-    let hdr = read_box_header(mvhd)
-        .ok_or_else(|| MuxerError::InvalidInput("Invalid mvhd".into()))?;
+    let hdr =
+        read_box_header(mvhd).ok_or_else(|| MuxerError::InvalidInput("Invalid mvhd".into()))?;
     let cs = hdr.header_size as usize; // content start
 
     if mvhd.len() < cs + 1 {
@@ -99,7 +96,9 @@ fn patch_mvhd_next_track_id(mvhd: &mut [u8], next_track_id: u32) -> Result<(), M
     let nti_off = cs + if version == 0 { 96 } else { 108 };
 
     if mvhd.len() < nti_off + 4 {
-        return Err(MuxerError::InvalidInput("mvhd too short for next_track_id".into()));
+        return Err(MuxerError::InvalidInput(
+            "mvhd too short for next_track_id".into(),
+        ));
     }
 
     write_u32_be(mvhd, nti_off, next_track_id);
@@ -111,8 +110,8 @@ fn patch_mvhd_next_track_id(mvhd: &mut [u8], next_track_id: u32) -> Result<(), M
 /// tkhd v0: `track_id` at content offset 12.
 /// tkhd v1: `track_id` at content offset 20.
 fn patch_trak_track_id(trak: &mut [u8], new_track_id: u32) -> Result<(), MuxerError> {
-    let trak_hdr = read_box_header(trak)
-        .ok_or_else(|| MuxerError::InvalidInput("Invalid trak".into()))?;
+    let trak_hdr =
+        read_box_header(trak).ok_or_else(|| MuxerError::InvalidInput("Invalid trak".into()))?;
     let trak_content_start = trak_hdr.header_size as usize;
 
     // Find tkhd offset within trak content
@@ -135,7 +134,9 @@ fn patch_trak_track_id(trak: &mut [u8], new_track_id: u32) -> Result<(), MuxerEr
     let tid_off = tkhd_content_start + if version == 0 { 12 } else { 20 };
 
     if trak.len() < tid_off + 4 {
-        return Err(MuxerError::InvalidInput("tkhd too short for track_id".into()));
+        return Err(MuxerError::InvalidInput(
+            "tkhd too short for track_id".into(),
+        ));
     }
 
     write_u32_be(trak, tid_off, new_track_id);

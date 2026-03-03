@@ -32,10 +32,7 @@ struct FetchOptions {
 }
 
 // Register custom ops with deno_core 0.300 extension macro
-deno_core::extension!(
-    extractor_ops,
-    ops = [op_fetch, op_log],
-);
+deno_core::extension!(extractor_ops, ops = [op_fetch, op_log],);
 
 /// JavaScript runtime wrapper for running extractors
 pub struct ExtractorRuntime {
@@ -99,10 +96,7 @@ impl ExtractorRuntime {
         runtime
             .execute_script("extractors.js", js_bundle.to_string())
             .map_err(|e| {
-                ExtractionError::JavaScriptError(format!(
-                    "Failed to load extractor bundle: {}",
-                    e
-                ))
+                ExtractionError::JavaScriptError(format!("Failed to load extractor bundle: {}", e))
             })?;
 
         info!("Extractor runtime initialized successfully");
@@ -173,9 +167,10 @@ impl ExtractorRuntime {
         // Convert to serde_json::Value
         let scope = &mut self.runtime.handle_scope();
         let local = deno_core::v8::Local::new(scope, &resolved);
-        let value = deno_core::serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
-            ExtractionError::JavaScriptError(format!("Failed to deserialize result: {}", e))
-        })?;
+        let value =
+            deno_core::serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
+                ExtractionError::JavaScriptError(format!("Failed to deserialize result: {}", e))
+            })?;
 
         parse_extraction_result(value, url)
     }
@@ -241,9 +236,10 @@ impl ExtractorRuntime {
 
         let scope = &mut self.runtime.handle_scope();
         let local = deno_core::v8::Local::new(scope, &resolved);
-        let value = deno_core::serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
-            ExtractionError::JavaScriptError(format!("Failed to deserialize result: {}", e))
-        })?;
+        let value =
+            deno_core::serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
+                ExtractionError::JavaScriptError(format!("Failed to deserialize result: {}", e))
+            })?;
 
         Ok(value)
     }
@@ -271,11 +267,17 @@ fn parse_extraction_result(
 
     let view_count = result.get("viewCount").and_then(parse_u64_value);
 
-    let description = result.get("description").and_then(|v| v.as_str()).map(String::from);
+    let description = result
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(String::from);
 
     let duration = result.get("duration").and_then(|v| v.as_u64());
 
-    let thumbnail = result.get("thumbnail").and_then(|v| v.as_str()).map(String::from);
+    let thumbnail = result
+        .get("thumbnail")
+        .and_then(|v| v.as_str())
+        .map(String::from);
 
     let streams = result
         .get("streams")
@@ -313,9 +315,15 @@ fn parse_extraction_result(
             .and_then(|v| v.as_str())
             .unwrap_or("video/mp4");
 
-        let height = stream_obj.get("height").and_then(|v| v.as_u64()).map(|h| h as u32);
+        let height = stream_obj
+            .get("height")
+            .and_then(|v| v.as_u64())
+            .map(|h| h as u32);
 
-        let width = stream_obj.get("width").and_then(|v| v.as_u64()).map(|w| w as u32);
+        let width = stream_obj
+            .get("width")
+            .and_then(|v| v.as_u64())
+            .map(|w| w as u32);
 
         let bitrate = stream_obj.get("bitrate").and_then(|v| v.as_u64());
         let filesize = stream_obj
@@ -324,15 +332,31 @@ fn parse_extraction_result(
             .or_else(|| stream_obj.get("contentLength").and_then(parse_u64_value))
             .or_else(|| extract_clen_from_url(url));
 
-        let codec = stream_obj.get("codec").and_then(|v| v.as_str()).map(String::from);
-        let codec_label = stream_obj.get("codecLabel").and_then(|v| v.as_str()).map(String::from);
-        let has_audio = stream_obj.get("hasAudio").and_then(|v| v.as_bool()).unwrap_or(false);
-        let is_audio_only = stream_obj.get("isAudioOnly").and_then(|v| v.as_bool()).unwrap_or(false);
+        let codec = stream_obj
+            .get("codec")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let codec_label = stream_obj
+            .get("codecLabel")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let has_audio = stream_obj
+            .get("hasAudio")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let is_audio_only = stream_obj
+            .get("isAudioOnly")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         formats.push(VideoFormat {
             format_id: format!("{}-{}", format, idx),
             quality: quality.to_string(),
-            vcodec: if mime.contains("video") { codec.clone() } else { None },
+            vcodec: if mime.contains("video") {
+                codec.clone()
+            } else {
+                None
+            },
             acodec: if mime.contains("audio") { codec } else { None },
             codec_label,
             has_audio,
@@ -382,19 +406,18 @@ const ALLOWED_DOMAINS: &[&str] = &[
     "youtube.com",
     "www.youtube.com",
     "youtu.be",
-    "googlevideo.com",     // YouTube CDN
+    "googlevideo.com", // YouTube CDN
 ];
 
 /// Validate URL against allowed domains
 fn validate_url(url: &str) -> Result<(), anyhow::Error> {
-    let parsed = reqwest::Url::parse(url)
-        .map_err(|e| anyhow::anyhow!("Invalid URL: {}", e))?;
+    let parsed = reqwest::Url::parse(url).map_err(|e| anyhow::anyhow!("Invalid URL: {}", e))?;
 
     let host = parsed.host_str().unwrap_or("");
 
-    let is_allowed = ALLOWED_DOMAINS.iter().any(|domain| {
-        host == *domain || host.ends_with(&format!(".{}", domain))
-    });
+    let is_allowed = ALLOWED_DOMAINS
+        .iter()
+        .any(|domain| host == *domain || host.ends_with(&format!(".{}", domain)));
 
     if !is_allowed {
         return Err(anyhow::anyhow!(
@@ -418,14 +441,16 @@ static SOCKS5_CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
 fn get_fetch_client(url: &str) -> Result<&'static reqwest::Client, anyhow::Error> {
     if should_use_socks5(url) {
         let socks5 = SOCKS5_CLIENT.get_or_init(|| {
-            std::env::var("SOCKS5_PROXY_URL").ok().and_then(|socks5_url| {
-                let proxy = reqwest::Proxy::all(&socks5_url).ok()?;
-                reqwest::Client::builder()
-                    .timeout(Duration::from_secs(90))
-                    .proxy(proxy)
-                    .build()
-                    .ok()
-            })
+            std::env::var("SOCKS5_PROXY_URL")
+                .ok()
+                .and_then(|socks5_url| {
+                    let proxy = reqwest::Proxy::all(&socks5_url).ok()?;
+                    reqwest::Client::builder()
+                        .timeout(Duration::from_secs(90))
+                        .proxy(proxy)
+                        .build()
+                        .ok()
+                })
         });
         if let Some(client) = socks5 {
             debug!("Routing {} through SOCKS5 proxy", url);
@@ -446,7 +471,9 @@ fn get_fetch_client(url: &str) -> Result<&'static reqwest::Client, anyhow::Error
 /// These domains are routed through SOCKS5 proxy to avoid rate-limiting
 /// on home server IPs.
 fn should_use_socks5(url: &str) -> bool {
-    let Ok(parsed) = reqwest::Url::parse(url) else { return false };
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
     let host = parsed.host_str().unwrap_or("");
     host == "youtube.com" || host.ends_with(".youtube.com") || host == "youtu.be"
 }
@@ -490,10 +517,7 @@ async fn op_fetch(
     // Get cached client; routes youtube.com through SOCKS5 if configured
     let client = get_fetch_client(&url)?;
 
-    let mut request = client.request(
-        reqwest::Method::from_bytes(method.as_bytes())?,
-        &url,
-    );
+    let mut request = client.request(reqwest::Method::from_bytes(method.as_bytes())?, &url);
 
     request = request.headers(headers);
 
@@ -519,9 +543,13 @@ async fn op_fetch(
             // Get body as text (reqwest auto-decompresses gzip/brotli/deflate)
             let body = resp.text().await.unwrap_or_default();
 
-            debug!("op_fetch {} -> status={}, body_len={}, body_preview={:?}",
-                url, status.as_u16(), body.len(),
-                &body.chars().take(200).collect::<String>());
+            debug!(
+                "op_fetch {} -> status={}, body_len={}, body_preview={:?}",
+                url,
+                status.as_u16(),
+                body.len(),
+                &body.chars().take(200).collect::<String>()
+            );
 
             Ok(FetchResponse {
                 ok: status.is_success(),
@@ -580,7 +608,9 @@ mod tests {
 
     #[test]
     fn test_should_use_socks5_googlevideo_false() {
-        assert!(!should_use_socks5("https://rr1---sn-abc.googlevideo.com/videoplayback?..."));
+        assert!(!should_use_socks5(
+            "https://rr1---sn-abc.googlevideo.com/videoplayback?..."
+        ));
     }
 
     #[test]
@@ -604,7 +634,10 @@ mod tests {
     fn test_extract_clen_from_url() {
         let url = "https://rr1.googlevideo.com/videoplayback?clen=20971520&mime=video%2Fmp4";
         assert_eq!(extract_clen_from_url(url), Some(20_971_520));
-        assert_eq!(extract_clen_from_url("https://example.com/video?foo=bar"), None);
+        assert_eq!(
+            extract_clen_from_url("https://example.com/video?foo=bar"),
+            None
+        );
         assert_eq!(extract_clen_from_url("not-a-url"), None);
     }
 }

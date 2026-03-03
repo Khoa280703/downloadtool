@@ -43,11 +43,7 @@ impl DomainThrottle {
             let elapsed = last.elapsed();
             if elapsed < self.min_delay {
                 let wait_time = self.min_delay - elapsed;
-                trace!(
-                    "Throttling request to {}: waiting {:?}",
-                    domain,
-                    wait_time
-                );
+                trace!("Throttling request to {}: waiting {:?}", domain, wait_time);
                 Some(wait_time)
             } else {
                 None
@@ -64,7 +60,10 @@ impl DomainThrottle {
         // Update last request time
         self.last_request.insert(domain.to_string(), Instant::now());
 
-        debug!("Request allowed for domain: {} (min_delay: {:?})", domain, self.min_delay);
+        debug!(
+            "Request allowed for domain: {} (min_delay: {:?})",
+            domain, self.min_delay
+        );
     }
 
     /// Get the minimum delay configured for this throttle
@@ -132,7 +131,9 @@ mod tests {
     #[test]
     fn test_throttle_clear() {
         let throttle = DomainThrottle::new();
-        throttle.last_request.insert("example.com".to_string(), Instant::now());
+        throttle
+            .last_request
+            .insert("example.com".to_string(), Instant::now());
         assert_eq!(throttle.tracked_domains(), 1);
 
         throttle.clear();

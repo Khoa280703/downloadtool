@@ -33,14 +33,8 @@
 	);
 	let authModalOpen = $state(false);
 	let AuthModalComponent = $state<AuthModalComponentType | null>(null);
-	const hasInitialBetterAuthCookie = browser && document.cookie.includes('better-auth.');
-	const initialSessionRequest = hasInitialBetterAuthCookie
-		? fetch('/api/auth/get-session', { credentials: 'include' })
-				.then(async (resp) => (resp.ok ? ((await resp.json())?.user ?? null) : null))
-				.catch(() => null)
-		: null;
 	/** undefined = loading skeleton, null = unauthenticated, object = authenticated */
-	let authUser = $state<AuthUser | null | undefined>(hasInitialBetterAuthCookie ? undefined : null);
+	let authUser = $state<AuthUser | null | undefined>(undefined);
 	let redirectTo = $state('/');
 	const SEO_ORIGIN = 'https://download.khoadangbui.online';
 	const SEO_LOCALES = [
@@ -102,13 +96,30 @@
 		AuthModalComponent = module.default;
 	}
 
+	async function refreshAuthUser(): Promise<void> {
+		try {
+			const resp = await fetch('/api/auth/get-session', { credentials: 'include' });
+			authUser = resp.ok ? ((await resp.json())?.user ?? null) : null;
+		} catch {
+			authUser = null;
+		}
+	}
+
+	function syncThemeFromStorage(): void {
+		if (!browser) return;
+		isDarkMode = window.localStorage.getItem('fetchtube-theme') === 'dark';
+	}
+
+	function broadcastThemeChange(): void {
+		if (!browser) return;
+		window.dispatchEvent(new CustomEvent('fetchtube-theme-change', { detail: { isDarkMode } }));
+	}
+
 	onMount(() => {
-		const saved = localStorage.getItem('fetchtube-theme');
-		if (saved === 'dark') isDarkMode = true;
-		if (saved === 'light') isDarkMode = false;
+		syncThemeFromStorage();
 
 		void (async () => {
-			authUser = initialSessionRequest ? await initialSessionRequest : null;
+			await refreshAuthUser();
 
 			// Handle ?auth=required&redirectTo= after auth state resolves
 			const params = new URLSearchParams(window.location.search);
@@ -118,10 +129,29 @@
 				authModalOpen = true;
 			}
 		})();
-	});
 
-	$effect(() => {
-		localStorage.setItem('fetchtube-theme', isDarkMode ? 'dark' : 'light');
+		const storageHandler = (event: StorageEvent) => {
+			if (event.key !== 'fetchtube-theme') return;
+			isDarkMode = event.newValue === 'dark';
+		};
+
+		const themeChangeHandler = (event: Event) => {
+			const customEvent = event as CustomEvent<{ isDarkMode?: boolean }>;
+			if (typeof customEvent.detail?.isDarkMode === 'boolean') {
+				isDarkMode = customEvent.detail.isDarkMode;
+				return;
+			}
+
+			syncThemeFromStorage();
+		};
+
+		window.addEventListener('storage', storageHandler);
+		window.addEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+
+		return () => {
+			window.removeEventListener('storage', storageHandler);
+			window.removeEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+		};
 	});
 
 	function handleFormatSelect(videoStream: Stream, audioStream: Stream | null): void {
@@ -202,6 +232,9 @@
 
 	function toggleTheme(): void {
 		isDarkMode = !isDarkMode;
+		if (!browser) return;
+		window.localStorage.setItem('fetchtube-theme', isDarkMode ? 'dark' : 'light');
+		broadcastThemeChange();
 	}
 
 	function openAuthModal(): void {
@@ -219,6 +252,7 @@
 
 	async function handleAuthSuccess(target: string): Promise<void> {
 		authModalOpen = false;
+		await refreshAuthUser();
 		await goto(target, { invalidateAll: true, replaceState: true });
 	}
 </script>
@@ -661,7 +695,12 @@
 									<FormatPicker streams={extractResult.streams} onSelect={handleFormatSelect}/>
 								</div>
 								<div class="download-result-download p-6 md:p-8 border-t border-indigo-50 bg-indigo-50/20">
-									<DownloadBtn stream={$currentDownload.selectedStream} audioStream={selectedAudioStream} title={extractResult.title}/>
+									<DownloadBtn
+										stream={$currentDownload.selectedStream}
+										audioStream={selectedAudioStream}
+										sourceUrl={extractResult.originalUrl}
+										title={extractResult.title}
+									/>
 								</div>
 							</div>
 					</div>

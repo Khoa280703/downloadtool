@@ -28,6 +28,7 @@ use tracing_subscriber::FmtSubscriber;
 mod auth;
 mod config;
 mod routes;
+mod services;
 
 use config::Config;
 
@@ -36,6 +37,7 @@ pub struct AppState {
     pub db_pool: sqlx::PgPool,
     pub jwt_secret: String,
     pub whop_webhook_secret: String,
+    pub mux_jobs: Arc<services::muxed_job_queue::MuxedJobQueue>,
 }
 
 type KeyedLimiter = RateLimiter<IpAddr, DefaultKeyedStateStore<IpAddr>, DefaultClock>;
@@ -104,17 +106,33 @@ async fn rate_limit_middleware(
     next.run(request).await
 }
 
-fn build_app(app_state: AppState, limiter: Arc<KeyedLimiter>) -> Router {
+fn build_app(
+    app_state: AppState,
+    limiter: Arc<KeyedLimiter>,
+    extract_rate_limit_enabled: bool,
+) -> Router {
+    let extract_route = if extract_rate_limit_enabled {
+        post(routes::extract_handler).route_layer(middleware::from_fn_with_state(
+            limiter,
+            rate_limit_middleware,
+        ))
+    } else {
+        post(routes::extract_handler)
+    };
+
     let protected_api = Router::new()
-        .route(
-            "/api/extract",
-            post(routes::extract_handler).route_layer(middleware::from_fn_with_state(
-                limiter,
-                rate_limit_middleware,
-            )),
-        )
+        .route("/api/extract", extract_route)
         .route("/api/stream", get(routes::stream_handler))
         .route("/api/stream/muxed", get(routes::muxed_stream_handler))
+        .route("/api/stream/muxed/jobs", post(routes::create_muxed_job_handler))
+        .route(
+            "/api/stream/muxed/jobs/{job_id}",
+            get(routes::muxed_job_status_handler),
+        )
+        .route(
+            "/api/stream/muxed/jobs/{job_id}/file",
+            get(routes::muxed_job_file_handler),
+        )
         .route("/api/batch", get(routes::batch_handler))
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
@@ -165,16 +183,26 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     sqlx::migrate!("./migrations").run(&db_pool).await?;
     info!("Database pool connected");
+    let mux_jobs = services::muxed_job_queue::MuxedJobQueue::from_env()?;
 
     let app_state = AppState {
         db_pool,
         jwt_secret: config.jwt_secret,
         whop_webhook_secret: config.whop_webhook_secret,
+        mux_jobs,
     };
 
     info!("Starting API server on port {}", config.port);
     let limiter = make_rate_limiter();
-    let app = build_app(app_state, limiter);
+    info!(
+        "/api/extract rate limit: {}",
+        if config.extract_rate_limit_enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+    let app = build_app(app_state, limiter, config.extract_rate_limit_enabled);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -198,11 +226,14 @@ mod tests {
             .max_connections(1)
             .connect_lazy("postgres://postgres:postgres@localhost:5432/postgres")
             .expect("valid postgres url for lazy pool");
+        let mux_jobs = services::muxed_job_queue::MuxedJobQueue::from_env()
+            .expect("test mux queue should initialize");
 
         AppState {
             db_pool,
             jwt_secret: "test-secret".to_string(),
             whop_webhook_secret: "test-whop-secret".to_string(),
+            mux_jobs,
         }
     }
 
@@ -211,12 +242,15 @@ mod tests {
             .await
             .expect("bind test listener");
         let addr = listener.local_addr().expect("local addr");
-        let app = build_app(test_app_state(), make_rate_limiter());
+        let app = build_app(test_app_state(), make_rate_limiter(), true);
 
         tokio::spawn(async move {
             if with_connect_info {
-                let _ = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-                    .await;
+                let _ = axum::serve(
+                    listener,
+                    app.into_make_service_with_connect_info::<SocketAddr>(),
+                )
+                .await;
             } else {
                 let _ = axum::serve(listener, app.into_make_service()).await;
             }

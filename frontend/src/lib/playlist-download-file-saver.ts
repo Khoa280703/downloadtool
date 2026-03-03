@@ -15,9 +15,19 @@ type FileWritableHandle = WritableStream & {
 export interface SaveDownloadOptions {
 	requireFsaa?: boolean;
 	allowAnchorFallback?: boolean;
+	preflightAnchor?: boolean;
 }
 
 let saveDirectoryHandle: SaveDirectoryHandle | null = null;
+const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
+const MAX_RETRY_ATTEMPTS = 5;
+const RETRY_BASE_DELAY_MS = 600;
+const RETRY_MAX_DELAY_MS = 12_000;
+
+type DownloadErrorWithStatus = Error & {
+	status?: number;
+	retryAfterMs?: number;
+};
 
 export function hasSelectedSaveDirectory(): boolean {
 	return saveDirectoryHandle !== null;
@@ -50,6 +60,7 @@ export async function saveDownload(
 ): Promise<void> {
 	const requireFsaa = options.requireFsaa === true;
 	const allowAnchorFallback = options.allowAnchorFallback !== false;
+	const preflightAnchor = options.preflightAnchor !== false;
 
 	if (saveDirectoryHandle) {
 		try {
@@ -58,6 +69,9 @@ export async function saveDownload(
 		} catch (error) {
 			if (isAbortError(error)) throw error;
 			if (!allowAnchorFallback) throw error;
+			if (preflightAnchor) {
+				await preflightDownload(url, signal);
+			}
 			downloadViaAnchor(url, filename);
 			return;
 		}
@@ -71,6 +85,9 @@ export async function saveDownload(
 		throw new Error('Anchor fallback is disabled');
 	}
 
+	if (preflightAnchor) {
+		await preflightDownload(url, signal);
+	}
 	downloadViaAnchor(url, filename);
 }
 
@@ -80,8 +97,7 @@ async function saveWithDirectory(
 	dirHandle: SaveDirectoryHandle,
 	signal: AbortSignal
 ): Promise<void> {
-	const response = await fetch(url, { signal });
-	if (!response.ok) throw new Error(`Download failed with status ${response.status}`);
+	const response = await fetchWithRetry(url, signal);
 
 	const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
 	const writable = await fileHandle.createWritable();
@@ -105,6 +121,115 @@ async function saveWithDirectory(
 		}
 		throw error;
 	}
+}
+
+async function preflightDownload(url: string, signal: AbortSignal): Promise<void> {
+	const response = await fetchWithRetry(url, signal);
+	if (response.body) {
+		try {
+			await response.body.cancel();
+		} catch {
+			// Ignore cancellation errors from probe request.
+		}
+	}
+}
+
+async function fetchWithRetry(url: string, signal: AbortSignal): Promise<Response> {
+	let lastError: unknown;
+
+	for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+		try {
+			const response = await fetch(url, { signal });
+			if (response.ok) return response;
+
+			const status = response.status;
+			const retryAfterMs = parseRetryAfterHeader(response.headers.get('retry-after'));
+			if (response.body) {
+				try {
+					await response.body.cancel();
+				} catch {
+					// Ignore body cancellation errors.
+				}
+			}
+
+			if (!isRetryableStatus(status) || attempt >= MAX_RETRY_ATTEMPTS) {
+				const error = new Error(`Download failed with status ${status}`) as DownloadErrorWithStatus;
+				error.status = status;
+				error.retryAfterMs = retryAfterMs;
+				throw error;
+			}
+
+			const delayMs = clampRetryDelay(
+				retryAfterMs ?? computeBackoffWithJitter(attempt),
+				RETRY_MAX_DELAY_MS
+			);
+			await sleep(delayMs, signal);
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			lastError = error;
+			if (attempt >= MAX_RETRY_ATTEMPTS) break;
+
+			const delayMs = computeDelayFromError(error, attempt);
+			await sleep(delayMs, signal);
+		}
+	}
+
+	if (lastError instanceof Error) throw lastError;
+	throw new Error('Download failed after retries');
+}
+
+function isRetryableStatus(status: number): boolean {
+	return RETRYABLE_STATUS_CODES.has(status);
+}
+
+function parseRetryAfterHeader(value: string | null): number | undefined {
+	if (!value) return undefined;
+	const seconds = Number.parseInt(value, 10);
+	if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+
+	const asDate = Date.parse(value);
+	if (!Number.isNaN(asDate)) {
+		const diff = asDate - Date.now();
+		if (diff > 0) return diff;
+	}
+	return undefined;
+}
+
+function clampRetryDelay(delayMs: number, maxMs: number): number {
+	return Math.max(0, Math.min(delayMs, maxMs));
+}
+
+function computeBackoffWithJitter(attempt: number): number {
+	const base = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1), RETRY_MAX_DELAY_MS);
+	const jitter = Math.floor(Math.random() * Math.min(400, Math.floor(base * 0.3)));
+	return base + jitter;
+}
+
+function computeDelayFromError(error: unknown, attempt: number): number {
+	const retryAfterMs = (error as DownloadErrorWithStatus | null | undefined)?.retryAfterMs;
+	if (typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+		return clampRetryDelay(retryAfterMs, RETRY_MAX_DELAY_MS);
+	}
+	return computeBackoffWithJitter(attempt);
+}
+
+async function sleep(ms: number, signal: AbortSignal): Promise<void> {
+	if (ms <= 0) return;
+	if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
+	await new Promise<void>((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			signal.removeEventListener('abort', onAbort);
+			resolve();
+		}, ms);
+
+		const onAbort = () => {
+			clearTimeout(timeout);
+			signal.removeEventListener('abort', onAbort);
+			reject(new DOMException('Operation aborted', 'AbortError'));
+		};
+
+		signal.addEventListener('abort', onAbort, { once: true });
+	});
 }
 
 function downloadViaAnchor(url: string, filename: string): void {

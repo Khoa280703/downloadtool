@@ -30,17 +30,24 @@ fn main() {
     // Note: pre-built dist/*.js use ESM format (not suitable for V8 execute_script)
     // Try common npx locations since cargo build may not have full PATH
     let npx_candidates = ["/usr/bin/npx", "/usr/local/bin/npx", "npx"];
-    let npx_bin = npx_candidates.iter()
+    let npx_bin = npx_candidates
+        .iter()
         .find(|p| {
             let result = Command::new(p).args(["esbuild", "--version"]).output();
             match &result {
-                Ok(o) => eprintln!("build.rs: npx {} esbuild --version -> status={}", p, o.status),
+                Ok(o) => eprintln!(
+                    "build.rs: npx {} esbuild --version -> status={}",
+                    p, o.status
+                ),
                 Err(e) => eprintln!("build.rs: npx {} failed: {}", p, e),
             }
             result.map(|o| o.status.success()).unwrap_or(false)
         })
         .copied();
-    eprintln!("build.rs: npx_bin={:?}, extractors_dir={:?}", npx_bin, extractors_dir);
+    eprintln!(
+        "build.rs: npx_bin={:?}, extractors_dir={:?}",
+        npx_bin, extractors_dir
+    );
     let bundle_content = if let Some(npx) = npx_bin {
         bundle_with_esbuild_cmd(&extractors_dir, &dist_dir, npx)
     } else {
@@ -116,7 +123,8 @@ fn run_esbuild(extractors_dir: &Path, file: &str, dist_dir: &Path, npx: &str) ->
 
     match result {
         Ok(output) if output.status.success() => {
-            fs::read_to_string(dist_dir.join(file.replace(".ts", ".js"))).unwrap_or_else(|_| create_inline_fallback(file))
+            fs::read_to_string(dist_dir.join(file.replace(".ts", ".js")))
+                .unwrap_or_else(|_| create_inline_fallback(file))
         }
         Ok(output) => {
             eprintln!(

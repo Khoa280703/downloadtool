@@ -10,6 +10,8 @@ export type Platform = 'youtube' | 'unknown';
 export interface Stream {
 	/** Direct stream URL */
 	url: string;
+	/** Extractor format ID (yt-dlp format_id) */
+	formatId?: string;
 	/** Quality label (e.g., '4K', '1080p', '720p') */
 	quality: string;
 	/** Format (e.g., 'mp4', 'webm', 'mp3') */
@@ -38,6 +40,8 @@ export interface ExtractResult {
 	description?: string;
 	/** Available streams */
 	streams: Stream[];
+	/** Canonical source/watch URL used by extractor */
+	originalUrl?: string;
 	/** Detected platform */
 	platform: Platform;
 	/** Video thumbnail URL */

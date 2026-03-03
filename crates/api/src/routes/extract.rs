@@ -234,10 +234,7 @@ fn select_best_stream(
     if let Some(pref) = quality_pref {
         let pref_lower = pref.to_lowercase();
         // Extract numeric part (e.g., "1080p" -> 1080)
-        let target_height: u32 = pref_lower
-            .trim_end_matches('p')
-            .parse()
-            .unwrap_or(1080);
+        let target_height: u32 = pref_lower.trim_end_matches('p').parse().unwrap_or(1080);
 
         // Find closest match
         let best_match = filtered

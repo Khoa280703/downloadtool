@@ -3,21 +3,21 @@
 //! Provides fragment MP4 muxing capabilities for HLS/DASH streaming
 //! without requiring GPU acceleration.
 
+pub mod atom_framer;
 pub mod box_parser;
+pub mod codec;
+pub mod fmp4_remuxer;
+pub mod fragment_aligner;
 pub mod fragment_stream;
 pub mod moov_merger;
-pub mod traf_merger;
-pub mod atom_framer;
-pub mod fragment_aligner;
-pub mod fmp4_remuxer;
 pub mod mux_router;
 pub mod stream_fetcher;
-pub mod codec;
+pub mod traf_merger;
 
+pub use codec::Codec;
 pub use fmp4_remuxer::{remux_streams, MuxedStream};
 pub use mux_router::{MuxRouter, StreamSource};
 pub use stream_fetcher::StreamFetcher;
-pub use codec::Codec;
 
 use thiserror::Error;
 

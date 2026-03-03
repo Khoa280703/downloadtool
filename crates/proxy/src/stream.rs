@@ -192,18 +192,9 @@ mod tests {
 
         let forwarded = forward_stream_headers(&source_headers);
 
-        assert_eq!(
-            forwarded.get("content-type").unwrap(),
-            "video/mp4"
-        );
-        assert_eq!(
-            forwarded.get("content-length").unwrap(),
-            "12345"
-        );
-        assert_eq!(
-            forwarded.get("accept-ranges").unwrap(),
-            "bytes"
-        );
+        assert_eq!(forwarded.get("content-type").unwrap(), "video/mp4");
+        assert_eq!(forwarded.get("content-length").unwrap(), "12345");
+        assert_eq!(forwarded.get("accept-ranges").unwrap(), "bytes");
         assert!(forwarded.get("x-custom-header").is_none());
     }
 }

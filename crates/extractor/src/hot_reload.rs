@@ -110,10 +110,7 @@ impl ReloadableBundle {
     /// # Arguments
     /// * `bundle_path` - Path to the bundled JS file or directory
     /// * `watch_dir` - Directory to watch for changes
-    pub fn new(
-        bundle_path: &Path,
-        watch_dir: &Path,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(bundle_path: &Path, watch_dir: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         let bundle_content = std::fs::read_to_string(bundle_path)?;
         let bundle = Arc::new(std::sync::RwLock::new(bundle_content));
 
@@ -134,13 +131,17 @@ impl ReloadableBundle {
     /// Check for reload and update bundle if needed
     pub fn check_and_reload(&self) -> Result<bool, Box<dyn std::error::Error>> {
         if self.reloader.check_reload() {
-            info!("Reloading extractor bundle from: {}", self.bundle_path.display());
+            info!(
+                "Reloading extractor bundle from: {}",
+                self.bundle_path.display()
+            );
 
             match std::fs::read_to_string(&self.bundle_path) {
                 Ok(new_content) => {
-                    let mut bundle = self.bundle.write().map_err(|e| {
-                        std::io::Error::other(e.to_string())
-                    })?;
+                    let mut bundle = self
+                        .bundle
+                        .write()
+                        .map_err(|e| std::io::Error::other(e.to_string()))?;
                     *bundle = new_content;
                     info!("Bundle reloaded successfully");
                     Ok(true)

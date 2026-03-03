@@ -6,6 +6,7 @@ use axum::Json;
 use utoipa::OpenApi;
 
 use crate::routes::extract::{ExtractRequest, ExtractResponse, StreamFormat, VideoMetadata};
+use crate::routes::mux_jobs::{CreateMuxJobRequest, CreateMuxJobResponse, MuxJobStatusResponse};
 use crate::routes::stream::MuxedStreamParams;
 
 /// OpenAPI document definition for the YouTube Downloader API.
@@ -22,6 +23,9 @@ use crate::routes::stream::MuxedStreamParams;
         VideoMetadata,
         StreamFormat,
         MuxedStreamParams,
+        CreateMuxJobRequest,
+        CreateMuxJobResponse,
+        MuxJobStatusResponse,
     ))
 )]
 pub struct ApiDoc;

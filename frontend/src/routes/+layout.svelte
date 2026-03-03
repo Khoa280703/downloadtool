@@ -22,14 +22,18 @@
 	let isDarkMode = $state(false);
 	let authModalOpen = $state(false);
 	let AuthModalComponent = $state<AuthModalComponentType | null>(null);
-	const hasInitialBetterAuthCookie = browser && document.cookie.includes('better-auth.');
-	let authUser = $state<AuthUser | null | undefined>(hasInitialBetterAuthCookie ? undefined : null);
+	let authUser = $state<AuthUser | null | undefined>(undefined);
 	let redirectTo = $state('/');
 
 	function syncThemeFromStorage(): void {
 		if (!browser) return;
 
 		isDarkMode = window.localStorage.getItem('fetchtube-theme') === 'dark';
+	}
+
+	function broadcastThemeChange(): void {
+		if (!browser) return;
+		window.dispatchEvent(new CustomEvent('fetchtube-theme-change', { detail: { isDarkMode } }));
 	}
 
 	function normalizeRedirectTo(value: string | null): string {
@@ -44,6 +48,15 @@
 		const module = await import('$components/AuthModal.svelte');
 
 		AuthModalComponent = module.default;
+	}
+
+	async function refreshAuthUser(): Promise<void> {
+		try {
+			const resp = await fetch('/api/auth/get-session', { credentials: 'include' });
+			authUser = resp.ok ? ((await resp.json())?.user ?? null) : null;
+		} catch {
+			authUser = null;
+		}
 	}
 
 	function hasExplicitLocalePrefix(pathname: string): boolean {
@@ -91,8 +104,7 @@
 		if (!browser) return;
 
 		syncThemeFromStorage();
-		const redirectedByPreferredLanguage = applyPreferredLanguageRedirect();
-		if (redirectedByPreferredLanguage) return;
+		applyPreferredLanguageRedirect();
 
 		if (GA_MEASUREMENT_ID) {
 			const startGA = () => initGA(GA_MEASUREMENT_ID);
@@ -129,21 +141,10 @@
 			navigator.serviceWorker.addEventListener('message', serviceWorkerMessageHandler);
 		}
 
-		// Homepage already resolves auth in +page.svelte; skip duplicate session fetch in layout.
+		// Homepage resolves auth in +page.svelte; avoid duplicate fetch here.
 		if (!isLocalizedHomePath(window.location.pathname)) {
 			void (async () => {
-				const hasBetterAuthCookie = document.cookie.includes('better-auth.');
-				if (hasBetterAuthCookie) {
-					try {
-						const resp = await fetch('/api/auth/get-session', { credentials: 'include' });
-
-						authUser = resp.ok ? (await resp.json())?.user ?? null : null;
-					} catch {
-						authUser = null;
-					}
-				} else {
-					authUser = null;
-				}
+				await refreshAuthUser();
 
 				const params = new URLSearchParams(window.location.search);
 
@@ -163,7 +164,18 @@
 			isDarkMode = event.newValue === 'dark';
 		};
 
+		const themeChangeHandler = (event: Event) => {
+			const customEvent = event as CustomEvent<{ isDarkMode?: boolean }>;
+			if (typeof customEvent.detail?.isDarkMode === 'boolean') {
+				isDarkMode = customEvent.detail.isDarkMode;
+				return;
+			}
+
+			syncThemeFromStorage();
+		};
+
 		window.addEventListener('storage', storageHandler);
+		window.addEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
 
 		// Clipboard auto-read: detect YouTube URL when user returns to tab
 		const visibilityHandler = async () => {
@@ -183,9 +195,10 @@
 
 		document.addEventListener('visibilitychange', visibilityHandler);
 
-		return () => {
-			window.removeEventListener('storage', storageHandler);
-			document.removeEventListener('visibilitychange', visibilityHandler);
+			return () => {
+				window.removeEventListener('storage', storageHandler);
+				window.removeEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+				document.removeEventListener('visibilitychange', visibilityHandler);
 
 			if (serviceWorkerMessageHandler && 'serviceWorker' in navigator) {
 				navigator.serviceWorker.removeEventListener('message', serviceWorkerMessageHandler);
@@ -207,6 +220,7 @@
 		if (!browser) return;
 
 		window.localStorage.setItem('fetchtube-theme', isDarkMode ? 'dark' : 'light');
+		broadcastThemeChange();
 	}
 
 	function openAuthModal(): void {
@@ -226,10 +240,11 @@
 		}
 	}
 
-	async function handleAuthSuccess(target: string): Promise<void> {
-		authModalOpen = false;
-		await goto(target, { invalidateAll: true, replaceState: true });
-	}
+async function handleAuthSuccess(target: string): Promise<void> {
+	authModalOpen = false;
+	await refreshAuthUser();
+	await goto(target, { invalidateAll: true, replaceState: true });
+}
 </script>
 
 <svelte:head>

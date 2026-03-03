@@ -86,7 +86,10 @@ impl CookieStore {
     /// This seeds initial cookies needed for subsequent requests
     pub async fn warm_up(&self, client: &reqwest::Client) -> Result<(), reqwest::Error> {
         let url = self.platform.homepage_url();
-        info!("Warming up cookies for {} by fetching {}", self.platform, url);
+        info!(
+            "Warming up cookies for {} by fetching {}",
+            self.platform, url
+        );
 
         let response = client.get(url).send().await?;
 
@@ -111,7 +114,10 @@ impl CookieStore {
     pub fn clear(&self) {
         // The actual clearing happens by creating a new client
         // This is a placeholder for the operation
-        info!("Cleared cookies for {} (client recreation required)", self.platform);
+        info!(
+            "Cleared cookies for {} (client recreation required)",
+            self.platform
+        );
     }
 
     /// Persist cookies to disk
@@ -150,7 +156,10 @@ impl CookieStore {
     /// Note: This is a placeholder since the built-in cookie store
     /// doesn't support manual cookie injection.
     pub fn add_cookie(&self, cookie: &str, _url: &Url) {
-        debug!("Cookie addition for {}: {} (requires custom store)", self.platform, cookie);
+        debug!(
+            "Cookie addition for {}: {} (requires custom store)",
+            self.platform, cookie
+        );
     }
 }
 

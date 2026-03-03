@@ -17,6 +17,12 @@
 	const completedCount = $derived.by(
 		() => $batchQueue.filter((item) => item.selected !== false && item.status === 'completed').length
 	);
+	const settledCount = $derived.by(
+		() =>
+			$batchQueue.filter(
+				(item) => item.selected !== false && (item.status === 'completed' || item.status === 'error')
+			).length
+	);
 	const errorCount = $derived.by(
 		() => $batchQueue.filter((item) => item.selected !== false && item.status === 'error').length
 	);
@@ -24,6 +30,12 @@
 		() => $batchQueue.filter((item) => item.selected !== false && item.status === 'pending').length
 	);
 	const canEditSelection = $derived.by(() => !$isBatchActive && workerStatus.active === 0);
+	const progressTotal = $derived.by(() => (selectedCount > 0 ? selectedCount : $batchProgress.total));
+	const progressDone = $derived.by(() => (selectedCount > 0 ? settledCount : $batchProgress.received));
+	const progressPercent = $derived.by(() => {
+		if (progressTotal <= 0) return 0;
+		return Math.min(100, Math.round((progressDone / progressTotal) * 100));
+	});
 
 	function truncate(text: string, maxLength: number = 32): string {
 		if (text.length <= maxLength) return text;
@@ -87,14 +99,14 @@
 <div class="batch-progress" class:is-idle={!$isBatchActive && $batchQueue.length === 0}>
 	<div class="header">
 		<h4>Playlist Progress</h4>
-		<span class="count">{$batchProgress.received} / {$batchProgress.total}</span>
+		<span class="count">{progressDone} / {progressTotal}</span>
 	</div>
 
 	<div class="progress-bar">
 		<div
 			class="progress-fill"
-			style:width="{$batchProgress.total > 0 ? ($batchProgress.received / $batchProgress.total) * 100 : 0}%"
-			class:complete={$batchProgress.received >= $batchProgress.total && $batchProgress.total > 0}
+			style:width={`${progressPercent}%`}
+			class:complete={progressDone >= progressTotal && progressTotal > 0}
 		></div>
 	</div>
 

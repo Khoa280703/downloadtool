@@ -39,8 +39,10 @@ where
     A: Stream<Item = Result<Bytes, AE>> + Send + 'static,
 {
     // Box::pin the mapped streams so they implement Unpin (required by AtomFramer)
-    let video_mapped = Box::pin(video.map(|r| r.map_err(|e| MuxerError::StreamFetchError(e.to_string()))));
-    let audio_mapped = Box::pin(audio.map(|r| r.map_err(|e| MuxerError::StreamFetchError(e.to_string()))));
+    let video_mapped =
+        Box::pin(video.map(|r| r.map_err(|e| MuxerError::StreamFetchError(e.to_string()))));
+    let audio_mapped =
+        Box::pin(audio.map(|r| r.map_err(|e| MuxerError::StreamFetchError(e.to_string()))));
 
     Box::pin(async_stream::try_stream! {
         // ── Phase 1: INIT ─────────────────────────────────────────────
@@ -180,10 +182,8 @@ mod tests {
         let video_data = build_test_fmp4(1);
         let audio_data = build_test_fmp4(1);
 
-        let video_stream =
-            stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(video_data))]);
-        let audio_stream =
-            stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(audio_data))]);
+        let video_stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(video_data))]);
+        let audio_stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(audio_data))]);
 
         let mut muxed = remux_streams(video_stream, audio_stream);
         let mut output = Vec::new();
@@ -205,10 +205,8 @@ mod tests {
         let video_data = build_test_fmp4(1);
         let audio_data = build_test_fmp4(1);
 
-        let video_stream =
-            stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(video_data))]);
-        let audio_stream =
-            stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(audio_data))]);
+        let video_stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(video_data))]);
+        let audio_stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(audio_data))]);
 
         let mut muxed = remux_streams(video_stream, audio_stream);
         let mut chunk_count = 0;
@@ -219,6 +217,10 @@ mod tests {
         }
 
         // At minimum: ftyp + moov + 1 fragment = 3 chunks
-        assert!(chunk_count >= 3, "Expected at least 3 output chunks, got {}", chunk_count);
+        assert!(
+            chunk_count >= 3,
+            "Expected at least 3 output chunks, got {}",
+            chunk_count
+        );
     }
 }

@@ -10,6 +10,7 @@ license.workspace = true
 axum = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+tokio-util = { version = "0.7", features = ["io"] }
 
 # HTTP client
 reqwest = { workspace = true }

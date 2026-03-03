@@ -27,7 +27,10 @@ pub async fn bm_js_handler() -> Response {
     (
         StatusCode::OK,
         [
-            (header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
             (header::CACHE_CONTROL, "public, max-age=3600"),
         ],
         BM_JS,
@@ -42,7 +45,10 @@ pub async fn userscript_handler() -> Response {
     (
         StatusCode::OK,
         [
-            (header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
             (header::CACHE_CONTROL, "public, max-age=3600"),
         ],
         USERSCRIPT_JS,

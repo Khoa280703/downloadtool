@@ -218,11 +218,17 @@ mod tests {
 
     #[test]
     fn test_is_valid_batch_url() {
-        assert!(is_valid_batch_url("https://youtube.com/playlist?list=PLxxx"));
-        assert!(is_valid_batch_url("https://www.youtube.com/watch?v=abc&list=PLxxx"));
+        assert!(is_valid_batch_url(
+            "https://youtube.com/playlist?list=PLxxx"
+        ));
+        assert!(is_valid_batch_url(
+            "https://www.youtube.com/watch?v=abc&list=PLxxx"
+        ));
 
         assert!(!is_valid_batch_url("https://youtube.com/watch?v=abc"));
-        assert!(!is_valid_batch_url("https://example.com/playlist?list=PLxxx"));
+        assert!(!is_valid_batch_url(
+            "https://example.com/playlist?list=PLxxx"
+        ));
     }
 
     #[test]

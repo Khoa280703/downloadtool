@@ -6,6 +6,10 @@
 import { writable } from 'svelte/store';
 import type { BatchItem, BatchProgress } from '$lib/types';
 
+type BatchEventConnection = {
+	close: () => void;
+};
+
 /** Batch queue items */
 export const batchQueue = writable<BatchItem[]>([]);
 
@@ -16,7 +20,7 @@ export const batchProgress = writable<BatchProgress>({ received: 0, total: 0 });
 export const isBatchActive = writable<boolean>(false);
 
 /** Current SSE connection */
-export const batchEventSource = writable<EventSource | null>(null);
+export const batchEventSource = writable<BatchEventConnection | null>(null);
 
 /**
  * Reset batch state
@@ -114,6 +118,6 @@ export function completeBatch(): void {
 /**
  * Set SSE connection
  */
-export function setEventSource(es: EventSource): void {
+export function setEventSource(es: BatchEventConnection): void {
 	batchEventSource.set(es);
 }

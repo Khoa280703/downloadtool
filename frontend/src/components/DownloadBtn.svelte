@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { buildStreamUrl, buildMuxedStreamUrl } from '$lib/api';
+	import { buildStreamUrl, createMuxedDownloadJob, waitForMuxedDownloadJobReady } from '$lib/api';
 	import { currentDownload, setDownloading, downloadProgress } from '$stores/download';
 	import { trackDownloadStarted } from '$lib/analytics';
+	import { saveDownload } from '$lib/playlist-download-file-saver';
 	import * as m from '$lib/paraglide/messages';
 	import type { Stream } from '$lib/types';
 
@@ -9,11 +10,13 @@
 		stream: Stream | null;
 		/** Audio-only stream to mux with video-only stream. When provided, uses /api/stream/muxed. */
 		audioStream?: Stream | null;
+		/** Canonical source/watch URL for refresh-on-auth-failure on backend. */
+		sourceUrl?: string | null;
 		title: string;
 		disabled?: boolean;
 	}
 
-	let { stream, audioStream = null, title, disabled = false }: Props = $props();
+	let { stream, audioStream = null, sourceUrl = null, title, disabled = false }: Props = $props();
 	let isLoading = $state(false);
 
 	function enforceHttps(url: string): string {
@@ -59,32 +62,53 @@
 
 		try {
 			const useMux = audioStream && !stream.hasAudio;
-			const downloadUrl = useMux
-				? buildMuxedStreamUrl(stream.url, audioStream!.url, title)
-				: buildStreamUrl(stream.url, title, stream.format);
-			const secureDownloadUrl = enforceHttps(downloadUrl);
+			const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
+			const controller = new AbortController();
+			let downloadUrl: string;
 
-			const anchor = document.createElement('a');
-			anchor.href = secureDownloadUrl;
-			anchor.download = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
-			anchor.style.display = 'none';
-			document.body.appendChild(anchor);
+			if (useMux) {
+				const { jobId } = await createMuxedDownloadJob(
+					stream.url,
+					audioStream!.url,
+					title,
+					{
+						sourceUrl: sourceUrl ?? undefined,
+						videoFormatId: stream.formatId,
+						audioFormatId: audioStream?.formatId
+					},
+					controller.signal
+				);
+				downloadUrl = await waitForMuxedDownloadJobReady(jobId, undefined, controller.signal);
+			} else {
+				downloadUrl = buildStreamUrl(stream.url, title, stream.format, {
+					sourceUrl: sourceUrl ?? undefined,
+					formatId: stream.formatId
+				});
+			}
+
+			const secureDownloadUrl = enforceHttps(downloadUrl);
 
 			const progressInterval = setInterval(() => {
 				downloadProgress.update((p) => Math.min(p + 10, 90));
 			}, 200);
 
-			anchor.click();
-
-			setTimeout(() => {
-				clearInterval(progressInterval);
-				document.body.removeChild(anchor);
+			try {
+				await saveDownload(secureDownloadUrl, filename, controller.signal, {
+					requireFsaa: false,
+					allowAnchorFallback: true,
+					preflightAnchor: true
+				});
 				downloadProgress.set(100);
-				isLoading = false;
-				setDownloading(false);
-			}, 1000);
+				currentDownload.update((state) => ({ ...state, error: null }));
+			} finally {
+				clearInterval(progressInterval);
+			}
+
+			isLoading = false;
+			setDownloading(false);
 		} catch (err) {
 			console.error('Download failed:', err);
+			currentDownload.update((state) => ({ ...state, error: 'Download failed. Please retry.' }));
 			isLoading = false;
 			setDownloading(false);
 		}

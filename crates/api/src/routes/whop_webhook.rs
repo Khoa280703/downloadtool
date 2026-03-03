@@ -72,7 +72,11 @@ pub async fn whop_webhook_handler(
     Ok(StatusCode::OK)
 }
 
-fn verify_whop_signature(payload: &[u8], sig_header: &str, secret: &str) -> Result<(), WebhookError> {
+fn verify_whop_signature(
+    payload: &[u8],
+    sig_header: &str,
+    secret: &str,
+) -> Result<(), WebhookError> {
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
         .map_err(|_| WebhookError::InvalidSignature)?;
     mac.update(payload);

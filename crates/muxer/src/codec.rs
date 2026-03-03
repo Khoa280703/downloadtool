@@ -40,7 +40,11 @@ impl Codec {
         if mime_lower.contains("avc1") || mime_lower.contains("h264") {
             return Some(Codec::H264);
         }
-        if mime_lower.contains("hev1") || mime_lower.contains("hvc1") || mime_lower.contains("h265") || mime_lower.contains("hevc") {
+        if mime_lower.contains("hev1")
+            || mime_lower.contains("hvc1")
+            || mime_lower.contains("h265")
+            || mime_lower.contains("hevc")
+        {
             return Some(Codec::H265);
         }
         if mime_lower.contains("vp9") {
@@ -74,7 +78,11 @@ impl Codec {
         if lower.starts_with("avc1") || lower == "h264" {
             return Some(Codec::H264);
         }
-        if lower.starts_with("hev1") || lower.starts_with("hvc1") || lower == "h265" || lower == "hevc" {
+        if lower.starts_with("hev1")
+            || lower.starts_with("hvc1")
+            || lower == "h265"
+            || lower == "hevc"
+        {
             return Some(Codec::H265);
         }
         if lower.contains("vp9") || lower == "vp09" {
@@ -135,24 +143,45 @@ mod tests {
     #[test]
     fn test_codec_from_mime() {
         // H264
-        assert_eq!(Codec::from_mime("video/mp4; codecs=avc1.42E01E"), Some(Codec::H264));
-        assert_eq!(Codec::from_mime("video/mp4; codecs=avc1.64001F"), Some(Codec::H264));
+        assert_eq!(
+            Codec::from_mime("video/mp4; codecs=avc1.42E01E"),
+            Some(Codec::H264)
+        );
+        assert_eq!(
+            Codec::from_mime("video/mp4; codecs=avc1.64001F"),
+            Some(Codec::H264)
+        );
 
         // H265
-        assert_eq!(Codec::from_mime("video/mp4; codecs=hev1.1.6.L93.B0"), Some(Codec::H265));
-        assert_eq!(Codec::from_mime("video/mp4; codecs=hvc1.1.6.L93.B0"), Some(Codec::H265));
+        assert_eq!(
+            Codec::from_mime("video/mp4; codecs=hev1.1.6.L93.B0"),
+            Some(Codec::H265)
+        );
+        assert_eq!(
+            Codec::from_mime("video/mp4; codecs=hvc1.1.6.L93.B0"),
+            Some(Codec::H265)
+        );
 
         // VP9
         assert_eq!(Codec::from_mime("video/webm; codecs=vp9"), Some(Codec::VP9));
 
         // AV1
-        assert_eq!(Codec::from_mime("video/mp4; codecs=av01.0.04M.08"), Some(Codec::AV1));
+        assert_eq!(
+            Codec::from_mime("video/mp4; codecs=av01.0.04M.08"),
+            Some(Codec::AV1)
+        );
 
         // AAC
-        assert_eq!(Codec::from_mime("audio/mp4; codecs=mp4a.40.2"), Some(Codec::AAC));
+        assert_eq!(
+            Codec::from_mime("audio/mp4; codecs=mp4a.40.2"),
+            Some(Codec::AAC)
+        );
 
         // Opus
-        assert_eq!(Codec::from_mime("audio/webm; codecs=opus"), Some(Codec::Opus));
+        assert_eq!(
+            Codec::from_mime("audio/webm; codecs=opus"),
+            Some(Codec::Opus)
+        );
 
         // Unknown
         assert_eq!(Codec::from_mime("video/mp4; codecs=unknown"), None);

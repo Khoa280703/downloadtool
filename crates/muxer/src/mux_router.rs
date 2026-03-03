@@ -45,8 +45,16 @@ impl MuxRouter {
         if let Some(fid) = format_id {
             if let Some(format) = video_info.formats.iter().find(|f| f.format_id == fid) {
                 // Check if this format has both audio and video
-                let has_video = format.vcodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
-                let has_audio = format.acodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
+                let has_video = format
+                    .vcodec
+                    .as_ref()
+                    .map(|c| !c.is_empty() && c != "none")
+                    .unwrap_or(false);
+                let has_audio = format
+                    .acodec
+                    .as_ref()
+                    .map(|c| !c.is_empty() && c != "none")
+                    .unwrap_or(false);
 
                 if has_video && has_audio {
                     // Format already has both - direct proxy
@@ -95,14 +103,30 @@ impl MuxRouter {
     /// Returns true if separate audio and video streams are detected.
     pub fn needs_mux(formats: &[VideoFormat]) -> bool {
         let has_video_only = formats.iter().any(|f| {
-            let has_video = f.vcodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
-            let has_audio = f.acodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
+            let has_video = f
+                .vcodec
+                .as_ref()
+                .map(|c| !c.is_empty() && c != "none")
+                .unwrap_or(false);
+            let has_audio = f
+                .acodec
+                .as_ref()
+                .map(|c| !c.is_empty() && c != "none")
+                .unwrap_or(false);
             has_video && !has_audio
         });
 
         let has_audio_only = formats.iter().any(|f| {
-            let has_video = f.vcodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
-            let has_audio = f.acodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
+            let has_video = f
+                .vcodec
+                .as_ref()
+                .map(|c| !c.is_empty() && c != "none")
+                .unwrap_or(false);
+            let has_audio = f
+                .acodec
+                .as_ref()
+                .map(|c| !c.is_empty() && c != "none")
+                .unwrap_or(false);
             !has_video && has_audio
         });
 
@@ -114,8 +138,16 @@ impl MuxRouter {
         formats
             .iter()
             .filter(|f| {
-                let has_video = f.vcodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
-                let has_audio = f.acodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
+                let has_video = f
+                    .vcodec
+                    .as_ref()
+                    .map(|c| !c.is_empty() && c != "none")
+                    .unwrap_or(false);
+                let has_audio = f
+                    .acodec
+                    .as_ref()
+                    .map(|c| !c.is_empty() && c != "none")
+                    .unwrap_or(false);
                 has_video && !has_audio
             })
             .max_by_key(|f| {
@@ -131,8 +163,16 @@ impl MuxRouter {
         formats
             .iter()
             .filter(|f| {
-                let has_video = f.vcodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
-                let has_audio = f.acodec.as_ref().map(|c| !c.is_empty() && c != "none").unwrap_or(false);
+                let has_video = f
+                    .vcodec
+                    .as_ref()
+                    .map(|c| !c.is_empty() && c != "none")
+                    .unwrap_or(false);
+                let has_audio = f
+                    .acodec
+                    .as_ref()
+                    .map(|c| !c.is_empty() && c != "none")
+                    .unwrap_or(false);
                 !has_video && has_audio
             })
             .max_by_key(|f| f.bitrate.unwrap_or(0))
@@ -143,12 +183,20 @@ impl MuxRouter {
 mod tests {
     use super::*;
 
-    fn create_video_format(id: &str, vcodec: Option<&str>, acodec: Option<&str>, height: Option<u32>, bitrate: Option<u64>) -> VideoFormat {
+    fn create_video_format(
+        id: &str,
+        vcodec: Option<&str>,
+        acodec: Option<&str>,
+        height: Option<u32>,
+        bitrate: Option<u64>,
+    ) -> VideoFormat {
         let is_audio_only = acodec.is_some() && vcodec.is_none();
         let has_audio = acodec.is_some() || vcodec.map(|v| v.contains("mp4a")).unwrap_or(false);
         VideoFormat {
             format_id: id.to_string(),
-            quality: height.map(|h| format!("{}p", h)).unwrap_or_else(|| "Audio".to_string()),
+            quality: height
+                .map(|h| format!("{}p", h))
+                .unwrap_or_else(|| "Audio".to_string()),
             vcodec: vcodec.map(|s| s.to_string()),
             acodec: acodec.map(|s| s.to_string()),
             codec_label: None,
@@ -159,7 +207,7 @@ mod tests {
             fps: Some(30.0),
             bitrate,
             ext: "mp4".to_string(),
-            url: format!("https://example.com/{}" , id),
+            url: format!("https://example.com/{}", id),
             filesize: None,
         }
     }
@@ -180,7 +228,13 @@ mod tests {
     #[test]
     fn test_needs_mux_with_separate_streams() {
         let formats = vec![
-            create_video_format("137", Some("avc1.640028"), Some("none"), Some(1080), Some(5000000)),
+            create_video_format(
+                "137",
+                Some("avc1.640028"),
+                Some("none"),
+                Some(1080),
+                Some(5000000),
+            ),
             create_video_format("140", Some("none"), Some("mp4a.40.2"), None, Some(128000)),
         ];
 
@@ -189,9 +243,13 @@ mod tests {
 
     #[test]
     fn test_needs_mux_with_combined_stream() {
-        let formats = vec![
-            create_video_format("18", Some("avc1.42001E"), Some("mp4a.40.2"), Some(360), Some(500000)),
-        ];
+        let formats = vec![create_video_format(
+            "18",
+            Some("avc1.42001E"),
+            Some("mp4a.40.2"),
+            Some(360),
+            Some(500000),
+        )];
 
         assert!(!MuxRouter::needs_mux(&formats));
     }
@@ -207,7 +265,11 @@ mod tests {
         let source = MuxRouter::route(&info, None);
 
         match source {
-            Some(StreamSource::Mux { video_url, audio_url, .. }) => {
+            Some(StreamSource::Mux {
+                video_url,
+                audio_url,
+                ..
+            }) => {
                 assert!(video_url.contains("137"));
                 assert!(audio_url.contains("140"));
             }
@@ -217,9 +279,13 @@ mod tests {
 
     #[test]
     fn test_route_with_combined_stream() {
-        let formats = vec![
-            create_video_format("18", Some("avc1.42001E"), Some("mp4a.40.2"), Some(360), Some(500000)),
-        ];
+        let formats = vec![create_video_format(
+            "18",
+            Some("avc1.42001E"),
+            Some("mp4a.40.2"),
+            Some(360),
+            Some(500000),
+        )];
         let info = create_video_info(formats);
 
         let source = MuxRouter::route(&info, Some("18"));

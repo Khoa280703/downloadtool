@@ -73,29 +73,22 @@ impl HeaderBuilder {
     }
 
     /// Build headers for a specific platform
-    pub fn build_headers(&self,
-        platform: Platform,
-        referer: Option<&str>,
-    ) -> HeaderMap {
+    pub fn build_headers(&self, platform: Platform, referer: Option<&str>) -> HeaderMap {
         let mut headers = HeaderMap::new();
         let user_agent = self.next_user_agent();
 
         // User-Agent
-        headers.insert(
-            USER_AGENT,
-            HeaderValue::from_static(user_agent),
-        );
+        headers.insert(USER_AGENT, HeaderValue::from_static(user_agent));
 
         // Accept headers
         headers.insert(
             ACCEPT,
-            HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"),
+            HeaderValue::from_static(
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            ),
         );
 
-        headers.insert(
-            ACCEPT_LANGUAGE,
-            HeaderValue::from_static("en-US,en;q=0.9"),
-        );
+        headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
 
         headers.insert(
             ACCEPT_ENCODING,
@@ -110,7 +103,10 @@ impl HeaderBuilder {
                     HeaderValue::from_static("\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\""),
                 );
                 headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
-                headers.insert("sec-ch-ua-platform", HeaderValue::from_static("\"Windows\""));
+                headers.insert(
+                    "sec-ch-ua-platform",
+                    HeaderValue::from_static("\"Windows\""),
+                );
                 headers.insert("sec-fetch-dest", HeaderValue::from_static("document"));
                 headers.insert("sec-fetch-mode", HeaderValue::from_static("navigate"));
                 headers.insert("sec-fetch-site", HeaderValue::from_static("none"));
@@ -118,7 +114,10 @@ impl HeaderBuilder {
                 headers.insert("upgrade-insecure-requests", HeaderValue::from_static("1"));
 
                 if referer.is_none() {
-                    headers.insert(REFERER, HeaderValue::from_static("https://www.youtube.com/"));
+                    headers.insert(
+                        REFERER,
+                        HeaderValue::from_static("https://www.youtube.com/"),
+                    );
                 }
             }
         }
@@ -156,21 +155,25 @@ impl HeaderBuilder {
         headers.insert(USER_AGENT, HeaderValue::from_static(IOS_USER_AGENT));
         headers.insert(ACCEPT, HeaderValue::from_static("*/*"));
         headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
-        headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip, deflate, br"));
+        headers.insert(
+            ACCEPT_ENCODING,
+            HeaderValue::from_static("gzip, deflate, br"),
+        );
         headers
     }
 
     /// Build headers for a generic request (no platform-specific headers)
-    pub fn build_generic_headers(&self,
-        referer: Option<&str>,
-    ) -> HeaderMap {
+    pub fn build_generic_headers(&self, referer: Option<&str>) -> HeaderMap {
         let mut headers = HeaderMap::new();
         let user_agent = self.next_user_agent();
 
         headers.insert(USER_AGENT, HeaderValue::from_static(user_agent));
         headers.insert(ACCEPT, HeaderValue::from_static("*/*"));
         headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
-        headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip, deflate, br"));
+        headers.insert(
+            ACCEPT_ENCODING,
+            HeaderValue::from_static("gzip, deflate, br"),
+        );
 
         if let Some(ref_url) = referer {
             if let Ok(value) = HeaderValue::from_str(ref_url) {

@@ -18,6 +18,8 @@ pub struct Config {
     pub jwt_secret: String,
     /// Whop webhook HMAC secret
     pub whop_webhook_secret: String,
+    /// Toggle rate limiter for /api/extract (default: true)
+    pub extract_rate_limit_enabled: bool,
 }
 
 impl Config {
@@ -89,8 +91,7 @@ impl Config {
     }
 
     fn resolve_local_database_url(raw_url: &str) -> String {
-        let uses_localhost =
-            raw_url.contains("@127.0.0.1:") || raw_url.contains("@localhost:");
+        let uses_localhost = raw_url.contains("@127.0.0.1:") || raw_url.contains("@localhost:");
         if !uses_localhost {
             return raw_url.to_string();
         }
@@ -114,13 +115,15 @@ impl Config {
     /// - `DATABASE_URL` - PostgreSQL connection string
     /// - `BETTER_AUTH_SECRET` - Shared Better Auth secret
     /// - `WHOP_WEBHOOK_SECRET` - Whop webhook signing secret
+    /// - `EXTRACT_RATE_LIMIT_ENABLED` - Enable /api/extract rate limiting (default: true)
     pub fn from_env() -> anyhow::Result<Self> {
         let port = env::var("PORT")
             .ok()
             .and_then(|p| p.parse().ok())
             .unwrap_or(3068);
 
-        let extractor_dir = env::var("EXTRACTOR_DIR").unwrap_or_else(|_| "./extractors".to_string());
+        let extractor_dir =
+            env::var("EXTRACTOR_DIR").unwrap_or_else(|_| "./extractors".to_string());
         let database_url = env::var("DATABASE_URL")
             .map_err(|_| anyhow::anyhow!("DATABASE_URL env var is required"))?;
         let database_url = Self::resolve_local_database_url(&database_url);
@@ -128,6 +131,12 @@ impl Config {
             .map_err(|_| anyhow::anyhow!("BETTER_AUTH_SECRET env var is required"))?;
         let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")
             .map_err(|_| anyhow::anyhow!("WHOP_WEBHOOK_SECRET env var is required"))?;
+        let extract_rate_limit_enabled = env::var("EXTRACT_RATE_LIMIT_ENABLED")
+            .map(|value| {
+                let normalized = value.trim().to_ascii_lowercase();
+                !matches!(normalized.as_str(), "0" | "false" | "off" | "no")
+            })
+            .unwrap_or(true);
 
         Ok(Self {
             port,
@@ -135,6 +144,7 @@ impl Config {
             database_url,
             jwt_secret,
             whop_webhook_secret,
+            extract_rate_limit_enabled,
         })
     }
 }
@@ -151,6 +161,7 @@ mod tests {
             database_url: "postgres://user:pass@localhost:5432/db".to_string(),
             jwt_secret: "secret".to_string(),
             whop_webhook_secret: "whop_secret".to_string(),
+            extract_rate_limit_enabled: true,
         };
 
         assert_eq!(config.port, 3068);
@@ -158,5 +169,6 @@ mod tests {
         assert!(config.database_url.starts_with("postgres://"));
         assert_eq!(config.jwt_secret, "secret");
         assert_eq!(config.whop_webhook_secret, "whop_secret");
+        assert!(config.extract_rate_limit_enabled);
     }
 }

@@ -146,15 +146,13 @@ pub fn read_tfdt(moof: &[u8]) -> Option<u64> {
     let moof_content = &moof[moof_hdr.header_size as usize..];
 
     // Find traf inside moof content
-    let (traf_off, traf_hdr) = iter_boxes(moof_content)
-        .find(|(_, h)| &h.box_type == b"traf")?;
+    let (traf_off, traf_hdr) = iter_boxes(moof_content).find(|(_, h)| &h.box_type == b"traf")?;
     let traf_content_start = traf_off + traf_hdr.header_size as usize;
     let traf_end = (traf_off + traf_hdr.total_size as usize).min(moof_content.len());
     let traf_content = &moof_content[traf_content_start..traf_end];
 
     // Find tfdt inside traf content
-    let (tfdt_off, _) = iter_boxes(traf_content)
-        .find(|(_, h)| &h.box_type == b"tfdt")?;
+    let (tfdt_off, _) = iter_boxes(traf_content).find(|(_, h)| &h.box_type == b"tfdt")?;
     let tfdt_data = &traf_content[tfdt_off..];
 
     // tfdt layout: [4B size][4B "tfdt"][1B version][3B flags][4B or 8B base_media_decode_time]
@@ -178,7 +176,6 @@ pub fn read_tfdt(moof: &[u8]) -> Option<u64> {
     }
 }
 
-
 /// Read the timescale from a `moov` box (first trak's mdhd).
 ///
 /// Box path: moov → trak → mdia → mdhd
@@ -189,24 +186,21 @@ pub fn read_timescale(moov: &[u8]) -> Option<u32> {
     let moov_content = &moov[moov_hdr.header_size as usize..moov_end];
 
     // Find first trak
-    let (trak_off, trak_hdr) = iter_boxes(moov_content)
-        .find(|(_, h)| &h.box_type == b"trak")?;
+    let (trak_off, trak_hdr) = iter_boxes(moov_content).find(|(_, h)| &h.box_type == b"trak")?;
     let trak_end = (trak_off + trak_hdr.total_size as usize).min(moov_content.len());
     let trak_slice = &moov_content[trak_off..trak_end];
     let trak_hdr2 = read_box_header(trak_slice)?;
     let trak_content = &trak_slice[trak_hdr2.header_size as usize..];
 
     // Find mdia inside trak
-    let (mdia_off, mdia_hdr) = iter_boxes(trak_content)
-        .find(|(_, h)| &h.box_type == b"mdia")?;
+    let (mdia_off, mdia_hdr) = iter_boxes(trak_content).find(|(_, h)| &h.box_type == b"mdia")?;
     let mdia_end = (mdia_off + mdia_hdr.total_size as usize).min(trak_content.len());
     let mdia_slice = &trak_content[mdia_off..mdia_end];
     let mdia_hdr2 = read_box_header(mdia_slice)?;
     let mdia_content = &mdia_slice[mdia_hdr2.header_size as usize..];
 
     // Find mdhd inside mdia
-    let (mdhd_off, _) = iter_boxes(mdia_content)
-        .find(|(_, h)| &h.box_type == b"mdhd")?;
+    let (mdhd_off, _) = iter_boxes(mdia_content).find(|(_, h)| &h.box_type == b"mdhd")?;
     let mdhd = &mdia_content[mdhd_off..];
 
     // mdhd FullBox: [4B size][4B type][1B version][3B flags] = 9 bytes minimum

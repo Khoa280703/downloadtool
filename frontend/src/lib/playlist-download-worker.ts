@@ -1,4 +1,9 @@
-import { buildMuxedStreamUrl, buildStreamUrl, extract } from '$lib/api';
+import {
+	buildStreamUrl,
+	createMuxedDownloadJob,
+	extract,
+	waitForMuxedDownloadJobReady
+} from '$lib/api';
 import { updateBatchItemByVideoId } from '$stores/batch';
 import {
 	getStoredPlaylistDownloadMode,
@@ -267,9 +272,22 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 	});
 
 	if (video && !video.hasAudio && audio) {
+		const { jobId } = await createMuxedDownloadJob(
+			video.url,
+			audio.url,
+			entry.title,
+			{
+				sourceUrl: result.originalUrl,
+				videoFormatId: video.formatId,
+				audioFormatId: audio.formatId
+			},
+			signal
+		);
+		const muxedFileUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
+
 		return {
 			entry,
-			downloadUrl: buildMuxedStreamUrl(video.url, audio.url, entry.title),
+			downloadUrl: muxedFileUrl,
 			filename: safeFilename(entry.title, 'mp4')
 		};
 	}
@@ -277,7 +295,10 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 	const stream = video ?? audio;
 	if (!stream) throw new Error('No downloadable stream found');
 
-	const downloadUrl = buildStreamUrl(stream.url, entry.title, stream.format || 'mp4');
+	const downloadUrl = buildStreamUrl(stream.url, entry.title, stream.format || 'mp4', {
+		sourceUrl: result.originalUrl,
+		formatId: stream.formatId
+	});
 
 	return {
 		entry,

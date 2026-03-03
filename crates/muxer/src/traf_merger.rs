@@ -342,7 +342,11 @@ mod tests {
         let mdat_start = moof_end;
         let mdat_bytes = &out[mdat_start..];
         assert!(mdat_bytes.len() >= 8 + 4 + 2, "mdat payload too short");
-        assert_eq!(&mdat_bytes[8..12], &[0x01, 0x02, 0x03, 0x04], "video payload");
+        assert_eq!(
+            &mdat_bytes[8..12],
+            &[0x01, 0x02, 0x03, 0x04],
+            "video payload"
+        );
         assert_eq!(&mdat_bytes[12..14], &[0xAA, 0xBB], "audio payload");
     }
 
@@ -363,8 +367,8 @@ mod tests {
         let moof_bytes = &out[..merged_moof_size];
 
         // Find video traf (first traf)
-        let mut traf_iter = iter_boxes(&moof_bytes[moof_content_start..])
-            .filter(|(_, h)| &h.box_type == b"traf");
+        let mut traf_iter =
+            iter_boxes(&moof_bytes[moof_content_start..]).filter(|(_, h)| &h.box_type == b"traf");
 
         let (v_traf_off, v_traf_hdr) = traf_iter.next().expect("video traf");
         let v_traf_abs = moof_content_start + v_traf_off;

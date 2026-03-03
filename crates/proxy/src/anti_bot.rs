@@ -4,12 +4,12 @@
 //! and request throttling to avoid bot detection.
 
 use crate::cookie_store::{CookieStore, Platform};
-use futures::StreamExt;
 use crate::header_builder::HeaderBuilder;
 use crate::proxy_pool::ProxyPool;
 use crate::throttle::DomainThrottle;
 use bytes::Bytes;
 use futures::Stream;
+use futures::StreamExt;
 use reqwest::{Client, Proxy, StatusCode};
 use std::sync::Arc;
 use std::time::Duration;
@@ -98,14 +98,14 @@ impl AntiBotClient {
         let mut builder = Client::builder()
             .connect_timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(10)
-            .cookie_store(true)  // Use built-in cookie store
+            .cookie_store(true) // Use built-in cookie store
             .connection_verbose(false);
 
         // Add proxy if available
         if let Some(proxy_url) = proxy_pool.next() {
             debug!("Configuring client with proxy: {}", proxy_url);
-            let proxy = Proxy::all(proxy_url)
-                .map_err(|e| AntiBotError::InvalidUrl(e.to_string()))?;
+            let proxy =
+                Proxy::all(proxy_url).map_err(|e| AntiBotError::InvalidUrl(e.to_string()))?;
             builder = builder.proxy(proxy);
         }
 
@@ -139,6 +139,12 @@ impl AntiBotClient {
         range: Option<String>,
     ) -> Result<impl Stream<Item = Result<Bytes, AntiBotError>>, AntiBotError> {
         let response = self.request_with_retry(url, range).await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(AntiBotError::RequestFailed(
+                response.error_for_status().unwrap_err(),
+            ));
+        }
 
         let stream = response
             .bytes_stream()
@@ -153,8 +159,8 @@ impl AntiBotClient {
         url: &str,
         range: Option<String>,
     ) -> Result<reqwest::Response, AntiBotError> {
-        let parsed_url = reqwest::Url::parse(url)
-            .map_err(|e| AntiBotError::InvalidUrl(e.to_string()))?;
+        let parsed_url =
+            reqwest::Url::parse(url).map_err(|e| AntiBotError::InvalidUrl(e.to_string()))?;
         let domain = parsed_url
             .host_str()
             .ok_or_else(|| AntiBotError::InvalidUrl("Missing host".to_string()))?;
@@ -169,7 +175,9 @@ impl AntiBotClient {
             let mut request = self.client.get(url);
 
             // Add headers — detects c=IOS URLs and uses iOS User-Agent automatically
-            let headers = self.header_builder.build_headers_for_url(url, self.cookie_store.platform(), None);
+            let headers =
+                self.header_builder
+                    .build_headers_for_url(url, self.cookie_store.platform(), None);
             request = request.headers(headers);
 
             // Add range if specified
@@ -202,7 +210,11 @@ impl AntiBotClient {
                             "Received {} for {}{}",
                             status,
                             url,
-                            if is_cdn_url { " (CDN URL — not retrying)" } else { ", rotating proxy and retrying" }
+                            if is_cdn_url {
+                                " (CDN URL — not retrying)"
+                            } else {
+                                ", rotating proxy and retrying"
+                            }
                         );
 
                         if is_cdn_url {
@@ -255,9 +267,7 @@ impl AntiBotClient {
 
         // Max retries exceeded
         error!("Max retries exceeded for URL: {}", url);
-        Err(last_error.unwrap_or_else(|| {
-            AntiBotError::MaxRetriesExceeded(url.to_string())
-        }))
+        Err(last_error.unwrap_or_else(|| AntiBotError::MaxRetriesExceeded(url.to_string())))
     }
 
     /// Get the platform associated with this client

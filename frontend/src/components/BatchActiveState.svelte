@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { batchProgress } from '$stores/batch';
+	import { batchProgress, batchQueue } from '$stores/batch';
 	import { getStatus } from '$lib/playlist-download-worker';
 	import { onMount } from 'svelte';
 
@@ -13,6 +13,22 @@
 	let { fsaaSupported, dirPicked, onPickDirectory, onCancel }: Props = $props();
 	let workerStatus = $state(getStatus());
 
+	const selectedCount = $derived.by(
+		() => $batchQueue.filter((item) => item.selected !== false).length
+	);
+	const settledCount = $derived.by(
+		() =>
+			$batchQueue.filter(
+				(item) => item.selected !== false && (item.status === 'completed' || item.status === 'error')
+			).length
+	);
+	const progressTotal = $derived.by(() => (selectedCount > 0 ? selectedCount : $batchProgress.total));
+	const progressDone = $derived.by(() => (selectedCount > 0 ? settledCount : $batchProgress.received));
+	const progressPercent = $derived.by(() => {
+		if (progressTotal <= 0) return 0;
+		return Math.min(100, Math.round((progressDone / progressTotal) * 100));
+	});
+
 	onMount(() => {
 		const timer = setInterval(() => {
 			workerStatus = getStatus();
@@ -23,10 +39,10 @@
 
 <div class="active-batch">
 	<div class="progress-info">
-		<span class="progress-text">{$batchProgress.received} / {$batchProgress.total} videos</span>
-		{#if $batchProgress.total > 0}
+		<span class="progress-text">{progressDone} / {progressTotal} videos</span>
+		{#if progressTotal > 0}
 			<span class="progress-percent">
-				{Math.round(($batchProgress.received / $batchProgress.total) * 100)}%
+				{progressPercent}%
 			</span>
 		{/if}
 	</div>
@@ -34,7 +50,7 @@
 	<div class="progress-bar">
 		<div
 			class="progress-fill"
-			style:width="{$batchProgress.total > 0 ? ($batchProgress.received / $batchProgress.total) * 100 : 0}%"
+			style:width={`${progressPercent}%`}
 		></div>
 	</div>
 

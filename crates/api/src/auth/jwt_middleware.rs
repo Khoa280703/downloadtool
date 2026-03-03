@@ -41,7 +41,9 @@ fn extract_bearer_token(request: &Request) -> Option<&str> {
         .headers()
         .get("Authorization")
         .and_then(|value| value.to_str().ok())?;
-    auth.strip_prefix("Bearer ").map(str::trim).filter(|v| !v.is_empty())
+    auth.strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
 }
 
 fn decode_jwt(token: &str, secret: &str) -> Result<JwtClaims, jsonwebtoken::errors::Error> {

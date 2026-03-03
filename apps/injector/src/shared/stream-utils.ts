@@ -44,8 +44,13 @@ export function buildMuxedPairs(formats: StreamFormat[]): MuxedPair[] {
   const videoStreams = formats.filter((f) => !f.is_audio_only && !f.has_audio);
   const audioStreams = formats.filter((f) => f.is_audio_only);
 
-  // Pick best audio: highest bitrate AAC preferred, then any
-  const bestAudio = audioStreams.sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))[0];
+  // Pick best audio: prefer MP4/M4A first, then highest bitrate.
+  const bestAudio = [...audioStreams].sort((a, b) => {
+    const aRank = a.ext === 'm4a' || a.ext === 'mp4' ? 0 : 1;
+    const bRank = b.ext === 'm4a' || b.ext === 'mp4' ? 0 : 1;
+    if (aRank !== bRank) return aRank - bRank;
+    return (b.bitrate ?? 0) - (a.bitrate ?? 0);
+  })[0];
   if (!bestAudio) return [];
 
   return videoStreams.map((v) => ({

@@ -193,22 +193,17 @@ pub fn parse_range_header(header: &str) -> Option<Range> {
 
 /// Validate that a URL is from an allowed host.
 pub fn validate_stream_url(url: &str) -> Result<reqwest::Url, ProxyError> {
-    const ALLOWED_STREAM_HOSTS: &[&str] = &[
-        "googlevideo.com",
-        "youtube.com",
-        "youtu.be",
-    ];
+    const ALLOWED_STREAM_HOSTS: &[&str] = &["googlevideo.com", "youtube.com", "youtu.be"];
 
-    let parsed = reqwest::Url::parse(url)
-        .map_err(|e| ProxyError::InvalidUrl(e.to_string()))?;
+    let parsed = reqwest::Url::parse(url).map_err(|e| ProxyError::InvalidUrl(e.to_string()))?;
 
     let host = parsed
         .host_str()
         .ok_or_else(|| ProxyError::InvalidUrl("Missing host".to_string()))?;
 
-    let is_allowed = ALLOWED_STREAM_HOSTS.iter().any(|allowed| {
-        host == *allowed || host.ends_with(&format!(".{}", allowed))
-    });
+    let is_allowed = ALLOWED_STREAM_HOSTS
+        .iter()
+        .any(|allowed| host == *allowed || host.ends_with(&format!(".{}", allowed)));
 
     if !is_allowed {
         return Err(ProxyError::UrlNotAllowed(host.to_string()));
@@ -250,7 +245,6 @@ mod tests {
         assert!(validate_stream_url("https://rr1---sn-abc.googlevideo.com/videoplayback").is_ok());
         assert!(validate_stream_url("https://youtube.com/watch?v=abc").is_ok());
         assert!(validate_stream_url("https://youtu.be/abc123").is_ok());
-
 
         // Invalid URLs
         assert!(validate_stream_url("https://example.com/video").is_err());

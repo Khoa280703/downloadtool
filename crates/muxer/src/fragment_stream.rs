@@ -109,9 +109,8 @@ where
         }
 
         // We are positioned at a moof box. Read its declared size.
-        let moof_size = u32::from_be_bytes(
-            self.buffer[0..4].try_into().expect("buffer has ≥8 bytes"),
-        ) as usize;
+        let moof_size =
+            u32::from_be_bytes(self.buffer[0..4].try_into().expect("buffer has ≥8 bytes")) as usize;
 
         if moof_size < 8 {
             self.done = true;
@@ -121,7 +120,9 @@ where
         match self.fill_to(moof_size).await {
             Ok(false) => {
                 self.done = true;
-                return Some(Err(MuxerError::InvalidInput("Stream ended inside moof".into())));
+                return Some(Err(MuxerError::InvalidInput(
+                    "Stream ended inside moof".into(),
+                )));
             }
             Err(e) => {
                 self.done = true;
@@ -136,7 +137,9 @@ where
         match self.fill_to(8).await {
             Ok(false) => {
                 self.done = true;
-                return Some(Err(MuxerError::InvalidInput("Stream ended after moof".into())));
+                return Some(Err(MuxerError::InvalidInput(
+                    "Stream ended after moof".into(),
+                )));
             }
             Err(e) => {
                 self.done = true;
@@ -152,9 +155,8 @@ where
             )));
         }
 
-        let mdat_size = u32::from_be_bytes(
-            self.buffer[0..4].try_into().expect("buffer has ≥8 bytes"),
-        ) as usize;
+        let mdat_size =
+            u32::from_be_bytes(self.buffer[0..4].try_into().expect("buffer has ≥8 bytes")) as usize;
 
         if mdat_size < 8 {
             self.done = true;

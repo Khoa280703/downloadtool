@@ -80,7 +80,10 @@ pub struct ProxyPool {
 impl ProxyPool {
     /// Create a new proxy pool from a list of proxy URLs
     pub fn new(urls: Vec<String>) -> Self {
-        let proxies = urls.into_iter().map(|url| Arc::new(ProxyEntry::new(url))).collect();
+        let proxies = urls
+            .into_iter()
+            .map(|url| Arc::new(ProxyEntry::new(url)))
+            .collect();
         Self {
             proxies,
             current: AtomicUsize::new(0),
@@ -96,7 +99,10 @@ impl ProxyPool {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            debug!("Loaded {} proxies from PROXY_LIST environment variable", urls.len());
+            debug!(
+                "Loaded {} proxies from PROXY_LIST environment variable",
+                urls.len()
+            );
             Self::new(urls)
         })
     }

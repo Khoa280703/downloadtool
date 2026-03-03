@@ -6,6 +6,33 @@
 import type { ExtractResult, BatchMessage } from './types';
 
 const RAW_API_BASE = import.meta.env.VITE_API_URL || '';
+const RETRYABLE_HTTP_STATUS = new Set([429, 502, 503, 504]);
+const EXTRACT_MAX_RETRY_ATTEMPTS = 4;
+const EXTRACT_RETRY_BASE_DELAY_MS = 500;
+const EXTRACT_RETRY_MAX_DELAY_MS = 8_000;
+const BATCH_MAX_RECONNECT_ATTEMPTS = 8;
+const BATCH_RECONNECT_BASE_DELAY_MS = 1_000;
+const BATCH_RECONNECT_MAX_DELAY_MS = 12_000;
+const MUX_JOB_POLL_INTERVAL_MS = 1_200;
+const MUX_JOB_MAX_WAIT_MS = 10 * 60 * 1000;
+
+export type BatchSubscription = {
+	close: () => void;
+};
+
+type CreateMuxJobApiResponse = {
+	job_id: string;
+	status: string;
+	status_url: string;
+	file_url: string;
+};
+
+type MuxJobStatusApiResponse = {
+	job_id: string;
+	status: 'queued' | 'processing' | 'ready' | 'failed';
+	error?: string | null;
+	file_url?: string | null;
+};
 
 function stripErrorPrefix(message: string): string {
 	return message.replace(/^extract(?:ion)?\s+failed:\s*/i, '').replace(/^error:\s*/i, '').trim();
@@ -112,6 +139,135 @@ function buildApiUrl(path: string): string {
 	return `${base}${path}`;
 }
 
+function isAbortError(error: unknown): boolean {
+	return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function toAbsoluteApiUrl(url: string): string {
+	if (url.startsWith('http://') || url.startsWith('https://')) return url;
+	if (url.startsWith('/')) return `${normalizeApiBase(RAW_API_BASE)}${url}`;
+	return `${normalizeApiBase(RAW_API_BASE)}/${url}`;
+}
+
+async function parseApiError(response: Response, fallbackMessage: string): Promise<Error & { status?: number }> {
+	let message = fallbackMessage;
+	try {
+		const text = await response.text();
+		if (text) {
+			try {
+				const parsed = JSON.parse(text) as { error?: string; message?: string };
+				message = parsed.error || parsed.message || text;
+			} catch {
+				message = text;
+			}
+		}
+	} catch {
+		// Ignore parse/read failures and keep fallback message.
+	}
+
+	const error = new Error(message) as Error & { status?: number };
+	error.status = response.status;
+	return error;
+}
+
+function parseRetryAfterHeader(value: string | null): number | undefined {
+	if (!value) return undefined;
+	const seconds = Number.parseInt(value, 10);
+	if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+
+	const asDate = Date.parse(value);
+	if (!Number.isNaN(asDate)) {
+		const diff = asDate - Date.now();
+		if (diff > 0) return diff;
+	}
+	return undefined;
+}
+
+function computeBackoffWithJitter(
+	attempt: number,
+	baseDelayMs: number,
+	maxDelayMs: number,
+	maxJitterMs: number
+): number {
+	const base = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+	const jitter = Math.floor(Math.random() * Math.min(maxJitterMs, Math.floor(base * 0.3)));
+	return Math.min(maxDelayMs, base + jitter);
+}
+
+async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+	if (ms <= 0) return;
+	if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
+
+	await new Promise<void>((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			if (signal) signal.removeEventListener('abort', onAbort);
+			resolve();
+		}, ms);
+
+		const onAbort = () => {
+			clearTimeout(timeout);
+			if (signal) signal.removeEventListener('abort', onAbort);
+			reject(new DOMException('Operation aborted', 'AbortError'));
+		};
+
+		if (signal) signal.addEventListener('abort', onAbort, { once: true });
+	});
+}
+
+async function fetchExtractWithRetry(requestUrl: string, signal?: AbortSignal): Promise<Response> {
+	let lastError: unknown;
+
+	for (let attempt = 1; attempt <= EXTRACT_MAX_RETRY_ATTEMPTS; attempt += 1) {
+		try {
+			const response = await fetch('/api/proxy/extract', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ url: requestUrl }),
+				signal
+			});
+
+			if (response.ok) return response;
+			if (!RETRYABLE_HTTP_STATUS.has(response.status) || attempt >= EXTRACT_MAX_RETRY_ATTEMPTS) {
+				return response;
+			}
+
+			const retryAfterMs = parseRetryAfterHeader(response.headers.get('retry-after'));
+			const delayMs =
+				retryAfterMs ??
+				computeBackoffWithJitter(
+					attempt,
+					EXTRACT_RETRY_BASE_DELAY_MS,
+					EXTRACT_RETRY_MAX_DELAY_MS,
+					500
+				);
+
+			try {
+				await response.text();
+			} catch {
+				// Ignore body read errors between retry attempts.
+			}
+
+			await sleep(delayMs, signal);
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			lastError = error;
+			if (attempt >= EXTRACT_MAX_RETRY_ATTEMPTS) break;
+			const delayMs = computeBackoffWithJitter(
+				attempt,
+				EXTRACT_RETRY_BASE_DELAY_MS,
+				EXTRACT_RETRY_MAX_DELAY_MS,
+				500
+			);
+			await sleep(delayMs, signal);
+		}
+	}
+
+	if (lastError instanceof Error) throw lastError;
+	throw new Error('Extraction request failed after retries');
+}
+
 function normalizeExtractUrl(url: string): string {
 	const videoId = extractYouTubeVideoId(url);
 	if (!videoId) return url;
@@ -126,14 +282,7 @@ function normalizeExtractUrl(url: string): string {
  */
 export async function extract(url: string, signal?: AbortSignal): Promise<ExtractResult> {
 	const requestUrl = normalizeExtractUrl(url);
-	const response = await fetch('/api/proxy/extract', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({ url: requestUrl }),
-		signal
-	});
+	const response = await fetchExtractWithRetry(requestUrl, signal);
 
 	if (!response.ok) {
 		const status = response.status;
@@ -162,6 +311,7 @@ export async function extract(url: string, signal?: AbortSignal): Promise<Extrac
 		// Backend StreamFormat fields: quality, ext, url, has_audio, is_audio_only, codec_label, bitrate, filesize
 		return {
 			url: f.url,
+			formatId: f.format_id,
 			quality: f.quality || 'Unknown',
 			format: f.ext || 'mp4',
 			hasAudio: !!f.has_audio,
@@ -178,6 +328,7 @@ export async function extract(url: string, signal?: AbortSignal): Promise<Extrac
 		viewCount: meta.view_count,
 		description: meta.description,
 		streams,
+		originalUrl: meta.original_url,
 		platform: getPlatform(url),
 		thumbnail: meta.thumbnail,
 		duration: meta.duration
@@ -194,13 +345,19 @@ export async function extract(url: string, signal?: AbortSignal): Promise<Extrac
 export function buildStreamUrl(
 	streamUrl: string,
 	title: string,
-	format: string = 'mp4'
+	format: string = 'mp4',
+	options?: {
+		sourceUrl?: string;
+		formatId?: string;
+	}
 ): string {
 	const params = new URLSearchParams({
 		url: streamUrl,
 		title,
 		format
 	});
+	if (options?.sourceUrl) params.set('source_url', options.sourceUrl);
+	if (options?.formatId) params.set('format_id', options.formatId);
 	return `${buildApiUrl('/api/stream')}?${params.toString()}`;
 }
 
@@ -214,14 +371,97 @@ export function buildStreamUrl(
 export function buildMuxedStreamUrl(
 	videoUrl: string,
 	audioUrl: string,
-	title: string
+	title: string,
+	options?: {
+		sourceUrl?: string;
+		videoFormatId?: string;
+		audioFormatId?: string;
+	}
 ): string {
 	const params = new URLSearchParams({
 		video_url: videoUrl,
 		audio_url: audioUrl,
 		title
 	});
+	if (options?.sourceUrl) params.set('source_url', options.sourceUrl);
+	if (options?.videoFormatId) params.set('video_format_id', options.videoFormatId);
+	if (options?.audioFormatId) params.set('audio_format_id', options.audioFormatId);
 	return `${buildApiUrl('/api/stream/muxed')}?${params.toString()}`;
+}
+
+export async function createMuxedDownloadJob(
+	videoUrl: string,
+	audioUrl: string,
+	title: string,
+	options?: {
+		sourceUrl?: string;
+		videoFormatId?: string;
+		audioFormatId?: string;
+	},
+	signal?: AbortSignal
+): Promise<{ jobId: string; statusUrl: string; fileUrl: string }> {
+	const response = await fetch(buildApiUrl('/api/stream/muxed/jobs'), {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({
+			video_url: videoUrl,
+			audio_url: audioUrl,
+			title,
+			source_url: options?.sourceUrl,
+			video_format_id: options?.videoFormatId,
+			audio_format_id: options?.audioFormatId
+		}),
+		signal
+	});
+
+	if (!response.ok) {
+		throw await parseApiError(response, `Failed to create mux job (${response.status})`);
+	}
+
+	const data = (await response.json()) as CreateMuxJobApiResponse;
+	return {
+		jobId: data.job_id,
+		statusUrl: toAbsoluteApiUrl(data.status_url),
+		fileUrl: toAbsoluteApiUrl(data.file_url)
+	};
+}
+
+export async function waitForMuxedDownloadJobReady(
+	jobId: string,
+	options?: {
+		timeoutMs?: number;
+		pollIntervalMs?: number;
+	},
+	signal?: AbortSignal
+): Promise<string> {
+	const startedAt = Date.now();
+	const timeoutMs = options?.timeoutMs ?? MUX_JOB_MAX_WAIT_MS;
+	const pollIntervalMs = options?.pollIntervalMs ?? MUX_JOB_POLL_INTERVAL_MS;
+	const statusUrl = buildApiUrl(`/api/stream/muxed/jobs/${encodeURIComponent(jobId)}`);
+
+	while (true) {
+		if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
+		if (Date.now() - startedAt > timeoutMs) {
+			throw new Error(`Mux job timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
+		}
+
+		const response = await fetch(statusUrl, { signal });
+		if (!response.ok) {
+			throw await parseApiError(response, `Failed to query mux job status (${response.status})`);
+		}
+
+		const status = (await response.json()) as MuxJobStatusApiResponse;
+		if (status.status === 'ready' && status.file_url) {
+			return toAbsoluteApiUrl(status.file_url);
+		}
+		if (status.status === 'failed') {
+			throw new Error(status.error || 'Mux job failed');
+		}
+
+		await sleep(pollIntervalMs, signal);
+	}
 }
 
 /**
@@ -235,26 +475,80 @@ export function subscribeBatch(
 	url: string,
 	onMessage: (msg: BatchMessage) => void,
 	onError?: (error: Event) => void
-): EventSource {
+): BatchSubscription {
 	const encodedUrl = encodeURIComponent(url);
-	const es = new EventSource(`${buildApiUrl('/api/batch')}?url=${encodedUrl}`);
+	let es: EventSource | null = null;
+	let closed = false;
+	let reconnectAttempts = 0;
+	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-	es.onmessage = (event) => {
-		try {
-			const data: BatchMessage = JSON.parse(event.data);
-			onMessage(data);
-		} catch (err) {
-			console.error('Failed to parse SSE message:', err);
+	const clearReconnectTimer = () => {
+		if (!reconnectTimer) return;
+		clearTimeout(reconnectTimer);
+		reconnectTimer = null;
+	};
+
+	const connect = () => {
+		if (closed) return;
+
+		es = new EventSource(`${buildApiUrl('/api/batch')}?url=${encodedUrl}`);
+		es.onopen = () => {
+			reconnectAttempts = 0;
+		};
+
+		es.onmessage = (event) => {
+			try {
+				const data: BatchMessage = JSON.parse(event.data);
+				onMessage(data);
+			} catch (err) {
+				console.error('Failed to parse SSE message:', err);
+			}
+		};
+
+		es.onerror = (err) => {
+			if (closed) return;
+			// Browser EventSource already auto-reconnects while CONNECTING.
+			if (es?.readyState === EventSource.CONNECTING) return;
+
+			if (reconnectAttempts >= BATCH_MAX_RECONNECT_ATTEMPTS) {
+				onError?.(err);
+				return;
+			}
+
+			reconnectAttempts += 1;
+			const delayMs = computeBackoffWithJitter(
+				reconnectAttempts,
+				BATCH_RECONNECT_BASE_DELAY_MS,
+				BATCH_RECONNECT_MAX_DELAY_MS,
+				800
+			);
+			try {
+				es?.close();
+			} catch {
+				// Ignore close errors while reconnecting.
+			}
+			clearReconnectTimer();
+			reconnectTimer = setTimeout(() => {
+				reconnectTimer = null;
+				connect();
+			}, delayMs);
+		};
+	};
+
+	connect();
+
+	return {
+		close: () => {
+			closed = true;
+			clearReconnectTimer();
+			try {
+				es?.close();
+			} catch {
+				// Ignore close errors.
+			}
+			es = null;
 		}
 	};
-
-	es.onerror = (err) => {
-		console.error('SSE error:', err);
-		onError?.(err);
-		es.close();
-	};
-
-	return es;
 }
 
 function isYouTubeHost(hostname: string): boolean {

@@ -140,11 +140,14 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         .stderr(Stdio::piped())
         .output()
         .await
-        .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e)))?;
+        .map_err(|e| {
+            ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e))
+        })?;
 
     if primary_output.status.success() {
-        let primary_json: Value = serde_json::from_slice(&primary_output.stdout)
-            .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e)))?;
+        let primary_json: Value = serde_json::from_slice(&primary_output.stdout).map_err(|e| {
+            ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e))
+        })?;
         let primary_info = parse_ytdlp_json(primary_json, &url)?;
         return Ok(Arc::new(primary_info));
     }
@@ -163,11 +166,14 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
     warn!(
         fallback_retries = retries,
         "yt-dlp primary extraction failed for {}: {}. Retrying with alternate player_client args",
-        url, stderr_trimmed
+        url,
+        stderr_trimmed
     );
 
-    if let Some(fallback_info) = try_extract_with_args(&url, Some(ALTERNATE_PLAYER_CLIENT_ARGS)).await? {
-        return Ok(Arc::new(fallback_info))
+    if let Some(fallback_info) =
+        try_extract_with_args(&url, Some(ALTERNATE_PLAYER_CLIENT_ARGS)).await?
+    {
+        return Ok(Arc::new(fallback_info));
     }
 
     Err(ExtractionError::ScriptExecutionFailed(format!(
@@ -219,7 +225,9 @@ async fn try_extract_with_args(
         .stderr(Stdio::piped())
         .output()
         .await
-        .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e)))?;
+        .map_err(|e| {
+            ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {}", e))
+        })?;
 
     if !fallback_output.status.success() {
         let fallback_stderr = String::from_utf8_lossy(&fallback_output.stderr);
@@ -231,8 +239,9 @@ async fn try_extract_with_args(
         return Ok(None);
     }
 
-    let fallback_json: Value = serde_json::from_slice(&fallback_output.stdout)
-        .map_err(|e| ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e)))?;
+    let fallback_json: Value = serde_json::from_slice(&fallback_output.stdout).map_err(|e| {
+        ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {}", e))
+    })?;
     let fallback_info = parse_ytdlp_json(fallback_json, url)?;
     Ok(Some(fallback_info))
 }
@@ -255,9 +264,7 @@ fn parse_ytdlp_json(json: Value, original_url: &str) -> Result<VideoInfo, Extrac
         .and_then(Value::as_str)
         .map(String::from);
 
-    let view_count = obj
-        .get("view_count")
-        .and_then(Value::as_u64);
+    let view_count = obj.get("view_count").and_then(Value::as_u64);
 
     let description = obj
         .get("description")
@@ -277,7 +284,9 @@ fn parse_ytdlp_json(json: Value, original_url: &str) -> Result<VideoInfo, Extrac
     let formats_raw = obj
         .get("formats")
         .and_then(Value::as_array)
-        .ok_or_else(|| ExtractionError::ScriptExecutionFailed("yt-dlp: no formats array".to_string()))?;
+        .ok_or_else(|| {
+            ExtractionError::ScriptExecutionFailed("yt-dlp: no formats array".to_string())
+        })?;
 
     let mut formats: Vec<VideoFormat> = formats_raw
         .iter()
@@ -292,9 +301,7 @@ fn parse_ytdlp_json(json: Value, original_url: &str) -> Result<VideoInfo, Extrac
     }
 
     // Sort: highest resolution video first, then audio-only by bitrate
-    formats.sort_by(|a, b| {
-        b.height.unwrap_or(0).cmp(&a.height.unwrap_or(0))
-    });
+    formats.sort_by(|a, b| b.height.unwrap_or(0).cmp(&a.height.unwrap_or(0)));
 
     Ok(VideoInfo {
         title,
@@ -316,7 +323,10 @@ fn parse_format(fmt: &Value, idx: usize) -> Option<VideoFormat> {
     let url = obj.get("url").and_then(Value::as_str)?;
 
     // Skip non-http protocols (m3u8, dash, etc.)
-    let protocol = obj.get("protocol").and_then(Value::as_str).unwrap_or("https");
+    let protocol = obj
+        .get("protocol")
+        .and_then(Value::as_str)
+        .unwrap_or("https");
     if protocol.contains("m3u8") || protocol == "mhtml" {
         return None;
     }
@@ -373,8 +383,16 @@ fn parse_format(fmt: &Value, idx: usize) -> Option<VideoFormat> {
         None
     };
 
-    let vcodec_str = if has_video { Some(vcodec.to_string()) } else { None };
-    let acodec_str = if has_audio_codec { Some(acodec.to_string()) } else { None };
+    let vcodec_str = if has_video {
+        Some(vcodec.to_string())
+    } else {
+        None
+    };
+    let acodec_str = if has_audio_codec {
+        Some(acodec.to_string())
+    } else {
+        None
+    };
 
     Some(VideoFormat {
         format_id,
@@ -438,29 +456,35 @@ fn build_quality_label(
 /// Human-readable video codec label
 fn codec_label_video(vcodec: &str) -> Option<String> {
     let v = vcodec.to_lowercase();
-    Some(if v.starts_with("av01") {
-        "AV1"
-    } else if v.starts_with("vp09") || v.starts_with("vp9") {
-        "VP9"
-    } else if v.starts_with("avc1") || v.starts_with("h264") {
-        "H.264"
-    } else if v.starts_with("hev1") || v.starts_with("hvc1") {
-        "H.265"
-    } else {
-        return Some(vcodec.split('.').next().unwrap_or(vcodec).to_uppercase());
-    }.to_string())
+    Some(
+        if v.starts_with("av01") {
+            "AV1"
+        } else if v.starts_with("vp09") || v.starts_with("vp9") {
+            "VP9"
+        } else if v.starts_with("avc1") || v.starts_with("h264") {
+            "H.264"
+        } else if v.starts_with("hev1") || v.starts_with("hvc1") {
+            "H.265"
+        } else {
+            return Some(vcodec.split('.').next().unwrap_or(vcodec).to_uppercase());
+        }
+        .to_string(),
+    )
 }
 
 /// Human-readable audio codec label
 fn codec_label_audio(acodec: &str) -> Option<String> {
     let a = acodec.to_lowercase();
-    Some(if a.starts_with("mp4a") {
-        "AAC"
-    } else if a.starts_with("opus") {
-        "Opus"
-    } else {
-        return Some(acodec.split('.').next().unwrap_or(acodec).to_uppercase());
-    }.to_string())
+    Some(
+        if a.starts_with("mp4a") {
+            "AAC"
+        } else if a.starts_with("opus") {
+            "Opus"
+        } else {
+            return Some(acodec.split('.').next().unwrap_or(acodec).to_uppercase());
+        }
+        .to_string(),
+    )
 }
 
 #[cfg(test)]
