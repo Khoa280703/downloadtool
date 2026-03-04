@@ -2,7 +2,7 @@
 //!
 //! Generates headers that mimic real browsers to avoid bot detection.
 
-use crate::cookie_store::Platform;
+use crate::platform::Platform;
 use reqwest::header::{
     HeaderMap, HeaderValue, ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, REFERER, USER_AGENT,
 };

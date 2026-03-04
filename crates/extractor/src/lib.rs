@@ -10,7 +10,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let info = extract("https://youtube.com/watch?v=...", None).await?;
+//!     let info = extract("https://youtube.com/watch?v=...").await?;
 //!     println!("Title: {}", info.title);
 //!     println!("Formats: {}", info.formats.len());
 //!     Ok(())
@@ -66,12 +66,16 @@ pub async fn init(bundle_path: Option<&Path>) -> Result<(), ExtractionError> {
 
 /// Extract video information from a URL via yt-dlp subprocess.
 ///
-/// Uses `yt-dlp -J --no-playlist` which handles PO Token, signature decryption,
-/// and throttle bypass automatically. The `cookies` parameter is accepted for
-/// API compatibility but yt-dlp manages cookies internally.
-pub async fn extract(url: &str, _cookies: Option<&str>) -> Result<VideoInfo, ExtractionError> {
+/// Uses `yt-dlp -J --no-playlist` which handles PO Token, signature decryption
+/// and throttle bypass automatically.
+pub async fn extract(url: &str) -> Result<VideoInfo, ExtractionError> {
     debug!("Extracting via yt-dlp: {}", url);
     ytdlp::extract_via_ytdlp(url).await
+}
+
+/// Resolve pinned proxy URL for a direct stream URL, if previously extracted.
+pub async fn resolve_stream_proxy(url: &str) -> Option<String> {
+    ytdlp::resolve_stream_proxy(url).await
 }
 
 /// Extract video information with a specific platform
@@ -81,11 +85,9 @@ pub async fn extract(url: &str, _cookies: Option<&str>) -> Result<VideoInfo, Ext
 /// # Arguments
 /// * `platform` - The platform identifier (e.g., "youtube")
 /// * `url` - The video URL to extract
-/// * `cookies` - Optional cookies string
 pub async fn extract_with_platform(
     platform: &str,
     url: &str,
-    cookies: Option<&str>,
 ) -> Result<VideoInfo, ExtractionError> {
     let pool = GLOBAL_POOL.get().ok_or_else(|| {
         ExtractionError::ScriptExecutionFailed(
@@ -93,7 +95,7 @@ pub async fn extract_with_platform(
         )
     })?;
 
-    pool.extract(platform, url, cookies).await
+    pool.extract(platform, url).await
 }
 
 /// Extract playlist items with a specific platform extractor.
@@ -102,7 +104,6 @@ pub async fn extract_with_platform(
 pub async fn extract_playlist(
     platform: &str,
     url: &str,
-    cookies: Option<&str>,
 ) -> Result<serde_json::Value, ExtractionError> {
     let pool = GLOBAL_POOL.get().ok_or_else(|| {
         ExtractionError::ScriptExecutionFailed(
@@ -110,7 +111,7 @@ pub async fn extract_playlist(
         )
     })?;
 
-    pool.extract_playlist(platform, url, cookies).await
+    pool.extract_playlist(platform, url).await
 }
 
 /// Create a new extractor pool with custom settings

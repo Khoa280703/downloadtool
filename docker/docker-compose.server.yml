@@ -20,6 +20,8 @@ services:
     environment:
       - PORT=3068
       - RUST_LOG=info
+      - SOCKS5_PROXY_URL=${SOCKS5_PROXY_URL}
+      - PROXY_LIST=${PROXY_LIST}
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - WHOP_WEBHOOK_SECRET=${WHOP_WEBHOOK_SECRET}

@@ -7,7 +7,7 @@ use bytes::Bytes;
 use extractor::VideoFormat;
 use futures::{Stream, StreamExt};
 use proxy::anti_bot::{AntiBotClient, AntiBotError};
-use proxy::cookie_store::Platform;
+use proxy::Platform;
 use reqwest::StatusCode;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -66,8 +66,13 @@ impl StreamFetcher {
         audio_url: &str,
         platform: Platform,
     ) -> Result<(ByteStream, ByteStream), AntiBotError> {
-        Self::fetch_both_with_refresh(video_url, audio_url, platform, FetchBothRefreshOptions::default())
-            .await
+        Self::fetch_both_with_refresh(
+            video_url,
+            audio_url,
+            platform,
+            FetchBothRefreshOptions::default(),
+        )
+        .await
     }
 
     /// Fetch both streams with optional refresh contexts for auth-like upstream failures.
@@ -77,12 +82,25 @@ impl StreamFetcher {
         platform: Platform,
         refresh: FetchBothRefreshOptions,
     ) -> Result<(ByteStream, ByteStream), AntiBotError> {
+        Self::fetch_both_with_refresh_and_proxy(video_url, audio_url, platform, refresh, None, None)
+            .await
+    }
+
+    /// Fetch both streams with optional refresh contexts and pinned proxies.
+    pub async fn fetch_both_with_refresh_and_proxy(
+        video_url: &str,
+        audio_url: &str,
+        platform: Platform,
+        refresh: FetchBothRefreshOptions,
+        video_proxy: Option<String>,
+        audio_proxy: Option<String>,
+    ) -> Result<(ByteStream, ByteStream), AntiBotError> {
         info!("Fetching video stream from: {}", video_url);
         info!("Fetching audio stream from: {}", audio_url);
 
         let (video_result, audio_result) = tokio::join!(
-            fetch_stream_chunked(platform, video_url, refresh.video),
-            fetch_stream_chunked(platform, audio_url, refresh.audio)
+            fetch_stream_chunked(platform, video_url, refresh.video, video_proxy),
+            fetch_stream_chunked(platform, audio_url, refresh.audio, audio_proxy)
         );
 
         let video_stream = video_result?;
@@ -166,18 +184,16 @@ fn find_refreshed_format_url(
         }
     }
 
-    let fallback_ext_owned = expected_ext
-        .map(|ext| ext.to_string())
-        .or_else(|| {
-            reqwest::Url::parse(fallback_url)
-                .ok()
-                .and_then(|url| {
-                    url.query_pairs()
-                        .find(|(k, _)| k == "mime")
-                        .map(|(_, v)| v.to_string())
-                })
-                .and_then(|mime| mime.split('/').nth(1).map(|v| v.to_lowercase()))
-        });
+    let fallback_ext_owned = expected_ext.map(|ext| ext.to_string()).or_else(|| {
+        reqwest::Url::parse(fallback_url)
+            .ok()
+            .and_then(|url| {
+                url.query_pairs()
+                    .find(|(k, _)| k == "mime")
+                    .map(|(_, v)| v.to_string())
+            })
+            .and_then(|mime| mime.split('/').nth(1).map(|v| v.to_lowercase()))
+    });
     let fallback_ext = fallback_ext_owned.as_deref();
 
     formats
@@ -207,7 +223,7 @@ async fn refresh_stream_url(
     context: &StreamUrlRefreshContext,
     fallback_url: &str,
 ) -> Option<String> {
-    let refreshed = extractor::extract(&context.source_url, None).await.ok()?;
+    let refreshed = extractor::extract(&context.source_url).await.ok()?;
     find_refreshed_format_url(
         &refreshed.formats,
         context.format_id.as_deref(),
@@ -247,11 +263,15 @@ async fn fetch_stream_chunked(
     platform: Platform,
     url: &str,
     refresh_context: Option<StreamUrlRefreshContext>,
+    mut forced_proxy: Option<String>,
 ) -> Result<ByteStream, AntiBotError> {
     // Fallback: non-CDN URL (no `clen`) -> single request, with optional auth-refresh.
     if extract_clen_from_url(url).is_none() {
-        let client = AntiBotClient::new(platform)?;
         let mut active_url = url.to_string();
+        if forced_proxy.is_none() {
+            forced_proxy = extractor::resolve_stream_proxy(&active_url).await;
+        }
+        let mut client = AntiBotClient::new_with_proxy(platform, forced_proxy.clone())?;
         let max_refresh_attempts = refresh_context
             .as_ref()
             .map(|context| context.max_refresh_attempts)
@@ -275,6 +295,13 @@ async fn fetch_stream_chunked(
                                     refresh_attempts, max_refresh_attempts
                                 );
                                 active_url = new_url;
+                                let refreshed_proxy =
+                                    extractor::resolve_stream_proxy(&active_url).await;
+                                if refreshed_proxy.is_some() {
+                                    forced_proxy = refreshed_proxy;
+                                }
+                                client =
+                                    AntiBotClient::new_with_proxy(platform, forced_proxy.clone())?;
                                 continue;
                             }
                         }
@@ -298,7 +325,10 @@ async fn fetch_stream_chunked(
     tokio::spawn(async move {
         type PrefetchHandle = tokio::task::JoinHandle<Result<ByteStream, AntiBotError>>;
 
-        let task_client = match AntiBotClient::new(platform) {
+        if forced_proxy.is_none() {
+            forced_proxy = extractor::resolve_stream_proxy(&initial_url).await;
+        }
+        let mut task_client = match AntiBotClient::new_with_proxy(platform, forced_proxy.clone()) {
             Ok(client) => Arc::new(client),
             Err(error) => {
                 let _ = tx.send(Err(error)).await;
@@ -355,8 +385,12 @@ async fn fetch_stream_chunked(
                     if let Some(stream) = next_stream.take() {
                         stream
                     } else {
-                        match open_chunk_stream_with_timeout(task_client.as_ref(), &active_url, &range)
-                            .await
+                        match open_chunk_stream_with_timeout(
+                            task_client.as_ref(),
+                            &active_url,
+                            &range,
+                        )
+                        .await
                         {
                             Ok(stream) => stream,
                             Err(error) => {
@@ -374,6 +408,21 @@ async fn fetch_stream_chunked(
                                                 refresh_attempts, max_refresh_attempts
                                             );
                                             active_url = new_url;
+                                            let refreshed_proxy =
+                                                extractor::resolve_stream_proxy(&active_url).await;
+                                            if refreshed_proxy.is_some() {
+                                                forced_proxy = refreshed_proxy;
+                                            }
+                                            task_client = match AntiBotClient::new_with_proxy(
+                                                platform,
+                                                forced_proxy.clone(),
+                                            ) {
+                                                Ok(client) => Arc::new(client),
+                                                Err(error) => {
+                                                    let _ = tx.send(Err(error)).await;
+                                                    return;
+                                                }
+                                            };
                                             if let Some(clen) = extract_clen_from_url(&active_url) {
                                                 active_total_size = clen;
                                             }
@@ -412,7 +461,8 @@ async fn fetch_stream_chunked(
                         }
                     }
                 } else {
-                    match open_chunk_stream_with_timeout(task_client.as_ref(), &active_url, &range).await
+                    match open_chunk_stream_with_timeout(task_client.as_ref(), &active_url, &range)
+                        .await
                     {
                         Ok(stream) => stream,
                         Err(error) => {
@@ -422,12 +472,29 @@ async fn fetch_stream_chunked(
                             if can_refresh {
                                 if let Some(context) = refresh_context.as_ref() {
                                     refresh_attempts += 1;
-                                    if let Some(new_url) = refresh_stream_url(context, &active_url).await {
+                                    if let Some(new_url) =
+                                        refresh_stream_url(context, &active_url).await
+                                    {
                                         info!(
                                             "Refreshed chunk URL after auth error (attempt {}/{})",
                                             refresh_attempts, max_refresh_attempts
                                         );
                                         active_url = new_url;
+                                        let refreshed_proxy =
+                                            extractor::resolve_stream_proxy(&active_url).await;
+                                        if refreshed_proxy.is_some() {
+                                            forced_proxy = refreshed_proxy;
+                                        }
+                                        task_client = match AntiBotClient::new_with_proxy(
+                                            platform,
+                                            forced_proxy.clone(),
+                                        ) {
+                                            Ok(client) => Arc::new(client),
+                                            Err(error) => {
+                                                let _ = tx.send(Err(error)).await;
+                                                return;
+                                            }
+                                        };
                                         if let Some(clen) = extract_clen_from_url(&active_url) {
                                             active_total_size = clen;
                                         }
@@ -487,12 +554,29 @@ async fn fetch_stream_chunked(
                             if can_refresh {
                                 if let Some(context) = refresh_context.as_ref() {
                                     refresh_attempts += 1;
-                                    if let Some(new_url) = refresh_stream_url(context, &active_url).await {
+                                    if let Some(new_url) =
+                                        refresh_stream_url(context, &active_url).await
+                                    {
                                         info!(
                                             "Refreshed stream URL after mid-chunk auth error (attempt {}/{})",
                                             refresh_attempts, max_refresh_attempts
                                         );
                                         active_url = new_url;
+                                        let refreshed_proxy =
+                                            extractor::resolve_stream_proxy(&active_url).await;
+                                        if refreshed_proxy.is_some() {
+                                            forced_proxy = refreshed_proxy;
+                                        }
+                                        task_client = match AntiBotClient::new_with_proxy(
+                                            platform,
+                                            forced_proxy.clone(),
+                                        ) {
+                                            Ok(client) => Arc::new(client),
+                                            Err(error) => {
+                                                let _ = tx.send(Err(error)).await;
+                                                return;
+                                            }
+                                        };
                                         if let Some(clen) = extract_clen_from_url(&active_url) {
                                             active_total_size = clen;
                                         }

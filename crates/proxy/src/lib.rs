@@ -3,7 +3,6 @@
 //! Provides HTTP proxying capabilities for video streams with
 //! anti-bot detection evasion techniques including:
 //! - Proxy rotation with health tracking
-//! - Per-platform cookie persistence
 //! - Browser-realistic header rotation
 //! - Per-domain request throttling
 
@@ -11,16 +10,16 @@ use reqwest::Client;
 
 pub mod anti_bot;
 pub mod client;
-pub mod cookie_store;
 pub mod header_builder;
+pub mod platform;
 pub mod proxy_pool;
 pub mod stream;
 pub mod throttle;
 
 pub use anti_bot::{AntiBotClient, AntiBotError, AntiBotGuard};
 pub use client::ProxyClient;
-pub use cookie_store::{CookieStore, Platform};
 pub use header_builder::HeaderBuilder;
+pub use platform::Platform;
 pub use proxy_pool::ProxyPool;
 pub use stream::StreamProxy;
 pub use throttle::DomainThrottle;

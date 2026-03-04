@@ -1,10 +1,10 @@
 //! Anti-bot detection evasion with full client implementation
 //!
-//! Provides proxy rotation, cookie persistence, header rotation,
+//! Provides proxy rotation, header rotation,
 //! and request throttling to avoid bot detection.
 
-use crate::cookie_store::{CookieStore, Platform};
 use crate::header_builder::HeaderBuilder;
+use crate::platform::Platform;
 use crate::proxy_pool::ProxyPool;
 use crate::throttle::DomainThrottle;
 use bytes::Bytes;
@@ -43,31 +43,50 @@ pub enum AntiBotError {
 
 /// Full anti-bot client with all protection layers
 pub struct AntiBotClient {
+    platform: Platform,
     proxy_pool: Arc<ProxyPool>,
-    cookie_store: Arc<CookieStore>,
+    active_proxy: Option<String>,
     header_builder: HeaderBuilder,
     throttle: Arc<DomainThrottle>,
     client: Client,
 }
 
 impl AntiBotClient {
-    /// Create a new anti-bot client for the given platform
-    pub fn new(platform: Platform) -> Result<Self, AntiBotError> {
-        let proxy_pool = Arc::new(ProxyPool::from_env().unwrap_or_default());
-        let cookie_store = Arc::new(CookieStore::new(platform));
+    fn build_for_platform(
+        platform: Platform,
+        proxy_pool: Arc<ProxyPool>,
+        forced_proxy: Option<String>,
+    ) -> Result<Self, AntiBotError> {
         let header_builder = HeaderBuilder::new();
         let throttle = Arc::new(DomainThrottle::new());
-
-        // Build client with cookie store
-        let client = Self::build_client(&proxy_pool, &cookie_store)?;
+        let active_proxy = forced_proxy.or_else(|| proxy_pool.next_owned());
+        let client = Self::build_client(active_proxy.as_deref())?;
 
         Ok(Self {
+            platform,
             proxy_pool,
-            cookie_store,
+            active_proxy,
             header_builder,
             throttle,
             client,
         })
+    }
+
+    /// Create a new anti-bot client for the given platform
+    pub fn new(platform: Platform) -> Result<Self, AntiBotError> {
+        let proxy_pool = Arc::new(ProxyPool::from_env().unwrap_or_default());
+        Self::build_for_platform(platform, proxy_pool, None)
+    }
+
+    /// Create a new anti-bot client pinned to a specific proxy URL.
+    ///
+    /// If `forced_proxy` is `None`, falls back to normal pool selection.
+    pub fn new_with_proxy(
+        platform: Platform,
+        forced_proxy: Option<String>,
+    ) -> Result<Self, AntiBotError> {
+        let proxy_pool = Arc::new(ProxyPool::from_env().unwrap_or_default());
+        Self::build_for_platform(platform, proxy_pool, forced_proxy)
     }
 
     /// Create a new anti-bot client with custom proxy pool
@@ -75,34 +94,18 @@ impl AntiBotClient {
         platform: Platform,
         proxy_pool: Arc<ProxyPool>,
     ) -> Result<Self, AntiBotError> {
-        let cookie_store = Arc::new(CookieStore::new(platform));
-        let header_builder = HeaderBuilder::new();
-        let throttle = Arc::new(DomainThrottle::new());
-
-        let client = Self::build_client(&proxy_pool, &cookie_store)?;
-
-        Ok(Self {
-            proxy_pool,
-            cookie_store,
-            header_builder,
-            throttle,
-            client,
-        })
+        Self::build_for_platform(platform, proxy_pool, None)
     }
 
-    /// Build the HTTP client with cookie jar and optional proxy
-    fn build_client(
-        proxy_pool: &ProxyPool,
-        _cookie_store: &CookieStore,
-    ) -> Result<Client, AntiBotError> {
+    /// Build the HTTP client with optional proxy.
+    fn build_client(proxy_url: Option<&str>) -> Result<Client, AntiBotError> {
         let mut builder = Client::builder()
             .connect_timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(10)
-            .cookie_store(true) // Use built-in cookie store
             .connection_verbose(false);
 
         // Add proxy if available
-        if let Some(proxy_url) = proxy_pool.next() {
+        if let Some(proxy_url) = proxy_url {
             debug!("Configuring client with proxy: {}", proxy_url);
             let proxy =
                 Proxy::all(proxy_url).map_err(|e| AntiBotError::InvalidUrl(e.to_string()))?;
@@ -110,12 +113,6 @@ impl AntiBotClient {
         }
 
         builder.build().map_err(AntiBotError::RequestFailed)
-    }
-
-    /// Warm up cookies by fetching platform homepage
-    pub async fn warm_up(&self) -> Result<(), AntiBotError> {
-        self.cookie_store.warm_up(&self.client).await?;
-        Ok(())
     }
 
     /// Make a GET request with full anti-bot protection
@@ -175,9 +172,9 @@ impl AntiBotClient {
             let mut request = self.client.get(url);
 
             // Add headers — detects c=IOS URLs and uses iOS User-Agent automatically
-            let headers =
-                self.header_builder
-                    .build_headers_for_url(url, self.cookie_store.platform(), None);
+            let headers = self
+                .header_builder
+                .build_headers_for_url(url, self.platform, None);
             request = request.headers(headers);
 
             // Add range if specified
@@ -186,7 +183,7 @@ impl AntiBotClient {
             }
 
             // Track current proxy for failure handling
-            let current_proxy = self.proxy_pool.next().map(|s| s.to_string());
+            let current_proxy = self.active_proxy.clone();
 
             debug!(
                 "Making request to {} (attempt {}/{})",
@@ -228,11 +225,6 @@ impl AntiBotClient {
                             self.proxy_pool.mark_failed(proxy);
                         }
 
-                        // Clear cookies on 403 (might be session-related)
-                        if status == StatusCode::FORBIDDEN {
-                            self.cookie_store.clear();
-                        }
-
                         last_error = Some(AntiBotError::RequestFailed(
                             response.error_for_status().unwrap_err(),
                         ));
@@ -272,23 +264,12 @@ impl AntiBotClient {
 
     /// Get the platform associated with this client
     pub fn platform(&self) -> Platform {
-        self.cookie_store.platform()
+        self.platform
     }
 
     /// Get a reference to the proxy pool
     pub fn proxy_pool(&self) -> &ProxyPool {
         &self.proxy_pool
-    }
-
-    /// Get a reference to the cookie store
-    pub fn cookie_store(&self) -> &CookieStore {
-        &self.cookie_store
-    }
-
-    /// Clear cookies and re-warm
-    pub async fn reset_cookies(&self) -> Result<(), AntiBotError> {
-        self.cookie_store.clear();
-        self.warm_up().await
     }
 }
 

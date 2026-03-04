@@ -83,17 +83,18 @@ impl BackendLimitProfile {
     }
 
     pub fn mux_url_refresh_max_attempts_value(&self) -> Option<usize> {
-        self.mux_url_refresh_max_attempts
-            .filter(|value| *value > 0)
+        self.mux_url_refresh_max_attempts.filter(|value| *value > 0)
     }
 
     pub fn mux_job_max_workers_value(&self) -> usize {
-        self.mux_job_max_workers.filter(|value| *value > 0).unwrap_or_else(|| {
-            std::thread::available_parallelism()
-                .map(|value| value.get().saturating_mul(8))
-                .unwrap_or(64)
-                .max(1)
-        })
+        self.mux_job_max_workers
+            .filter(|value| *value > 0)
+            .unwrap_or_else(|| {
+                std::thread::available_parallelism()
+                    .map(|value| value.get().saturating_mul(8))
+                    .unwrap_or(64)
+                    .max(1)
+            })
     }
 
     pub fn mux_job_queue_capacity_value(&self) -> Option<usize> {

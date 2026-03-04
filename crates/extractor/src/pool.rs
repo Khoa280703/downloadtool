@@ -39,12 +39,7 @@ impl ExtractorPool {
     /// Extract video information from a URL
     ///
     /// JsRuntime is !Send, so work runs in spawn_blocking with its own runtime.
-    pub async fn extract(
-        &self,
-        platform: &str,
-        url: &str,
-        cookies: Option<&str>,
-    ) -> Result<VideoInfo, ExtractionError> {
+    pub async fn extract(&self, platform: &str, url: &str) -> Result<VideoInfo, ExtractionError> {
         // OwnedSemaphorePermit is Send + 'static, safe to move into spawn_blocking
         let permit = Arc::clone(&self.semaphore)
             .acquire_owned()
@@ -56,7 +51,6 @@ impl ExtractorPool {
         let bundle = Arc::clone(&self.js_bundle);
         let platform = platform.to_string();
         let url = url.to_string();
-        let cookies = cookies.map(String::from);
 
         // JsRuntime is !Send — must run on a dedicated std::thread (not spawn_blocking).
         // Using spawn_blocking + rt.block_on() creates nested tokio contexts which
@@ -82,7 +76,7 @@ impl ExtractorPool {
             let local = tokio::task::LocalSet::new();
             let result = local.block_on(&rt, async move {
                 let mut runtime = ExtractorRuntime::new(&bundle)?;
-                runtime.extract(&platform, &url, cookies.as_deref()).await
+                runtime.extract(&platform, &url).await
             });
 
             let _ = tx.send(result);
@@ -101,7 +95,6 @@ impl ExtractorPool {
         &self,
         platform: &str,
         url: &str,
-        cookies: Option<&str>,
     ) -> Result<serde_json::Value, ExtractionError> {
         let permit = Arc::clone(&self.semaphore)
             .acquire_owned()
@@ -113,7 +106,6 @@ impl ExtractorPool {
         let bundle = Arc::clone(&self.js_bundle);
         let platform = platform.to_string();
         let url = url.to_string();
-        let cookies = cookies.map(String::from);
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         std::thread::spawn(move || {
@@ -133,9 +125,7 @@ impl ExtractorPool {
             let local = tokio::task::LocalSet::new();
             let result = local.block_on(&rt, async move {
                 let mut runtime = ExtractorRuntime::new(&bundle)?;
-                runtime
-                    .extract_playlist(&platform, &url, cookies.as_deref())
-                    .await
+                runtime.extract_playlist(&platform, &url).await
             });
 
             let _ = tx.send(result);
@@ -175,13 +165,8 @@ impl PoolHandle {
     }
 
     /// Extract video information
-    pub async fn extract(
-        &self,
-        platform: &str,
-        url: &str,
-        cookies: Option<&str>,
-    ) -> Result<VideoInfo, ExtractionError> {
-        self.inner.extract(platform, url, cookies).await
+    pub async fn extract(&self, platform: &str, url: &str) -> Result<VideoInfo, ExtractionError> {
+        self.inner.extract(platform, url).await
     }
 
     /// Extract playlist items.
@@ -189,9 +174,8 @@ impl PoolHandle {
         &self,
         platform: &str,
         url: &str,
-        cookies: Option<&str>,
     ) -> Result<serde_json::Value, ExtractionError> {
-        self.inner.extract_playlist(platform, url, cookies).await
+        self.inner.extract_playlist(platform, url).await
     }
 
     /// Get pool size

@@ -10,9 +10,7 @@ use serde::{Deserialize, Serialize};
 use tokio_util::io::ReaderStream;
 use utoipa::ToSchema;
 
-use crate::services::muxed_job_queue::{
-    MuxJobQueueError, MuxJobRequest, MuxJobStatus,
-};
+use crate::services::muxed_job_queue::{MuxJobQueueError, MuxJobRequest, MuxJobStatus};
 use crate::AppState;
 
 const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
@@ -87,7 +85,11 @@ pub async fn create_muxed_job_handler(
         title: payload.title,
     };
 
-    let job_id = state.mux_jobs.enqueue(request).await.map_err(map_queue_error)?;
+    let job_id = state
+        .mux_jobs
+        .enqueue(request)
+        .await
+        .map_err(map_queue_error)?;
     let response = CreateMuxJobResponse {
         status_url: build_status_url(&job_id),
         file_url: build_file_url(&job_id),
@@ -199,14 +201,18 @@ fn validate_create_payload(payload: &CreateMuxJobRequest) -> Result<(), MuxJobsA
 
     if is_webm_mime(&payload.video_url, "video") {
         return Err(MuxJobsApiError {
-            message: "WebM video streams cannot be muxed into fMP4. Select an MP4 video stream instead.".into(),
+            message:
+                "WebM video streams cannot be muxed into fMP4. Select an MP4 video stream instead."
+                    .into(),
             status: StatusCode::UNPROCESSABLE_ENTITY,
             retry_after_secs: None,
         });
     }
     if is_webm_mime(&payload.audio_url, "audio") {
         return Err(MuxJobsApiError {
-            message: "WebM audio streams cannot be muxed into fMP4. Select an M4A audio stream instead.".into(),
+            message:
+                "WebM audio streams cannot be muxed into fMP4. Select an M4A audio stream instead."
+                    .into(),
             status: StatusCode::UNPROCESSABLE_ENTITY,
             retry_after_secs: None,
         });

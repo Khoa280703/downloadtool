@@ -136,7 +136,7 @@ pub async fn extract_handler(
     }
 
     // Call extractor
-    match extractor::extract(&body.url, None).await {
+    match extractor::extract(&body.url).await {
         Ok(video_info) => {
             info!("Successfully extracted video: {}", video_info.title);
 

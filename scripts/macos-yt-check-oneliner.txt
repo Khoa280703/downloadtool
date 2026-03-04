@@ -1,0 +1,5 @@
+# macOS (Homebrew)
+IDS=(kJQP7kiw5Fk tPEE9ZwTmy0 9bZkp7q19f0 JGwWNGJdvx8); printf "video_id\trc\tresult\n"; for id in "${IDS[@]}"; do err="/tmp/yt-$id.err"; /opt/homebrew/bin/yt-dlp --skip-download --no-playlist --no-warnings --socket-timeout 15 --no-check-certificates "https://www.youtube.com/watch?v=$id" >/dev/null 2>"$err"; rc=$?; if [ "$rc" -eq 0 ]; then result="OK"; else result="$(head -n1 "$err")"; fi; printf "%s\t%s\t%s\n" "$id" "$rc" "$result"; rm -f "$err"; done
+
+# Linux server (PATH)
+IDS=(kJQP7kiw5Fk tPEE9ZwTmy0 9bZkp7q19f0 JGwWNGJdvx8); printf "video_id\trc\tresult\n"; for id in "${IDS[@]}"; do err="/tmp/yt-$id.err"; yt-dlp --skip-download --no-playlist --no-warnings --socket-timeout 15 --no-check-certificates "https://www.youtube.com/watch?v=$id" >/dev/null 2>"$err"; rc=$?; if [ "$rc" -eq 0 ]; then result="OK"; else result="$(head -n1 "$err")"; fi; printf "%s\t%s\t%s\n" "$id" "$rc" "$result"; rm -f "$err"; done

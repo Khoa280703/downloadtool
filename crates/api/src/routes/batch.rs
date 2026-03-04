@@ -118,7 +118,7 @@ fn create_batch_stream(url: &str) -> impl Stream<Item = Result<Event, Infallible
         // Normalize URL for the JS extractor.
         let playlist_url = format!("https://www.youtube.com/playlist?list={}", playlist_id);
 
-        let raw_entries = match extractor::extract_playlist("youtube", &playlist_url, None).await {
+        let raw_entries = match extractor::extract_playlist("youtube", &playlist_url).await {
             Ok(value) => value,
             Err(err) => {
                 yield Ok(error_event(format!("Batch extraction failed: {}", err)));

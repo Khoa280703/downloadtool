@@ -5,6 +5,7 @@
 
 use crate::types::{ExtractionError, VideoFormat, VideoInfo};
 use moka::future::Cache;
+use proxy::ProxyPool;
 use serde_json::Value;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -17,11 +18,16 @@ use tracing::{debug, warn};
 const MAX_CONCURRENT_YTDLP: usize = 10;
 const EXTRACT_CACHE_MAX_CAPACITY: u64 = 500;
 const EXTRACT_CACHE_TTL_SECONDS: u64 = 300;
+const MAX_PROXY_ROTATION_ATTEMPTS: usize = 3;
+const STREAM_PROXY_CACHE_MAX_CAPACITY: u64 = 10_000;
+const STREAM_PROXY_CACHE_TTL_SECONDS: u64 = 1800;
 
 static YTDLP_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 static EXTRACT_CACHE: OnceLock<Cache<String, Arc<VideoInfo>>> = OnceLock::new();
 static EXTRACT_CACHE_HITS: AtomicU64 = AtomicU64::new(0);
 static EXTRACT_CACHE_MISSES: AtomicU64 = AtomicU64::new(0);
+static YTDLP_PROXY_POOL: OnceLock<Option<ProxyPool>> = OnceLock::new();
+static STREAM_PROXY_CACHE: OnceLock<Cache<String, Arc<String>>> = OnceLock::new();
 
 fn get_semaphore() -> &'static Arc<Semaphore> {
     YTDLP_SEMAPHORE.get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_YTDLP)))
@@ -36,11 +42,81 @@ fn get_cache() -> &'static Cache<String, Arc<VideoInfo>> {
     })
 }
 
+fn get_stream_proxy_cache() -> &'static Cache<String, Arc<String>> {
+    STREAM_PROXY_CACHE.get_or_init(|| {
+        Cache::builder()
+            .max_capacity(STREAM_PROXY_CACHE_MAX_CAPACITY)
+            .time_to_live(Duration::from_secs(STREAM_PROXY_CACHE_TTL_SECONDS))
+            .build()
+    })
+}
+
 fn resolve_ytdlp_binary() -> String {
     std::env::var("YTDLP_PATH")
         .ok()
         .filter(|path| !path.trim().is_empty())
         .unwrap_or_else(|| "yt-dlp".to_string())
+}
+
+fn get_proxy_pool() -> Option<&'static ProxyPool> {
+    YTDLP_PROXY_POOL.get_or_init(ProxyPool::from_env).as_ref()
+}
+
+fn fixed_proxy_from_env() -> Option<String> {
+    std::env::var("SOCKS5_PROXY_URL")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+#[derive(Debug, Clone)]
+struct SelectedProxy {
+    url: String,
+    from_pool: bool,
+}
+
+fn select_proxy() -> Option<SelectedProxy> {
+    if let Some(url) = fixed_proxy_from_env() {
+        return Some(SelectedProxy {
+            url,
+            from_pool: false,
+        });
+    }
+
+    get_proxy_pool()
+        .and_then(ProxyPool::next_owned)
+        .map(|url| SelectedProxy {
+            url,
+            from_pool: true,
+        })
+}
+
+fn should_mark_proxy_failed(stderr: &str) -> bool {
+    let normalized = stderr.to_ascii_lowercase();
+    normalized.contains("sign in to confirm")
+        || normalized.contains("not a bot")
+        || normalized.contains("429")
+        || normalized.contains("too many requests")
+        || normalized.contains("403")
+        || normalized.contains("timed out")
+        || normalized.contains("connection reset")
+        || normalized.contains("unable to download")
+}
+
+/// Resolve pinned proxy URL for a previously extracted stream URL.
+pub async fn resolve_stream_proxy(url: &str) -> Option<String> {
+    get_stream_proxy_cache()
+        .get(url)
+        .await
+        .map(|proxy| (*proxy).clone())
+}
+
+async fn remember_stream_proxy(formats: &[VideoFormat], proxy_url: &str) {
+    let cache = get_stream_proxy_cache();
+    let proxy = Arc::new(proxy_url.to_string());
+    for format in formats {
+        cache.insert(format.url.clone(), Arc::clone(&proxy)).await;
+    }
 }
 
 /// Normalize YouTube URL to canonical cache key.
@@ -132,15 +208,64 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
     })?;
 
-    let output = run_ytdlp_command(&url).await?;
-    if output.status.success() {
-        let info = parse_ytdlp_success(&output.stdout, &url)?;
-        return Ok(Arc::new(info));
+    let pool_rotation_enabled = fixed_proxy_from_env().is_none() && get_proxy_pool().is_some();
+    let max_attempts = if pool_rotation_enabled {
+        MAX_PROXY_ROTATION_ATTEMPTS
+    } else {
+        1
+    };
+
+    let mut last_error: Option<String> = None;
+
+    for attempt in 0..max_attempts {
+        let selected_proxy = select_proxy();
+        let proxy_log = selected_proxy
+            .as_ref()
+            .map(|proxy| proxy.url.as_str())
+            .unwrap_or("direct");
+        debug!(
+            "yt-dlp attempt {}/{} for {} using {}",
+            attempt + 1,
+            max_attempts,
+            url,
+            proxy_log
+        );
+
+        let output = run_ytdlp_command(&url, selected_proxy.as_ref()).await?;
+        if output.status.success() {
+            if let Some(proxy) = selected_proxy.as_ref().filter(|proxy| proxy.from_pool) {
+                if let Some(pool) = get_proxy_pool() {
+                    pool.mark_success(&proxy.url);
+                }
+            }
+
+            let info = parse_ytdlp_success(&output.stdout, &url)?;
+            if let Some(proxy) = selected_proxy.as_ref() {
+                remember_stream_proxy(&info.formats, &proxy.url).await;
+            }
+            return Ok(Arc::new(info));
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if let Some(proxy) = selected_proxy.filter(|proxy| proxy.from_pool) {
+            if should_mark_proxy_failed(&stderr) {
+                if let Some(pool) = get_proxy_pool() {
+                    pool.mark_failed(&proxy.url);
+                }
+            }
+        }
+
+        last_error = Some(stderr.clone());
+        warn!(
+            "yt-dlp failed for {} (attempt {}/{}): {}",
+            url,
+            attempt + 1,
+            max_attempts,
+            stderr
+        );
     }
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let final_error = stderr.trim().to_string();
-    warn!("yt-dlp failed for {}: {}", url, final_error);
+    let final_error = last_error.unwrap_or_else(|| "unknown yt-dlp error".to_string());
     Err(ExtractionError::ScriptExecutionFailed(format!(
         "yt-dlp error: {}",
         final_error
@@ -153,8 +278,11 @@ struct YtdlpAttemptOutput {
     status: std::process::ExitStatus,
 }
 
-async fn run_ytdlp_command(url: &str) -> Result<YtdlpAttemptOutput, ExtractionError> {
-    let mut command = build_command(url);
+async fn run_ytdlp_command(
+    url: &str,
+    proxy: Option<&SelectedProxy>,
+) -> Result<YtdlpAttemptOutput, ExtractionError> {
+    let mut command = build_command(url, proxy);
     let output = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -179,7 +307,7 @@ fn parse_ytdlp_success(stdout: &[u8], url: &str) -> Result<VideoInfo, Extraction
 }
 
 /// Build the yt-dlp Command with appropriate flags
-fn build_command(url: &str) -> Command {
+fn build_command(url: &str, proxy: Option<&SelectedProxy>) -> Command {
     let mut cmd = Command::new(resolve_ytdlp_binary());
     cmd.args([
         "-J",            // Dump JSON metadata to stdout
@@ -190,12 +318,9 @@ fn build_command(url: &str) -> Command {
         "--no-check-certificates",
     ]);
 
-    // Route through SOCKS5 proxy if configured
-    if let Ok(proxy) = std::env::var("SOCKS5_PROXY_URL") {
-        if !proxy.is_empty() {
-            cmd.args(["--proxy", &proxy]);
-            debug!("yt-dlp routing through proxy: {}", proxy);
-        }
+    if let Some(proxy) = proxy {
+        cmd.args(["--proxy", &proxy.url]);
+        debug!("yt-dlp routing through proxy: {}", proxy.url);
     }
 
     cmd.arg(url);
@@ -513,5 +638,4 @@ mod tests {
         let key = normalize_cache_key("https://youtu.be/dQw4w9WgXcQ?si=test");
         assert_eq!(key, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     }
-
 }

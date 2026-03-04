@@ -9,7 +9,7 @@ use futures::StreamExt;
 use muxer::stream_fetcher::{FetchBothRefreshOptions, StreamFetcher, StreamUrlRefreshContext};
 use muxer::{remux_streams, MuxerError};
 use proxy::anti_bot::AntiBotError;
-use proxy::cookie_store::Platform;
+use proxy::Platform;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{error, info, warn};
@@ -303,10 +303,14 @@ impl MuxedJobQueue {
         }
         let inflight = queued + processing;
         let workers = self.inner.worker_count.max(1) as u64;
-        let currently_busy_round = if processing >= self.inner.worker_count { 1 } else { 0 };
+        let currently_busy_round = if processing >= self.inner.worker_count {
+            1
+        } else {
+            0
+        };
         let queued_rounds = (queued as u64).div_ceil(workers);
-        let estimated_wait_secs = (currently_busy_round + queued_rounds)
-            .saturating_mul(self.inner.estimated_job_secs);
+        let estimated_wait_secs =
+            (currently_busy_round + queued_rounds).saturating_mul(self.inner.estimated_job_secs);
 
         QueueSnapshot {
             queued,
@@ -316,7 +320,11 @@ impl MuxedJobQueue {
         }
     }
 
-    fn spawn_workers(inner: Arc<MuxedJobQueueInner>, receiver: mpsc::Receiver<String>, workers: usize) {
+    fn spawn_workers(
+        inner: Arc<MuxedJobQueueInner>,
+        receiver: mpsc::Receiver<String>,
+        workers: usize,
+    ) {
         let shared_receiver = Arc::new(Mutex::new(receiver));
         for worker_index in 0..workers {
             let worker_inner = inner.clone();
@@ -383,11 +391,7 @@ async fn process_single_job(inner: Arc<MuxedJobQueueInner>, job_id: &str, worker
         (entry.request.clone(), entry.created_at_ms)
     };
 
-    info!(
-        worker = worker_index,
-        job_id,
-        "Started mux job processing"
-    );
+    info!(worker = worker_index, job_id, "Started mux job processing");
 
     let result = if let Some(job_timeout) = inner.job_timeout {
         match tokio::time::timeout(
@@ -493,7 +497,8 @@ async fn cleanup_expired_jobs(inner: Arc<MuxedJobQueueInner>) {
     {
         let mut jobs = inner.jobs.write().await;
         jobs.retain(|job_id, entry| {
-            let terminal = entry.status == MuxJobStatus::Ready || entry.status == MuxJobStatus::Failed;
+            let terminal =
+                entry.status == MuxJobStatus::Ready || entry.status == MuxJobStatus::Failed;
             let stale = ttl_ms
                 .map(|ttl_ms| now.saturating_sub(entry.updated_at_ms) >= ttl_ms)
                 .unwrap_or(false);
@@ -534,7 +539,10 @@ async fn cleanup_expired_jobs(inner: Arc<MuxedJobQueueInner>) {
         let stale_deleted_bytes =
             cleanup_stale_mux_output_files(inner.clone(), referenced_files, temp_file_ttl).await;
         if stale_deleted_bytes > 0 {
-            info!(deleted_bytes = stale_deleted_bytes, "Removed stale mux temporary files");
+            info!(
+                deleted_bytes = stale_deleted_bytes,
+                "Removed stale mux temporary files"
+            );
         }
     }
 }
@@ -579,7 +587,9 @@ async fn execute_mux_job(
                     && is_auth_like_antibot_error(&error)
                     && request.source_url.is_some()
                 {
-                    if let Some((next_video, next_audio)) = refresh_both_urls(request, &video_url, &audio_url).await {
+                    if let Some((next_video, next_audio)) =
+                        refresh_both_urls(request, &video_url, &audio_url).await
+                    {
                         refresh_attempts += 1;
                         info!(
                             job_id,
@@ -636,7 +646,9 @@ async fn execute_mux_job(
         if should_refresh {
             drop(output);
             let _ = tokio::fs::remove_file(&part_path).await;
-            if let Some((next_video, next_audio)) = refresh_both_urls(request, &video_url, &audio_url).await {
+            if let Some((next_video, next_audio)) =
+                refresh_both_urls(request, &video_url, &audio_url).await
+            {
                 refresh_attempts += 1;
                 info!(
                     job_id,
@@ -725,7 +737,7 @@ async fn refresh_both_urls(
     fallback_audio_url: &str,
 ) -> Option<(String, String)> {
     let source_url = request.source_url.as_deref()?;
-    let refreshed = extractor::extract(source_url, None).await.ok()?;
+    let refreshed = extractor::extract(source_url).await.ok()?;
     let next_video = find_refreshed_format_url(
         &refreshed.formats,
         request.video_format_id.as_deref(),

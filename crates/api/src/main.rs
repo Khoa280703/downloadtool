@@ -125,7 +125,10 @@ fn build_app(
         .route("/api/extract", extract_route)
         .route("/api/stream", get(routes::stream_handler))
         .route("/api/stream/muxed", get(routes::muxed_stream_handler))
-        .route("/api/stream/muxed/jobs", post(routes::create_muxed_job_handler))
+        .route(
+            "/api/stream/muxed/jobs",
+            post(routes::create_muxed_job_handler),
+        )
         .route(
             "/api/stream/muxed/jobs/{job_id}",
             get(routes::muxed_job_status_handler),

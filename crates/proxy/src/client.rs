@@ -4,7 +4,7 @@
 //! anti-bot protection and range request support.
 
 use crate::anti_bot::{AntiBotClient, AntiBotError};
-use crate::cookie_store::Platform;
+use crate::platform::Platform;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use reqwest::header::HeaderMap;
@@ -78,10 +78,12 @@ impl ProxyClient {
         Ok(Self { anti_bot })
     }
 
-    /// Create a new proxy client with warm-up.
-    pub async fn with_warmup(platform: Platform) -> Result<Self, ProxyError> {
-        let anti_bot = AntiBotClient::new(platform)?;
-        anti_bot.warm_up().await?;
+    /// Create a new proxy client pinned to a specific proxy URL.
+    pub fn new_with_proxy(
+        platform: Platform,
+        forced_proxy: Option<String>,
+    ) -> Result<Self, ProxyError> {
+        let anti_bot = AntiBotClient::new_with_proxy(platform, forced_proxy)?;
         Ok(Self { anti_bot })
     }
 
@@ -154,12 +156,6 @@ impl ProxyClient {
     /// Get a reference to the anti-bot client.
     pub fn anti_bot(&self) -> &AntiBotClient {
         &self.anti_bot
-    }
-
-    /// Reset cookies and re-warm.
-    pub async fn reset_cookies(&self) -> Result<(), ProxyError> {
-        self.anti_bot.reset_cookies().await?;
-        Ok(())
     }
 }
 

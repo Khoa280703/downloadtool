@@ -12,16 +12,16 @@ use futures::{Stream, StreamExt};
 use serde::Deserialize;
 use std::sync::{Arc, OnceLock};
 use tokio::sync::mpsc;
-use tokio::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::time::Duration;
 use tracing::{debug, error, info};
 
 use crate::limit_profiles::backend_limit_profile;
-use proxy::client::{parse_range_header, validate_stream_url, ProxyClient, Range};
-use proxy::cookie_store::Platform;
-use proxy::stream::forward_stream_headers;
 use proxy::anti_bot::AntiBotError;
 use proxy::client::ProxyError;
+use proxy::client::{parse_range_header, validate_stream_url, ProxyClient, Range};
+use proxy::stream::forward_stream_headers;
+use proxy::Platform;
 
 use muxer::stream_fetcher::{FetchBothRefreshOptions, StreamFetcher, StreamUrlRefreshContext};
 use muxer::{remux_streams, MuxerError};
@@ -256,18 +256,16 @@ fn find_refreshed_format_url(
         }
     }
 
-    let fallback_ext_owned = expected_ext
-        .map(|ext| ext.to_string())
-        .or_else(|| {
-            reqwest::Url::parse(fallback_url)
-                .ok()
-                .and_then(|url| {
-                    url.query_pairs()
-                        .find(|(k, _)| k == "mime")
-                        .map(|(_, v)| v.to_string())
-                })
-                .and_then(|mime| mime.split('/').nth(1).map(|v| v.to_lowercase()))
-        });
+    let fallback_ext_owned = expected_ext.map(|ext| ext.to_string()).or_else(|| {
+        reqwest::Url::parse(fallback_url)
+            .ok()
+            .and_then(|url| {
+                url.query_pairs()
+                    .find(|(k, _)| k == "mime")
+                    .map(|(_, v)| v.to_string())
+            })
+            .and_then(|mime| mime.split('/').nth(1).map(|v| v.to_lowercase()))
+    });
     let fallback_ext = fallback_ext_owned.as_deref();
 
     formats
@@ -302,7 +300,7 @@ async fn refresh_stream_url(
     expected_has_audio: Option<bool>,
     expected_ext: Option<&str>,
 ) -> Option<String> {
-    let refreshed = extractor::extract(source_url, None).await.ok()?;
+    let refreshed = extractor::extract(source_url).await.ok()?;
     find_refreshed_format_url(
         &refreshed.formats,
         format_id,
@@ -320,7 +318,7 @@ async fn refresh_mux_stream_urls(
     fallback_video_url: &str,
     fallback_audio_url: &str,
 ) -> Option<(String, String)> {
-    let refreshed = extractor::extract(source_url, None).await.ok()?;
+    let refreshed = extractor::extract(source_url).await.ok()?;
     let next_video = find_refreshed_format_url(
         &refreshed.formats,
         video_format_id,
@@ -423,72 +421,73 @@ async fn proxy_single_request(
     platform: Platform,
     permit: Option<OwnedSemaphorePermit>,
 ) -> Result<Response, ApiError> {
-    let client = ProxyClient::new(platform).map_err(|e| ApiError {
-        message: format!("Failed to create proxy client: {}", e),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        retry_after_secs: None,
-    })?;
-
     let mut target_url = params.url.clone();
     let max_refresh_attempts = stream_url_refresh_max_attempts();
     let mut refresh_attempts = 0usize;
     loop {
+        let pinned_proxy = extractor::resolve_stream_proxy(&target_url).await;
+        let client = ProxyClient::new_with_proxy(platform, pinned_proxy).map_err(|e| ApiError {
+            message: format!("Failed to create proxy client: {}", e),
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            retry_after_secs: None,
+        })?;
+
         match client.fetch_stream_with_headers(&target_url, range).await {
-        Ok((source_headers, byte_stream)) => {
-            let mut response_headers = forward_stream_headers(&source_headers);
-            let filename = build_filename(&params.title, &params.format);
-            add_content_disposition(&mut response_headers, &filename);
-            add_cors_headers(&mut response_headers);
-            add_no_store_header(&mut response_headers);
+            Ok((source_headers, byte_stream)) => {
+                let mut response_headers = forward_stream_headers(&source_headers);
+                let filename = build_filename(&params.title, &params.format);
+                add_content_disposition(&mut response_headers, &filename);
+                add_cors_headers(&mut response_headers);
+                add_no_store_header(&mut response_headers);
 
-            let guarded_stream = stream_with_permit_guard(byte_stream, permit);
-            let body = Body::from_stream(guarded_stream);
-            let mut rb = Response::builder();
-            for (k, v) in response_headers.iter() {
-                rb = rb.header(k.as_str(), v.as_bytes());
+                let guarded_stream = stream_with_permit_guard(byte_stream, permit);
+                let body = Body::from_stream(guarded_stream);
+                let mut rb = Response::builder();
+                for (k, v) in response_headers.iter() {
+                    rb = rb.header(k.as_str(), v.as_bytes());
+                }
+                return rb.body(body).map_err(|e| ApiError {
+                    message: format!("Failed to build response: {}", e),
+                    status: StatusCode::INTERNAL_SERVER_ERROR,
+                    retry_after_secs: None,
+                });
             }
-            return rb.body(body).map_err(|e| ApiError {
-                message: format!("Failed to build response: {}", e),
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                retry_after_secs: None,
-            });
-        }
-        Err(e) => {
-            let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
-                && is_auth_like_proxy_error(&e)
-                && params.source_url.is_some();
+            Err(e) => {
+                let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
+                    && is_auth_like_proxy_error(&e)
+                    && params.source_url.is_some();
 
-            if can_refresh {
-                refresh_attempts += 1;
-                if let Some(source_url) = params.source_url.as_deref() {
-                    if let Some(new_url) = refresh_stream_url(
-                        source_url,
-                        params.format_id.as_deref(),
-                        &target_url,
-                        None,
-                        None,
-                        params.format.as_deref(),
-                    )
-                    .await
-                    {
-                        info!(
-                            attempt = refresh_attempts,
-                            max_attempts = ?max_refresh_attempts,
-                            "Refreshed stream URL after upstream auth error"
-                        );
-                        target_url = new_url;
-                        continue;
+                if can_refresh {
+                    refresh_attempts += 1;
+                    if let Some(source_url) = params.source_url.as_deref() {
+                        if let Some(new_url) = refresh_stream_url(
+                            source_url,
+                            params.format_id.as_deref(),
+                            &target_url,
+                            None,
+                            None,
+                            params.format.as_deref(),
+                        )
+                        .await
+                        {
+                            info!(
+                                attempt = refresh_attempts,
+                                max_attempts = ?max_refresh_attempts,
+                                "Refreshed stream URL after upstream auth error"
+                            );
+                            target_url = new_url;
+                            continue;
+                        }
                     }
                 }
-            }
 
-            error!("Failed to fetch stream: {}", e);
-            return Err(ApiError {
-                message: format!("Failed to fetch stream: {}", e),
-                status: StatusCode::BAD_GATEWAY,
-                retry_after_secs: None,
-            });
-        }
+                error!("Failed to fetch stream: {}", e);
+                return Err(ApiError {
+                    message: format!("Failed to fetch stream: {}", e),
+                    status: StatusCode::BAD_GATEWAY,
+                    retry_after_secs: None,
+                });
+            }
         }
     }
 }
@@ -564,19 +563,6 @@ fn chunked_stream(
     let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(8);
 
     tokio::spawn(async move {
-        let client = match ProxyClient::new(platform) {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = tx
-                    .send(Err(std::io::Error::other(format!(
-                        "Failed to create proxy client: {}",
-                        e
-                    ))))
-                    .await;
-                return;
-            }
-        };
-
         let mut active_url = url;
         let mut active_total_size = total_size;
         let max_refresh_attempts = stream_url_refresh_max_attempts();
@@ -590,7 +576,24 @@ fn chunked_stream(
             };
             debug!("Chunk: bytes={}-{} / {}", offset, end, active_total_size);
 
-            match client.fetch_stream_with_headers(&active_url, Some(range)).await {
+            let pinned_proxy = extractor::resolve_stream_proxy(&active_url).await;
+            let client = match ProxyClient::new_with_proxy(platform, pinned_proxy) {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = tx
+                        .send(Err(std::io::Error::other(format!(
+                            "Failed to create proxy client: {}",
+                            e
+                        ))))
+                        .await;
+                    return;
+                }
+            };
+
+            match client
+                .fetch_stream_with_headers(&active_url, Some(range))
+                .await
+            {
                 Ok((_, mut chunk_stream)) => {
                     while let Some(item) = chunk_stream.next().await {
                         let result = item.map_err(|e| std::io::Error::other(e.to_string()));
@@ -710,11 +713,15 @@ pub async fn muxed_stream_handler(
     let mut refresh_attempts = 0usize;
     let preflight_timeout = mux_preflight_timeout();
     let (first_chunk, muxed_stream) = loop {
-        let (video_stream, audio_stream) = match StreamFetcher::fetch_both_with_refresh(
+        let pinned_video_proxy = extractor::resolve_stream_proxy(&video_url).await;
+        let pinned_audio_proxy = extractor::resolve_stream_proxy(&audio_url).await;
+        let (video_stream, audio_stream) = match StreamFetcher::fetch_both_with_refresh_and_proxy(
             &video_url,
             &audio_url,
             platform,
             fetch_refresh_options.clone(),
+            pinned_video_proxy,
+            pinned_audio_proxy,
         )
         .await
         {
