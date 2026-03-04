@@ -11,6 +11,7 @@ import {
 	isTimeoutLikeMuxedSyncError,
 	withSyncMuxedDownloadSlot
 } from '$lib/muxed-download-routing-policy';
+import { playlistWorkerLimitConfig } from '$lib/runtime-limit-config';
 import { updateBatchItemByVideoId } from '$stores/batch';
 import {
 	getStoredPlaylistDownloadMode,
@@ -47,11 +48,11 @@ type ReadyEntry = {
 	};
 };
 
-const MAX_CONCURRENT = 1;
-const READY_QUEUE_MAX = 1;
-const EXTRACT_JITTER_MIN_MS = 2000;
-const EXTRACT_JITTER_RANGE_MS = 3000;
-const CIRCUIT_COOLDOWN_MS = 5 * 60 * 1000;
+const MAX_CONCURRENT = playlistWorkerLimitConfig.maxConcurrent;
+const READY_QUEUE_MAX = playlistWorkerLimitConfig.readyQueueMax;
+const EXTRACT_JITTER_MIN_MS = playlistWorkerLimitConfig.extractJitterMinMs;
+const EXTRACT_JITTER_RANGE_MS = playlistWorkerLimitConfig.extractJitterRangeMs;
+const CIRCUIT_COOLDOWN_MS = playlistWorkerLimitConfig.circuitCooldownMs;
 
 const pendingQueue: QueueEntry[] = [];
 const readyQueue: ReadyEntry[] = [];

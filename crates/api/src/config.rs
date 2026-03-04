@@ -5,6 +5,8 @@
 use std::env;
 use std::process::Command;
 
+use crate::limit_profiles::backend_limit_profile;
+
 /// Application configuration loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -115,7 +117,7 @@ impl Config {
     /// - `DATABASE_URL` - PostgreSQL connection string
     /// - `BETTER_AUTH_SECRET` - Shared Better Auth secret
     /// - `WHOP_WEBHOOK_SECRET` - Whop webhook signing secret
-    /// - `EXTRACT_RATE_LIMIT_ENABLED` - Enable /api/extract rate limiting (default: true)
+    /// - `config/runtime-limit-profiles.json` - Backend limits profile (local/production)
     pub fn from_env() -> anyhow::Result<Self> {
         let port = env::var("PORT")
             .ok()
@@ -131,12 +133,7 @@ impl Config {
             .map_err(|_| anyhow::anyhow!("BETTER_AUTH_SECRET env var is required"))?;
         let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")
             .map_err(|_| anyhow::anyhow!("WHOP_WEBHOOK_SECRET env var is required"))?;
-        let extract_rate_limit_enabled = env::var("EXTRACT_RATE_LIMIT_ENABLED")
-            .map(|value| {
-                let normalized = value.trim().to_ascii_lowercase();
-                !matches!(normalized.as_str(), "0" | "false" | "off" | "no")
-            })
-            .unwrap_or(true);
+        let extract_rate_limit_enabled = backend_limit_profile().extract_rate_limit_enabled_value();
 
         Ok(Self {
             port,

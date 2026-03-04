@@ -38,7 +38,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.frontend
       args:
-        - VITE_API_URL=https://api-download.khoadangbui.online
+        - VITE_API_URL=${VITE_API_URL:-https://api-download.khoadangbui.online}
     container_name: downloadtool-frontend
     environment:
       - NODE_ENV=production

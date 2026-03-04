@@ -16,6 +16,7 @@ use tokio::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tracing::{debug, error, info};
 
+use crate::limit_profiles::backend_limit_profile;
 use proxy::client::{parse_range_header, validate_stream_url, ProxyClient, Range};
 use proxy::cookie_store::Platform;
 use proxy::stream::forward_stream_headers;
@@ -32,18 +33,13 @@ use muxer::{remux_streams, MuxerError};
 /// range chunks bypasses the per-file throttle entirely — same technique as yt-dlp.
 const YOUTUBE_CHUNK_SIZE: u64 = 9_500_000;
 const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
-const MUX_PREFLIGHT_TIMEOUT_DEFAULT_SECS: u64 = 15;
-const STREAM_MAX_CONCURRENT_DEFAULT: usize = 128;
-const MUX_MAX_CONCURRENT_DEFAULT: usize = 20;
-const STREAM_URL_REFRESH_MAX_ATTEMPTS_DEFAULT: usize = 3;
-const MUX_URL_REFRESH_MAX_ATTEMPTS_DEFAULT: usize = 3;
 const BACKPRESSURE_RETRY_AFTER_SECS: u64 = 2;
 
-static STREAM_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
-static MUX_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
-static MUX_PREFLIGHT_TIMEOUT: OnceLock<Duration> = OnceLock::new();
-static STREAM_URL_REFRESH_MAX_ATTEMPTS: OnceLock<usize> = OnceLock::new();
-static MUX_URL_REFRESH_MAX_ATTEMPTS: OnceLock<usize> = OnceLock::new();
+static STREAM_SEMAPHORE: OnceLock<Option<Arc<Semaphore>>> = OnceLock::new();
+static MUX_SEMAPHORE: OnceLock<Option<Arc<Semaphore>>> = OnceLock::new();
+static MUX_PREFLIGHT_TIMEOUT: OnceLock<Option<Duration>> = OnceLock::new();
+static STREAM_URL_REFRESH_MAX_ATTEMPTS: OnceLock<Option<usize>> = OnceLock::new();
+static MUX_URL_REFRESH_MAX_ATTEMPTS: OnceLock<Option<usize>> = OnceLock::new();
 
 /// Query parameters for stream proxy.
 #[derive(Debug, Deserialize)]
@@ -117,90 +113,73 @@ impl From<MuxerError> for ApiError {
     }
 }
 
-fn read_env_usize(name: &str, default_value: usize) -> usize {
-    std::env::var(name)
-        .ok()
-        .and_then(|raw| raw.parse::<usize>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(default_value)
-}
-
-fn read_env_u64(name: &str, default_value: u64) -> u64 {
-    std::env::var(name)
-        .ok()
-        .and_then(|raw| raw.parse::<u64>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(default_value)
-}
-
-fn stream_semaphore() -> Arc<Semaphore> {
+fn stream_semaphore() -> Option<Arc<Semaphore>> {
     STREAM_SEMAPHORE
         .get_or_init(|| {
-            Arc::new(Semaphore::new(read_env_usize(
-                "STREAM_MAX_CONCURRENT",
-                STREAM_MAX_CONCURRENT_DEFAULT,
-            )))
+            backend_limit_profile()
+                .stream_max_concurrent_value()
+                .map(|limit| Arc::new(Semaphore::new(limit)))
         })
         .clone()
 }
 
-fn mux_semaphore() -> Arc<Semaphore> {
+fn mux_semaphore() -> Option<Arc<Semaphore>> {
     MUX_SEMAPHORE
         .get_or_init(|| {
-            Arc::new(Semaphore::new(read_env_usize(
-                "MUX_MAX_CONCURRENT",
-                MUX_MAX_CONCURRENT_DEFAULT,
-            )))
+            backend_limit_profile()
+                .mux_max_concurrent_value()
+                .map(|limit| Arc::new(Semaphore::new(limit)))
         })
         .clone()
 }
 
-fn mux_preflight_timeout() -> Duration {
-    *MUX_PREFLIGHT_TIMEOUT.get_or_init(|| {
-        Duration::from_secs(read_env_u64(
-            "MUX_PREFLIGHT_TIMEOUT_SECS",
-            MUX_PREFLIGHT_TIMEOUT_DEFAULT_SECS,
-        ))
-    })
+fn mux_preflight_timeout() -> Option<Duration> {
+    *MUX_PREFLIGHT_TIMEOUT.get_or_init(|| backend_limit_profile().mux_preflight_timeout_value())
 }
 
-fn stream_url_refresh_max_attempts() -> usize {
-    *STREAM_URL_REFRESH_MAX_ATTEMPTS.get_or_init(|| {
-        read_env_usize(
-            "STREAM_URL_REFRESH_MAX_ATTEMPTS",
-            STREAM_URL_REFRESH_MAX_ATTEMPTS_DEFAULT,
-        )
-    })
+fn stream_url_refresh_max_attempts() -> Option<usize> {
+    *STREAM_URL_REFRESH_MAX_ATTEMPTS
+        .get_or_init(|| backend_limit_profile().stream_url_refresh_max_attempts_value())
 }
 
-fn mux_url_refresh_max_attempts() -> usize {
-    *MUX_URL_REFRESH_MAX_ATTEMPTS.get_or_init(|| {
-        read_env_usize(
-            "MUX_URL_REFRESH_MAX_ATTEMPTS",
-            MUX_URL_REFRESH_MAX_ATTEMPTS_DEFAULT,
-        )
-    })
+fn mux_url_refresh_max_attempts() -> Option<usize> {
+    *MUX_URL_REFRESH_MAX_ATTEMPTS
+        .get_or_init(|| backend_limit_profile().mux_url_refresh_max_attempts_value())
+}
+
+fn within_retry_limit(attempts: usize, max_attempts: Option<usize>) -> bool {
+    max_attempts
+        .map(|max_attempts| attempts < max_attempts)
+        .unwrap_or(true)
+}
+
+fn max_refresh_attempts_for_context(max_attempts: Option<usize>) -> usize {
+    max_attempts.unwrap_or(usize::MAX)
 }
 
 fn acquire_backpressure_permit(
-    semaphore: Arc<Semaphore>,
+    semaphore: Option<Arc<Semaphore>>,
     endpoint: &'static str,
-) -> Result<OwnedSemaphorePermit, ApiError> {
-    semaphore
-        .try_acquire_owned()
-        .map_err(|_| ApiError {
-            message: format!(
-                "Server is busy for {}. Please retry after a short delay.",
-                endpoint
-            ),
-            status: StatusCode::SERVICE_UNAVAILABLE,
-            retry_after_secs: Some(BACKPRESSURE_RETRY_AFTER_SECS),
-        })
+) -> Result<Option<OwnedSemaphorePermit>, ApiError> {
+    match semaphore {
+        Some(semaphore) => semaphore
+            .try_acquire_owned()
+            .map(Some)
+            .map_err(|_| ApiError {
+                message: format!(
+                    "Server is busy for {}. Please retry after a short delay.",
+                    endpoint
+                ),
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                retry_after_secs: Some(BACKPRESSURE_RETRY_AFTER_SECS),
+            }),
+        None => Ok(None),
+    }
 }
 
 fn stream_with_permit_guard<E, S>(
     stream: S,
-    permit: OwnedSemaphorePermit,
+    permit: Option<OwnedSemaphorePermit>,
 ) -> impl Stream<Item = Result<Bytes, E>> + Send
 where
     E: Send + 'static,
@@ -363,11 +342,12 @@ async fn refresh_mux_stream_urls(
 
 fn build_mux_refresh_options(
     params: &MuxedStreamParams,
-    max_refresh_attempts: usize,
+    max_refresh_attempts: Option<usize>,
 ) -> FetchBothRefreshOptions {
     let Some(source_url) = params.source_url.clone() else {
         return FetchBothRefreshOptions::default();
     };
+    let max_refresh_attempts = max_refresh_attempts_for_context(max_refresh_attempts);
 
     let video = StreamUrlRefreshContext {
         source_url: source_url.clone(),
@@ -441,7 +421,7 @@ async fn proxy_single_request(
     params: &StreamParams,
     range: Option<Range>,
     platform: Platform,
-    permit: OwnedSemaphorePermit,
+    permit: Option<OwnedSemaphorePermit>,
 ) -> Result<Response, ApiError> {
     let client = ProxyClient::new(platform).map_err(|e| ApiError {
         message: format!("Failed to create proxy client: {}", e),
@@ -474,7 +454,7 @@ async fn proxy_single_request(
             });
         }
         Err(e) => {
-            let can_refresh = refresh_attempts < max_refresh_attempts
+            let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
                 && is_auth_like_proxy_error(&e)
                 && params.source_url.is_some();
 
@@ -492,8 +472,9 @@ async fn proxy_single_request(
                     .await
                     {
                         info!(
-                            "Refreshed stream URL after upstream auth error (attempt {}/{})",
-                            refresh_attempts, max_refresh_attempts
+                            attempt = refresh_attempts,
+                            max_attempts = ?max_refresh_attempts,
+                            "Refreshed stream URL after upstream auth error"
                         );
                         target_url = new_url;
                         continue;
@@ -520,7 +501,7 @@ async fn proxy_chunked(
     parsed_url: &reqwest::Url,
     total_size: u64,
     platform: Platform,
-    permit: OwnedSemaphorePermit,
+    permit: Option<OwnedSemaphorePermit>,
 ) -> Result<Response, ApiError> {
     let content_type =
         extract_mime_type(parsed_url).unwrap_or_else(|| "application/octet-stream".to_string());
@@ -619,7 +600,7 @@ fn chunked_stream(
                     }
                 }
                 Err(e) => {
-                    let can_refresh = refresh_attempts < max_refresh_attempts
+                    let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
                         && is_auth_like_proxy_error(&e)
                         && source_url.is_some();
                     if can_refresh {
@@ -636,8 +617,9 @@ fn chunked_stream(
                             .await
                             {
                                 info!(
-                                    "Refreshed chunked stream URL after upstream auth error (attempt {}/{})",
-                                    refresh_attempts, max_refresh_attempts
+                                    attempt = refresh_attempts,
+                                    max_attempts = ?max_refresh_attempts,
+                                    "Refreshed chunked stream URL after upstream auth error"
                                 );
                                 active_url = new_url;
                                 if let Ok(parsed) = reqwest::Url::parse(&active_url) {
@@ -738,7 +720,7 @@ pub async fn muxed_stream_handler(
         {
             Ok(streams) => streams,
             Err(error) => {
-                let can_refresh = refresh_attempts < max_refresh_attempts
+                let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
                     && is_auth_like_antibot_error(&error)
                     && params.source_url.is_some();
 
@@ -755,8 +737,9 @@ pub async fn muxed_stream_handler(
                         .await
                         {
                             info!(
-                                "Refreshed muxed URLs after upstream auth error (attempt {}/{})",
-                                refresh_attempts, max_refresh_attempts
+                                attempt = refresh_attempts,
+                                max_attempts = ?max_refresh_attempts,
+                                "Refreshed muxed URLs after upstream auth error"
                             );
                             video_url = next_video;
                             audio_url = next_audio;
@@ -777,10 +760,25 @@ pub async fn muxed_stream_handler(
         let mut candidate_muxed_stream = remux_streams(video_stream, audio_stream);
 
         // Force a first-frame preflight so we don't commit HTTP 200 for a broken mux pipeline.
-        match tokio::time::timeout(preflight_timeout, candidate_muxed_stream.next()).await {
-            Ok(Some(Ok(chunk))) => break (chunk, candidate_muxed_stream),
-            Ok(Some(Err(error))) => {
-                let can_refresh = refresh_attempts < max_refresh_attempts
+        let preflight_result = if let Some(timeout) = preflight_timeout {
+            match tokio::time::timeout(timeout, candidate_muxed_stream.next()).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(ApiError {
+                        message: format!("Mux preflight timed out after {}s", timeout.as_secs()),
+                        status: StatusCode::GATEWAY_TIMEOUT,
+                        retry_after_secs: None,
+                    });
+                }
+            }
+        } else {
+            candidate_muxed_stream.next().await
+        };
+
+        match preflight_result {
+            Some(Ok(chunk)) => break (chunk, candidate_muxed_stream),
+            Some(Err(error)) => {
+                let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
                     && is_auth_like_muxer_error(&error)
                     && params.source_url.is_some();
 
@@ -797,8 +795,9 @@ pub async fn muxed_stream_handler(
                         .await
                         {
                             info!(
-                                "Refreshed muxed URLs after mux preflight auth error (attempt {}/{})",
-                                refresh_attempts, max_refresh_attempts
+                                attempt = refresh_attempts,
+                                max_attempts = ?max_refresh_attempts,
+                                "Refreshed muxed URLs after mux preflight auth error"
                             );
                             video_url = next_video;
                             audio_url = next_audio;
@@ -814,20 +813,10 @@ pub async fn muxed_stream_handler(
                     retry_after_secs: None,
                 });
             }
-            Ok(None) => {
+            None => {
                 return Err(ApiError {
                     message: "Muxing produced an empty stream".into(),
                     status: StatusCode::BAD_GATEWAY,
-                    retry_after_secs: None,
-                });
-            }
-            Err(_) => {
-                return Err(ApiError {
-                    message: format!(
-                        "Mux preflight timed out after {}s",
-                        preflight_timeout.as_secs()
-                    ),
-                    status: StatusCode::GATEWAY_TIMEOUT,
                     retry_after_secs: None,
                 });
             }

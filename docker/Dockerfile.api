@@ -44,6 +44,7 @@ COPY Cargo.lock ./
 
 # Copy all crates
 COPY crates/ ./crates/
+COPY config/ ./config/
 
 # Copy injector dist (required by include_str! in crates/api/src/routes/static_files.rs)
 COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist

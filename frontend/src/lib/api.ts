@@ -4,17 +4,18 @@
  */
 
 import type { ExtractResult, BatchMessage } from './types';
+import { apiClientLimitConfig, muxJobClientLimitConfig } from './runtime-limit-config';
 
 const RAW_API_BASE = import.meta.env.VITE_API_URL || '';
 const RETRYABLE_HTTP_STATUS = new Set([429, 502, 503, 504]);
-const EXTRACT_MAX_RETRY_ATTEMPTS = 4;
-const EXTRACT_RETRY_BASE_DELAY_MS = 500;
-const EXTRACT_RETRY_MAX_DELAY_MS = 8_000;
-const BATCH_MAX_RECONNECT_ATTEMPTS = 8;
-const BATCH_RECONNECT_BASE_DELAY_MS = 1_000;
-const BATCH_RECONNECT_MAX_DELAY_MS = 12_000;
-const MUX_JOB_POLL_INTERVAL_MS = 1_200;
-const MUX_JOB_MAX_WAIT_MS = 10 * 60 * 1000;
+const EXTRACT_MAX_RETRY_ATTEMPTS = apiClientLimitConfig.extractMaxRetryAttempts;
+const EXTRACT_RETRY_BASE_DELAY_MS = apiClientLimitConfig.extractRetryBaseDelayMs;
+const EXTRACT_RETRY_MAX_DELAY_MS = apiClientLimitConfig.extractRetryMaxDelayMs;
+const BATCH_MAX_RECONNECT_ATTEMPTS = apiClientLimitConfig.batchMaxReconnectAttempts;
+const BATCH_RECONNECT_BASE_DELAY_MS = apiClientLimitConfig.batchReconnectBaseDelayMs;
+const BATCH_RECONNECT_MAX_DELAY_MS = apiClientLimitConfig.batchReconnectMaxDelayMs;
+const MUX_JOB_POLL_INTERVAL_MS = muxJobClientLimitConfig.pollIntervalMs;
+const MUX_JOB_MAX_WAIT_MS = muxJobClientLimitConfig.maxWaitMs;
 
 export type BatchSubscription = {
 	close: () => void;

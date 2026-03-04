@@ -68,4 +68,7 @@ pnpm dev:down  # stop docker compose services
 - `frontend` currently proxies to Rust API by `RUST_API_URL`.
 - If you run full Docker stack (`api` + `frontend` containers), requests go to API container.
 - If you run `pnpm dev:be` + `pnpm dev:fe`, requests go to host API and logs appear in Terminal B.
+- Env source of truth is root `.env` (see `.env.example`) for secrets/runtime endpoints.
+- Runtime limits are now managed in `config/runtime-limit-profiles.json` with `local` and `production` objects.
+- In `runtime-limit-profiles.json`, set a limit field to `null` to disable that specific guard (concurrency caps, retry caps, timeout caps, queue/TTL caps). `mux_job_max_workers` falls back to auto sizing when `null`.
 - For SEO audits: disable Cloudflare "Managed robots/content signals" for `robots.txt`, otherwise Cloudflare injects `Content-Signal` lines that Lighthouse flags as invalid robots directives.

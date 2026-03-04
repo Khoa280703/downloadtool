@@ -8,6 +8,7 @@ WORKDIR /app
 
 # Copy all frontend source files first (node_modules excluded via .dockerignore)
 COPY frontend/ ./
+COPY config/ /config/
 
 # Install — prepare script runs svelte-kit sync with svelte.config.js available
 RUN npm install

@@ -14,17 +14,10 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{error, info, warn};
 
-const MUX_JOB_MAX_WORKERS_DEFAULT: usize = 6;
-const MUX_JOB_QUEUE_CAPACITY_DEFAULT: usize = 128;
-const MUX_JOB_ESTIMATED_RUNTIME_SECS_DEFAULT: u64 = 210;
-const MUX_JOB_MAX_ESTIMATED_WAIT_SECS_DEFAULT: u64 = 420;
-const MUX_JOB_TTL_SECS_DEFAULT: u64 = 1800;
-const MUX_JOB_TEMP_FILE_TTL_SECS_DEFAULT: u64 = 1800;
-const MUX_JOB_TIMEOUT_SECS_DEFAULT: u64 = 900;
-const MUX_JOB_CLEANUP_INTERVAL_SECS_DEFAULT: u64 = 60;
-const MUX_JOB_OUTPUT_DIR_DEFAULT: &str = "/tmp/downloadtool-mux-jobs";
-const MUX_URL_REFRESH_MAX_ATTEMPTS_DEFAULT: usize = 3;
+use crate::limit_profiles::backend_limit_profile;
+
 const READY_WITHIN_5_MIN_MS: u64 = 5 * 60 * 1000;
+const UNBOUNDED_QUEUE_CHANNEL_CAPACITY: usize = 1_000_000;
 
 #[derive(Clone, Debug)]
 pub struct MuxJobRequest {
@@ -93,14 +86,15 @@ struct MuxedJobQueueInner {
     sender: mpsc::Sender<String>,
     worker_count: usize,
     estimated_job_secs: u64,
-    max_estimated_wait_secs: u64,
+    max_estimated_wait_secs: Option<u64>,
     output_dir: PathBuf,
-    queue_capacity: usize,
-    job_timeout: Duration,
-    temp_file_ttl: Duration,
-    cleanup_interval: Duration,
-    ttl: Duration,
-    max_refresh_attempts: usize,
+    queue_capacity: Option<usize>,
+    queue_channel_capacity: usize,
+    job_timeout: Option<Duration>,
+    temp_file_ttl: Option<Duration>,
+    cleanup_interval: Option<Duration>,
+    ttl: Option<Duration>,
+    max_refresh_attempts: Option<usize>,
     id_counter: AtomicU64,
     last_cleanup_ms: AtomicU64,
 }
@@ -131,41 +125,18 @@ struct QueueSnapshot {
 
 impl MuxedJobQueue {
     pub fn from_env() -> anyhow::Result<Arc<Self>> {
-        let workers = read_env_usize("MUX_JOB_MAX_WORKERS", MUX_JOB_MAX_WORKERS_DEFAULT).max(1);
-        let queue_capacity = read_env_usize(
-            "MUX_JOB_QUEUE_CAPACITY",
-            MUX_JOB_QUEUE_CAPACITY_DEFAULT,
-        );
-        let estimated_job_secs = read_env_u64(
-            "MUX_JOB_ESTIMATED_RUNTIME_SECS",
-            MUX_JOB_ESTIMATED_RUNTIME_SECS_DEFAULT,
-        );
-        let max_estimated_wait_secs = read_env_u64(
-            "MUX_JOB_MAX_ESTIMATED_WAIT_SECS",
-            MUX_JOB_MAX_ESTIMATED_WAIT_SECS_DEFAULT,
-        );
-        let ttl = Duration::from_secs(read_env_u64("MUX_JOB_TTL_SECS", MUX_JOB_TTL_SECS_DEFAULT));
-        let job_timeout = Duration::from_secs(read_env_u64(
-            "MUX_JOB_TIMEOUT_SECS",
-            MUX_JOB_TIMEOUT_SECS_DEFAULT,
-        ));
-        let temp_file_ttl = Duration::from_secs(read_env_u64(
-            "MUX_JOB_TEMP_FILE_TTL_SECS",
-            MUX_JOB_TEMP_FILE_TTL_SECS_DEFAULT,
-        ));
-        let cleanup_interval = Duration::from_secs(read_env_u64(
-            "MUX_JOB_CLEANUP_INTERVAL_SECS",
-            MUX_JOB_CLEANUP_INTERVAL_SECS_DEFAULT,
-        ));
-        let max_refresh_attempts = read_env_usize(
-            "MUX_URL_REFRESH_MAX_ATTEMPTS",
-            MUX_URL_REFRESH_MAX_ATTEMPTS_DEFAULT,
-        );
-        let output_dir = std::env::var("MUX_JOB_OUTPUT_DIR")
-            .ok()
-            .filter(|v| !v.trim().is_empty())
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(MUX_JOB_OUTPUT_DIR_DEFAULT));
+        let limits = backend_limit_profile();
+        let workers = limits.mux_job_max_workers_value().max(1);
+        let queue_capacity = limits.mux_job_queue_capacity_value();
+        let queue_channel_capacity = queue_capacity.unwrap_or(UNBOUNDED_QUEUE_CHANNEL_CAPACITY);
+        let estimated_job_secs = limits.mux_job_estimated_runtime_secs_value().max(1);
+        let max_estimated_wait_secs = limits.mux_job_max_estimated_wait_secs_value();
+        let ttl = limits.mux_job_ttl_value();
+        let job_timeout = limits.mux_job_timeout_value();
+        let temp_file_ttl = limits.mux_job_temp_file_ttl_value();
+        let cleanup_interval = limits.mux_job_cleanup_interval_value();
+        let max_refresh_attempts = limits.mux_url_refresh_max_attempts_value();
+        let output_dir = PathBuf::from(limits.mux_job_output_dir_value());
 
         std::fs::create_dir_all(&output_dir).with_context(|| {
             format!(
@@ -174,7 +145,7 @@ impl MuxedJobQueue {
             )
         })?;
 
-        let (sender, receiver) = mpsc::channel::<String>(queue_capacity);
+        let (sender, receiver) = mpsc::channel::<String>(queue_channel_capacity);
         let inner = Arc::new(MuxedJobQueueInner {
             jobs: RwLock::new(HashMap::new()),
             sender,
@@ -183,6 +154,7 @@ impl MuxedJobQueue {
             max_estimated_wait_secs,
             output_dir,
             queue_capacity,
+            queue_channel_capacity,
             job_timeout,
             temp_file_ttl,
             cleanup_interval,
@@ -200,12 +172,15 @@ impl MuxedJobQueue {
 
         info!(
             workers,
-            queue_capacity,
+            queue_capacity = ?queue.inner.queue_capacity,
+            queue_channel_capacity = queue.inner.queue_channel_capacity,
             estimated_job_secs,
-            max_estimated_wait_secs,
-            job_timeout_secs = queue.inner.job_timeout.as_secs(),
-            temp_file_ttl_secs = queue.inner.temp_file_ttl.as_secs(),
-            ttl_secs = queue.inner.ttl.as_secs(),
+            max_estimated_wait_secs = ?queue.inner.max_estimated_wait_secs,
+            job_timeout_secs = ?queue.inner.job_timeout.map(|value| value.as_secs()),
+            temp_file_ttl_secs = ?queue.inner.temp_file_ttl.map(|value| value.as_secs()),
+            ttl_secs = ?queue.inner.ttl.map(|value| value.as_secs()),
+            cleanup_interval_secs = ?queue.inner.cleanup_interval.map(|value| value.as_secs()),
+            max_refresh_attempts = ?queue.inner.max_refresh_attempts,
             output_dir = %queue.inner.output_dir.display(),
             "Muxed async job queue initialized"
         );
@@ -220,24 +195,28 @@ impl MuxedJobQueue {
         let now = unix_ms_now();
         let mut jobs = self.inner.jobs.write().await;
         let snapshot = self.queue_snapshot_from_jobs(&jobs);
-        if snapshot.inflight >= self.inner.queue_capacity {
-            return Err(MuxJobQueueError::QueueFull);
+        if let Some(queue_capacity) = self.inner.queue_capacity {
+            if snapshot.inflight >= queue_capacity {
+                return Err(MuxJobQueueError::QueueFull);
+            }
         }
-        if snapshot.estimated_wait_secs > self.inner.max_estimated_wait_secs {
-            let retry_after_secs = snapshot.estimated_wait_secs.clamp(2, 120);
-            warn!(
-                queued = snapshot.queued,
-                processing = snapshot.processing,
-                inflight = snapshot.inflight,
-                estimated_wait_secs = snapshot.estimated_wait_secs,
-                max_estimated_wait_secs = self.inner.max_estimated_wait_secs,
-                retry_after_secs,
-                "Rejecting mux job due to estimated wait"
-            );
-            return Err(MuxJobQueueError::QueueOverloaded {
-                retry_after_secs,
-                estimated_wait_secs: snapshot.estimated_wait_secs,
-            });
+        if let Some(max_estimated_wait_secs) = self.inner.max_estimated_wait_secs {
+            if snapshot.estimated_wait_secs > max_estimated_wait_secs {
+                let retry_after_secs = snapshot.estimated_wait_secs.clamp(2, 120);
+                warn!(
+                    queued = snapshot.queued,
+                    processing = snapshot.processing,
+                    inflight = snapshot.inflight,
+                    estimated_wait_secs = snapshot.estimated_wait_secs,
+                    max_estimated_wait_secs,
+                    retry_after_secs,
+                    "Rejecting mux job due to estimated wait"
+                );
+                return Err(MuxJobQueueError::QueueOverloaded {
+                    retry_after_secs,
+                    estimated_wait_secs: snapshot.estimated_wait_secs,
+                });
+            }
         }
         let entry = MuxJobEntry {
             request,
@@ -359,17 +338,23 @@ impl MuxedJobQueue {
     }
 
     fn spawn_cleanup(inner: Arc<MuxedJobQueueInner>) {
+        let Some(cleanup_interval) = inner.cleanup_interval else {
+            return;
+        };
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(inner.cleanup_interval).await;
+                tokio::time::sleep(cleanup_interval).await;
                 cleanup_expired_jobs(inner.clone()).await;
             }
         });
     }
 
     async fn maybe_cleanup(&self) {
+        let Some(cleanup_interval) = self.inner.cleanup_interval else {
+            return;
+        };
         let now = unix_ms_now();
-        let interval_ms = self.inner.cleanup_interval.as_millis() as u64;
+        let interval_ms = cleanup_interval.as_millis() as u64;
         let should_run = self
             .inner
             .last_cleanup_ms
@@ -404,16 +389,30 @@ async fn process_single_job(inner: Arc<MuxedJobQueueInner>, job_id: &str, worker
         "Started mux job processing"
     );
 
-    let result = tokio::time::timeout(
-        inner.job_timeout,
-        execute_mux_job(
+    let result = if let Some(job_timeout) = inner.job_timeout {
+        match tokio::time::timeout(
+            job_timeout,
+            execute_mux_job(
+                job_id,
+                &request,
+                inner.output_dir.clone(),
+                inner.max_refresh_attempts,
+            ),
+        )
+        .await
+        {
+            Ok(result) => Ok(result),
+            Err(_) => Err(job_timeout),
+        }
+    } else {
+        Ok(execute_mux_job(
             job_id,
             &request,
             inner.output_dir.clone(),
             inner.max_refresh_attempts,
-        ),
-    )
-    .await;
+        )
+        .await)
+    };
 
     match result {
         Ok(Ok(job_result)) => {
@@ -458,7 +457,7 @@ async fn process_single_job(inner: Arc<MuxedJobQueueInner>, job_id: &str, worker
                 "Mux job failed"
             );
         }
-        Err(_) => {
+        Err(job_timeout) => {
             let finished_at_ms = unix_ms_now();
             let job_age_ms = finished_at_ms.saturating_sub(created_at_ms);
             let cleanup_deleted_bytes = cleanup_incomplete_job_files(inner.clone(), job_id).await;
@@ -467,7 +466,7 @@ async fn process_single_job(inner: Arc<MuxedJobQueueInner>, job_id: &str, worker
                 entry.status = MuxJobStatus::Failed;
                 entry.error = Some(format!(
                     "Mux job timed out after {} seconds",
-                    inner.job_timeout.as_secs()
+                    job_timeout.as_secs()
                 ));
                 entry.updated_at_ms = finished_at_ms;
                 entry.file_path = None;
@@ -478,7 +477,7 @@ async fn process_single_job(inner: Arc<MuxedJobQueueInner>, job_id: &str, worker
                 job_id,
                 job_age_ms,
                 cleanup_deleted_bytes,
-                timeout_secs = inner.job_timeout.as_secs(),
+                timeout_secs = job_timeout.as_secs(),
                 "Mux job timed out"
             );
         }
@@ -487,7 +486,7 @@ async fn process_single_job(inner: Arc<MuxedJobQueueInner>, job_id: &str, worker
 
 async fn cleanup_expired_jobs(inner: Arc<MuxedJobQueueInner>) {
     let now = unix_ms_now();
-    let ttl_ms = inner.ttl.as_millis() as u64;
+    let ttl_ms = inner.ttl.map(|ttl| ttl.as_millis() as u64);
     let mut expired = Vec::new();
     let mut referenced_files = HashSet::new();
 
@@ -495,7 +494,9 @@ async fn cleanup_expired_jobs(inner: Arc<MuxedJobQueueInner>) {
         let mut jobs = inner.jobs.write().await;
         jobs.retain(|job_id, entry| {
             let terminal = entry.status == MuxJobStatus::Ready || entry.status == MuxJobStatus::Failed;
-            let stale = now.saturating_sub(entry.updated_at_ms) >= ttl_ms;
+            let stale = ttl_ms
+                .map(|ttl_ms| now.saturating_sub(entry.updated_at_ms) >= ttl_ms)
+                .unwrap_or(false);
             if terminal && stale {
                 if let Some(path) = entry.file_path.clone() {
                     expired.push((job_id.clone(), path));
@@ -529,10 +530,12 @@ async fn cleanup_expired_jobs(inner: Arc<MuxedJobQueueInner>) {
         }
     }
 
-    let stale_deleted_bytes =
-        cleanup_stale_mux_output_files(inner.clone(), referenced_files, inner.temp_file_ttl).await;
-    if stale_deleted_bytes > 0 {
-        info!(deleted_bytes = stale_deleted_bytes, "Removed stale mux temporary files");
+    if let Some(temp_file_ttl) = inner.temp_file_ttl {
+        let stale_deleted_bytes =
+            cleanup_stale_mux_output_files(inner.clone(), referenced_files, temp_file_ttl).await;
+        if stale_deleted_bytes > 0 {
+            info!(deleted_bytes = stale_deleted_bytes, "Removed stale mux temporary files");
+        }
     }
 }
 
@@ -540,7 +543,7 @@ async fn execute_mux_job(
     job_id: &str,
     request: &MuxJobRequest,
     output_dir: PathBuf,
-    max_refresh_attempts: usize,
+    max_refresh_attempts: Option<usize>,
 ) -> anyhow::Result<MuxJobResult> {
     let platform = Platform::YouTube;
     let mut video_url = request.video_url.clone();
@@ -568,11 +571,11 @@ async fn execute_mux_job(
                     warn!(
                         job_id,
                         refresh_attempts,
-                        max_refresh_attempts,
+                        max_refresh_attempts = ?max_refresh_attempts,
                         "Upstream auth-like error (401/403) while fetching mux streams"
                     );
                 }
-                if refresh_attempts < max_refresh_attempts
+                if within_retry_limit(refresh_attempts, max_refresh_attempts)
                     && is_auth_like_antibot_error(&error)
                     && request.source_url.is_some()
                 {
@@ -581,7 +584,7 @@ async fn execute_mux_job(
                         info!(
                             job_id,
                             attempt = refresh_attempts,
-                            max_refresh_attempts,
+                            max_refresh_attempts = ?max_refresh_attempts,
                             "Refreshed mux job URLs after fetch auth failure"
                         );
                         video_url = next_video;
@@ -614,11 +617,11 @@ async fn execute_mux_job(
                         warn!(
                             job_id,
                             refresh_attempts,
-                            max_refresh_attempts,
+                            max_refresh_attempts = ?max_refresh_attempts,
                             "Upstream auth-like error (401/403) during muxing"
                         );
                     }
-                    if refresh_attempts < max_refresh_attempts
+                    if within_retry_limit(refresh_attempts, max_refresh_attempts)
                         && is_auth_like_muxer_error(&error)
                         && request.source_url.is_some()
                     {
@@ -638,7 +641,7 @@ async fn execute_mux_job(
                 info!(
                     job_id,
                     attempt = refresh_attempts,
-                    max_refresh_attempts,
+                    max_refresh_attempts = ?max_refresh_attempts,
                     "Refreshed mux job URLs after mux auth failure"
                 );
                 video_url = next_video;
@@ -677,11 +680,12 @@ async fn execute_mux_job(
 
 fn build_fetch_refresh_options(
     request: &MuxJobRequest,
-    max_refresh_attempts: usize,
+    max_refresh_attempts: Option<usize>,
 ) -> FetchBothRefreshOptions {
     let Some(source_url) = request.source_url.clone() else {
         return FetchBothRefreshOptions::default();
     };
+    let max_refresh_attempts = max_refresh_attempts_for_context(max_refresh_attempts);
 
     let video = StreamUrlRefreshContext {
         source_url: source_url.clone(),
@@ -703,6 +707,16 @@ fn build_fetch_refresh_options(
         video: Some(video),
         audio: Some(audio),
     }
+}
+
+fn within_retry_limit(attempts: usize, max_attempts: Option<usize>) -> bool {
+    max_attempts
+        .map(|max_attempts| attempts < max_attempts)
+        .unwrap_or(true)
+}
+
+fn max_refresh_attempts_for_context(max_attempts: Option<usize>) -> usize {
+    max_attempts.unwrap_or(usize::MAX)
 }
 
 async fn refresh_both_urls(
@@ -800,22 +814,6 @@ fn is_auth_like_error_message(message: &str) -> bool {
         || normalized.contains("status client error (403")
         || normalized.contains("http status client error (401")
         || normalized.contains("http status client error (403")
-}
-
-fn read_env_usize(name: &str, default_value: usize) -> usize {
-    std::env::var(name)
-        .ok()
-        .and_then(|raw| raw.parse::<usize>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(default_value)
-}
-
-fn read_env_u64(name: &str, default_value: u64) -> u64 {
-    std::env::var(name)
-        .ok()
-        .and_then(|raw| raw.parse::<u64>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(default_value)
 }
 
 fn unix_ms_now() -> u64 {

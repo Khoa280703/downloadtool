@@ -1,14 +1,14 @@
 import type { Stream } from '$lib/types';
+import { muxRoutingLimitConfig } from '$lib/runtime-limit-config';
 
-const MB = 1024 * 1024;
-const SYNC_ACTIVE_HARD_LIMIT = 12;
-const SYNC_ACTIVE_SOFT_LIMIT = 6;
-const SYNC_DURATION_MAX_SECONDS = 30 * 60;
-const FORCE_JOB_DURATION_SECONDS = 90 * 60;
-const SYNC_SIZE_MAX_BYTES = 120 * MB;
-const FORCE_JOB_SIZE_BYTES = 300 * MB;
-const SYNC_RESOLUTION_MAX = 1080;
-const FORCE_JOB_RESOLUTION_MIN = 1440;
+const SYNC_ACTIVE_HARD_LIMIT = muxRoutingLimitConfig.syncActiveHardLimit;
+const SYNC_ACTIVE_SOFT_LIMIT = muxRoutingLimitConfig.syncActiveSoftLimit;
+const SYNC_DURATION_MAX_SECONDS = muxRoutingLimitConfig.syncDurationMaxSeconds;
+const FORCE_JOB_DURATION_SECONDS = muxRoutingLimitConfig.forceJobDurationSeconds;
+const SYNC_SIZE_MAX_BYTES = muxRoutingLimitConfig.syncSizeMaxBytes;
+const FORCE_JOB_SIZE_BYTES = muxRoutingLimitConfig.forceJobSizeMaxBytes;
+const SYNC_RESOLUTION_MAX = muxRoutingLimitConfig.syncResolutionMax;
+const FORCE_JOB_RESOLUTION_MIN = muxRoutingLimitConfig.forceJobResolutionMin;
 const TIMEOUT_STATUS_CODES = new Set([408, 504]);
 const TIMEOUT_MESSAGE_PATTERNS = [
 	'timed out',

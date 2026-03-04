@@ -27,6 +27,7 @@ use tracing_subscriber::FmtSubscriber;
 
 mod auth;
 mod config;
+mod limit_profiles;
 mod routes;
 mod services;
 
