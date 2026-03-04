@@ -391,8 +391,7 @@ URL Input
         │
         ├─► Success: Parse JSON → Cache → Return
         │
-        └─► Failure: Retry with alternate player client
-            └─► youtube:player_client=android,web
+        └─► Failure: Return extraction error
 ```
 
 **Key Functions:**
@@ -412,12 +411,10 @@ fn resolve_ytdlp_binary() -> String  // YTDLP_PATH env or "yt-dlp"
 
 **Rate Limiting:**
 - Semaphore: `Arc<Semaphore>::new(10)` — prevents resource exhaustion
-- Fallback: On first failure, retry with `youtube:player_client=android,web`
 
 **Metrics:**
 - `EXTRACT_CACHE_HITS`: AtomicU64 counter for cache hit rate monitoring
 - `EXTRACT_CACHE_MISSES`: For cache efficiency analysis
-- `EXTRACT_FALLBACK_RETRIES`: Tracks fallback attempts
 
 **Error Handling:**
 ```rust

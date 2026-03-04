@@ -71,6 +71,4 @@ pnpm dev:down  # stop docker compose services
 - Env source of truth is root `.env` (see `.env.example`) for secrets/runtime endpoints.
 - Runtime limits are now managed in `config/runtime-limit-profiles.json` with `local` and `production` objects.
 - In `runtime-limit-profiles.json`, set a limit field to `null` to disable that specific guard (concurrency caps, retry caps, timeout caps, queue/TTL caps). `mux_job_max_workers` falls back to auto sizing when `null`.
-- yt-dlp extraction now supports fallback `player_client` profiles via `YTDLP_FALLBACK_EXTRACTOR_ARGS` and JS runtime selection via `YTDLP_JS_RUNTIMES` (default runtime order in code: `deno,node`).
-- Extraction attempt metrics are logged under target `extractor::ytdlp_metrics` with fields like `profile`, `success`, `duration_ms`, `error_kind`.
 - For SEO audits: disable Cloudflare "Managed robots/content signals" for `robots.txt`, otherwise Cloudflare injects `Content-Signal` lines that Lighthouse flags as invalid robots directives.

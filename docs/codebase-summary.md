@@ -254,10 +254,9 @@ The platform now reaches users via 4 independent channels:
   - Moka async cache (500 items, 300s TTL) for repeat URL lookups
   - Tokio Semaphore (max 10 concurrent yt-dlp processes) to prevent resource exhaustion
   - governor rate limiting (per-IP keyed) via middleware
-  - Fallback retry with alternate player client (`youtube:player_client=android,web`) on format errors
   - Cache metrics: hits/misses tracked for observability
 - **Integration:** `lib.rs` calls `ytdlp::extract_via_ytdlp()` as primary; Deno pool kept for playlists only
-- **Metrics:** Extract cache hits/misses, fallback retry count via `EXTRACT_CACHE_HITS`, `EXTRACT_CACHE_MISSES`, `EXTRACT_FALLBACK_RETRIES` atomics
+- **Metrics:** Extract cache hits/misses via `EXTRACT_CACHE_HITS`, `EXTRACT_CACHE_MISSES` atomics
 
 ### 2. **Authentication & JWT System** ✅
 - **Files:** `crates/api/src/auth/` (NEW)

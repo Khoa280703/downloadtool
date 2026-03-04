@@ -10,28 +10,18 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use std::time::Instant;
 use tokio::process::Command;
 use tokio::sync::Semaphore;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 const MAX_CONCURRENT_YTDLP: usize = 10;
 const EXTRACT_CACHE_MAX_CAPACITY: u64 = 500;
 const EXTRACT_CACHE_TTL_SECONDS: u64 = 300;
-const DEFAULT_FALLBACK_EXTRACTOR_ARGS: &str =
-    "youtube:player_client=android,web;youtube:player_client=web_safari";
-const DEFAULT_YTDLP_JS_RUNTIMES: &str = "deno,node";
 
 static YTDLP_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 static EXTRACT_CACHE: OnceLock<Cache<String, Arc<VideoInfo>>> = OnceLock::new();
 static EXTRACT_CACHE_HITS: AtomicU64 = AtomicU64::new(0);
 static EXTRACT_CACHE_MISSES: AtomicU64 = AtomicU64::new(0);
-static EXTRACT_FALLBACK_RETRIES: AtomicU64 = AtomicU64::new(0);
-static EXTRACT_ATTEMPTS: AtomicU64 = AtomicU64::new(0);
-static EXTRACT_ATTEMPT_SUCCESSES: AtomicU64 = AtomicU64::new(0);
-static EXTRACT_ATTEMPT_FAILURES: AtomicU64 = AtomicU64::new(0);
-static FALLBACK_EXTRACTOR_ARGS: OnceLock<Vec<String>> = OnceLock::new();
-static YTDLP_JS_RUNTIMES: OnceLock<Option<String>> = OnceLock::new();
 
 fn get_semaphore() -> &'static Arc<Semaphore> {
     YTDLP_SEMAPHORE.get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_YTDLP)))
@@ -51,35 +41,6 @@ fn resolve_ytdlp_binary() -> String {
         .ok()
         .filter(|path| !path.trim().is_empty())
         .unwrap_or_else(|| "yt-dlp".to_string())
-}
-
-fn fallback_extractor_args() -> &'static [String] {
-    FALLBACK_EXTRACTOR_ARGS.get_or_init(|| {
-        std::env::var("YTDLP_FALLBACK_EXTRACTOR_ARGS")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_FALLBACK_EXTRACTOR_ARGS.to_string())
-            .split(';')
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string)
-            .collect()
-    })
-}
-
-fn ytdlp_js_runtimes() -> Option<&'static str> {
-    YTDLP_JS_RUNTIMES
-        .get_or_init(|| {
-            let value = std::env::var("YTDLP_JS_RUNTIMES")
-                .unwrap_or_else(|_| DEFAULT_YTDLP_JS_RUNTIMES.to_string());
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        })
-        .as_deref()
 }
 
 /// Normalize YouTube URL to canonical cache key.
@@ -171,65 +132,14 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
     })?;
 
-    let mut attempt_plan: Vec<Option<String>> = vec![None];
-    attempt_plan.extend(
-        fallback_extractor_args()
-            .iter()
-            .map(|value| Some(value.clone())),
-    );
-    let total_attempts = attempt_plan.len();
-
-    let mut last_error: Option<String> = None;
-
-    for (attempt_index, extractor_args_owned) in attempt_plan.into_iter().enumerate() {
-        let extractor_args = extractor_args_owned.as_deref();
-        let profile_label = extractor_args.unwrap_or("default");
-
-        let output = run_ytdlp_command(&url, extractor_args).await?;
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stderr_trimmed = stderr.trim();
-
-        if output.status.success() {
-            let info = parse_ytdlp_success(&output.stdout, &url)?;
-            EXTRACT_ATTEMPT_SUCCESSES.fetch_add(1, Ordering::Relaxed);
-            log_attempt_metric(
-                &url,
-                attempt_index,
-                profile_label,
-                output.duration_ms,
-                true,
-                stderr_trimmed,
-            );
-            return Ok(Arc::new(info));
-        }
-
-        EXTRACT_ATTEMPT_FAILURES.fetch_add(1, Ordering::Relaxed);
-        log_attempt_metric(
-            &url,
-            attempt_index,
-            profile_label,
-            output.duration_ms,
-            false,
-            stderr_trimmed,
-        );
-
-        last_error = Some(stderr_trimmed.to_string());
-
-        let has_more_fallbacks = attempt_index + 1 < total_attempts;
-        if !has_more_fallbacks || !should_retry_with_alternate_client_args(stderr_trimmed) {
-            break;
-        }
-
-        EXTRACT_FALLBACK_RETRIES.fetch_add(1, Ordering::Relaxed);
-        warn!(
-            attempt_index,
-            profile = profile_label,
-            "yt-dlp failed for {} with retryable error. Retrying with next player_client profile",
-            url
-        );
+    let output = run_ytdlp_command(&url).await?;
+    if output.status.success() {
+        let info = parse_ytdlp_success(&output.stdout, &url)?;
+        return Ok(Arc::new(info));
     }
 
-    let final_error = last_error.unwrap_or_else(|| "unknown yt-dlp error".to_string());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let final_error = stderr.trim().to_string();
     warn!("yt-dlp failed for {}: {}", url, final_error);
     Err(ExtractionError::ScriptExecutionFailed(format!(
         "yt-dlp error: {}",
@@ -241,16 +151,10 @@ struct YtdlpAttemptOutput {
     stdout: Vec<u8>,
     stderr: Vec<u8>,
     status: std::process::ExitStatus,
-    duration_ms: u128,
 }
 
-async fn run_ytdlp_command(
-    url: &str,
-    extractor_args: Option<&str>,
-) -> Result<YtdlpAttemptOutput, ExtractionError> {
-    EXTRACT_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
-    let started_at = Instant::now();
-    let mut command = build_command(url, extractor_args);
+async fn run_ytdlp_command(url: &str) -> Result<YtdlpAttemptOutput, ExtractionError> {
+    let mut command = build_command(url);
     let output = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -264,7 +168,6 @@ async fn run_ytdlp_command(
         stdout: output.stdout,
         stderr: output.stderr,
         status: output.status,
-        duration_ms: started_at.elapsed().as_millis(),
     })
 }
 
@@ -276,7 +179,7 @@ fn parse_ytdlp_success(stdout: &[u8], url: &str) -> Result<VideoInfo, Extraction
 }
 
 /// Build the yt-dlp Command with appropriate flags
-fn build_command(url: &str, extractor_args: Option<&str>) -> Command {
+fn build_command(url: &str) -> Command {
     let mut cmd = Command::new(resolve_ytdlp_binary());
     cmd.args([
         "-J",            // Dump JSON metadata to stdout
@@ -286,14 +189,6 @@ fn build_command(url: &str, extractor_args: Option<&str>) -> Command {
         "15",
         "--no-check-certificates",
     ]);
-
-    if let Some(runtimes) = ytdlp_js_runtimes() {
-        cmd.args(["--js-runtimes", runtimes]);
-    }
-
-    if let Some(extractor_args) = extractor_args {
-        cmd.args(["--extractor-args", extractor_args]);
-    }
 
     // Route through SOCKS5 proxy if configured
     if let Ok(proxy) = std::env::var("SOCKS5_PROXY_URL") {
@@ -305,73 +200,6 @@ fn build_command(url: &str, extractor_args: Option<&str>) -> Command {
 
     cmd.arg(url);
     cmd
-}
-
-fn should_retry_with_alternate_client_args(stderr: &str) -> bool {
-    stderr.contains("Requested format is not available")
-        || stderr.contains("No video formats found")
-        || stderr.contains("Only images are available for download")
-        || stderr.contains("Sign in to confirm you’re not a bot")
-        || stderr.contains("Sign in to confirm you're not a bot")
-        || stderr.contains("HTTP Error 401")
-        || stderr.contains("HTTP Error 403")
-        || stderr.contains("HTTP Error 429")
-}
-
-fn classify_stderr(stderr: &str) -> &'static str {
-    if stderr.contains("Sign in to confirm you’re not a bot")
-        || stderr.contains("Sign in to confirm you're not a bot")
-    {
-        return "bot_challenge";
-    }
-    if stderr.contains("HTTP Error 401") {
-        return "http_401";
-    }
-    if stderr.contains("HTTP Error 403") {
-        return "http_403";
-    }
-    if stderr.contains("HTTP Error 429") {
-        return "http_429";
-    }
-    if stderr.contains("Requested format is not available") {
-        return "format_unavailable";
-    }
-    if stderr.contains("No video formats found") {
-        return "no_video_formats";
-    }
-    if stderr.contains("Only images are available for download") {
-        return "images_only";
-    }
-    if stderr.contains("No supported JavaScript runtime") {
-        return "missing_js_runtime";
-    }
-
-    "other"
-}
-
-fn log_attempt_metric(
-    url: &str,
-    attempt_index: usize,
-    profile_label: &str,
-    duration_ms: u128,
-    success: bool,
-    stderr: &str,
-) {
-    let video_id = extract_video_id(url).unwrap_or("unknown");
-    info!(
-        target: "extractor::ytdlp_metrics",
-        video_id,
-        attempt_index,
-        profile = profile_label,
-        success,
-        duration_ms,
-        error_kind = classify_stderr(stderr),
-        attempts_total = EXTRACT_ATTEMPTS.load(Ordering::Relaxed),
-        attempts_success = EXTRACT_ATTEMPT_SUCCESSES.load(Ordering::Relaxed),
-        attempts_failure = EXTRACT_ATTEMPT_FAILURES.load(Ordering::Relaxed),
-        fallback_retries = EXTRACT_FALLBACK_RETRIES.load(Ordering::Relaxed),
-        "yt-dlp extraction attempt"
-    );
 }
 
 /// Parse yt-dlp `-J` JSON output into VideoInfo
@@ -686,15 +514,4 @@ mod tests {
         assert_eq!(key, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     }
 
-    #[test]
-    fn test_retry_on_bot_challenge_error() {
-        let stderr = "ERROR: [youtube] abc: Sign in to confirm you’re not a bot";
-        assert!(should_retry_with_alternate_client_args(stderr));
-    }
-
-    #[test]
-    fn test_classify_stderr_bot_challenge() {
-        let stderr = "ERROR: [youtube] abc: Sign in to confirm you're not a bot";
-        assert_eq!(classify_stderr(stderr), "bot_challenge");
-    }
 }
