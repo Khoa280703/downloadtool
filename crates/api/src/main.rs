@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::{
-    extract::{ConnectInfo, Request, State},
+    extract::{ConnectInfo, MatchedPath, Request, State},
     http::StatusCode,
     middleware,
     response::{IntoResponse, Response},
@@ -21,8 +21,9 @@ use governor::{clock::DefaultClock, state::keyed::DefaultKeyedStateStore, Quota,
 use serde_json::json;
 use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::CorsLayer;
-use tower_http::trace::TraceLayer;
-use tracing::{info, warn, Level};
+use tower_http::trace::{DefaultOnFailure, DefaultOnResponse, TraceLayer};
+use tower_http::LatencyUnit;
+use tracing::{info, info_span, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod auth;
@@ -152,7 +153,32 @@ fn build_app(
         .merge(protected_api)
         .with_state(app_state)
         .layer(CorsLayer::permissive())
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &Request| {
+                    let matched_path = request
+                        .extensions()
+                        .get::<MatchedPath>()
+                        .map(MatchedPath::as_str)
+                        .unwrap_or_else(|| request.uri().path());
+
+                    info_span!(
+                        "http_request",
+                        method = %request.method(),
+                        matched_path = %matched_path
+                    )
+                })
+                .on_response(
+                    DefaultOnResponse::new()
+                        .level(Level::INFO)
+                        .latency_unit(LatencyUnit::Millis),
+                )
+                .on_failure(
+                    DefaultOnFailure::new()
+                        .level(Level::ERROR)
+                        .latency_unit(LatencyUnit::Millis),
+                ),
+        )
 }
 
 #[tokio::main]

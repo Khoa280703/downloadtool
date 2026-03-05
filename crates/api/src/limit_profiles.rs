@@ -37,7 +37,8 @@ static BACKEND_ACTIVE_PROFILE: OnceLock<BackendLimitProfile> = OnceLock::new();
 
 fn parse_profiles() -> RuntimeLimitProfiles {
     let raw = include_str!("../../../config/runtime-limit-profiles.json");
-    serde_json::from_str(raw).expect("config/runtime-limit-profiles.json must be valid JSON")
+    json5::from_str(raw)
+        .expect("config/runtime-limit-profiles.json must be valid JSON5 (supports // comments)")
 }
 
 fn current_profile_name() -> &'static str {

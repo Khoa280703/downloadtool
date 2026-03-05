@@ -3,6 +3,7 @@
 //! Calls `yt-dlp -J --no-playlist` to get video metadata + stream URLs.
 //! yt-dlp handles PO Token, signature decryption, and throttle bypass automatically.
 
+use crate::runtime_limit_profiles::extractor_limit_profile;
 use crate::types::{ExtractionError, VideoFormat, VideoInfo};
 use moka::future::Cache;
 use proxy::ProxyPool;
@@ -17,10 +18,10 @@ use tracing::{debug, warn};
 
 const MAX_CONCURRENT_YTDLP: usize = 10;
 const EXTRACT_CACHE_MAX_CAPACITY: u64 = 500;
-const EXTRACT_CACHE_TTL_SECONDS: u64 = 300;
+const DEFAULT_EXTRACT_CACHE_TTL_SECONDS: u64 = 300;
 const MAX_PROXY_ROTATION_ATTEMPTS: usize = 3;
 const STREAM_PROXY_CACHE_MAX_CAPACITY: u64 = 10_000;
-const STREAM_PROXY_CACHE_TTL_SECONDS: u64 = 1800;
+const DEFAULT_STREAM_PROXY_CACHE_TTL_SECONDS: u64 = 1800;
 
 static YTDLP_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 static EXTRACT_CACHE: OnceLock<Cache<String, Arc<VideoInfo>>> = OnceLock::new();
@@ -28,6 +29,15 @@ static EXTRACT_CACHE_HITS: AtomicU64 = AtomicU64::new(0);
 static EXTRACT_CACHE_MISSES: AtomicU64 = AtomicU64::new(0);
 static YTDLP_PROXY_POOL: OnceLock<Option<ProxyPool>> = OnceLock::new();
 static STREAM_PROXY_CACHE: OnceLock<Cache<String, Arc<String>>> = OnceLock::new();
+
+fn extract_cache_ttl_secs() -> u64 {
+    extractor_limit_profile().extract_cache_ttl_secs_value(DEFAULT_EXTRACT_CACHE_TTL_SECONDS)
+}
+
+fn stream_proxy_cache_ttl_secs() -> u64 {
+    extractor_limit_profile()
+        .stream_proxy_cache_ttl_secs_value(DEFAULT_STREAM_PROXY_CACHE_TTL_SECONDS)
+}
 
 fn get_semaphore() -> &'static Arc<Semaphore> {
     YTDLP_SEMAPHORE.get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_YTDLP)))
@@ -37,7 +47,7 @@ fn get_cache() -> &'static Cache<String, Arc<VideoInfo>> {
     EXTRACT_CACHE.get_or_init(|| {
         Cache::builder()
             .max_capacity(EXTRACT_CACHE_MAX_CAPACITY)
-            .time_to_live(Duration::from_secs(EXTRACT_CACHE_TTL_SECONDS))
+            .time_to_live(Duration::from_secs(extract_cache_ttl_secs()))
             .build()
     })
 }
@@ -46,7 +56,7 @@ fn get_stream_proxy_cache() -> &'static Cache<String, Arc<String>> {
     STREAM_PROXY_CACHE.get_or_init(|| {
         Cache::builder()
             .max_capacity(STREAM_PROXY_CACHE_MAX_CAPACITY)
-            .time_to_live(Duration::from_secs(STREAM_PROXY_CACHE_TTL_SECONDS))
+            .time_to_live(Duration::from_secs(stream_proxy_cache_ttl_secs()))
             .build()
     })
 }

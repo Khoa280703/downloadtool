@@ -77,6 +77,7 @@ dependencies = [
  "governor",
  "hex",
  "hmac",
+ "json5",
  "jsonwebtoken",
  "muxer",
  "proxy",
@@ -873,6 +874,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "deno_core",
+ "json5",
  "moka",
  "num_cpus",
  "proxy",

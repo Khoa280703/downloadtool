@@ -18,6 +18,7 @@ reqwest = { workspace = true }
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
+json5 = "0.4"
 
 # Logging
 tracing = { workspace = true }

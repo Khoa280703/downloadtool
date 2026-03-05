@@ -1,4 +1,5 @@
-import runtimeLimitProfiles from '../../../config/runtime-limit-profiles.json';
+import JSON5 from 'json5';
+import runtimeLimitProfilesRaw from '../../../config/runtime-limit-profiles.json?raw';
 
 const MB = 1024 * 1024;
 const DISABLED_NUMERIC_LIMIT = Number.MAX_SAFE_INTEGER;
@@ -65,7 +66,7 @@ function toZeroWhenNull(value: number | undefined | null, fallback: number, min 
 }
 
 function getFrontendLimitProfile(): FrontendLimitProfile {
-	const profiles = runtimeLimitProfiles as RuntimeLimitProfiles;
+	const profiles = JSON5.parse(runtimeLimitProfilesRaw) as RuntimeLimitProfiles;
 	const active = import.meta.env.PROD ? profiles.production : profiles.local;
 	return active?.frontend ?? {};
 }

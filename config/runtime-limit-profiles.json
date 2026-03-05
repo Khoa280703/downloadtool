@@ -2,6 +2,8 @@
   "local": {
     "backend": {
       "extract_rate_limit_enabled": false,
+      "extract_cache_ttl_secs": 300,
+      "stream_proxy_cache_ttl_secs": 1800,
       "stream_max_concurrent": 128,
       "mux_max_concurrent": 20,
       "mux_preflight_timeout_secs": 15,
@@ -44,6 +46,8 @@
   "production": {
     "backend": {
       "extract_rate_limit_enabled": false,
+      "extract_cache_ttl_secs": 300,
+      "stream_proxy_cache_ttl_secs": 1800,
       "stream_max_concurrent": null,
       "mux_max_concurrent": null,
       "mux_preflight_timeout_secs": null,
