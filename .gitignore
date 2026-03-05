@@ -43,3 +43,4 @@ logs/
 # Temporary local files
 .tmp/
 home/
+proxy.md

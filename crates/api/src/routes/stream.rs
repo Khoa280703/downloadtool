@@ -568,6 +568,21 @@ fn chunked_stream(
         let max_refresh_attempts = stream_url_refresh_max_attempts();
         let mut refresh_attempts = 0usize;
         let mut offset = start_offset;
+
+        let mut forced_proxy = extractor::resolve_stream_proxy(&active_url).await;
+        let mut client = match ProxyClient::new_with_proxy(platform, forced_proxy.clone()) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = tx
+                    .send(Err(std::io::Error::other(format!(
+                        "Failed to create proxy client: {}",
+                        e
+                    ))))
+                    .await;
+                return;
+            }
+        };
+
         while offset < active_total_size {
             let end = (offset + YOUTUBE_CHUNK_SIZE - 1).min(active_total_size - 1);
             let range = Range {
@@ -575,20 +590,6 @@ fn chunked_stream(
                 end: Some(end),
             };
             debug!("Chunk: bytes={}-{} / {}", offset, end, active_total_size);
-
-            let pinned_proxy = extractor::resolve_stream_proxy(&active_url).await;
-            let client = match ProxyClient::new_with_proxy(platform, pinned_proxy) {
-                Ok(c) => c,
-                Err(e) => {
-                    let _ = tx
-                        .send(Err(std::io::Error::other(format!(
-                            "Failed to create proxy client: {}",
-                            e
-                        ))))
-                        .await;
-                    return;
-                }
-            };
 
             match client
                 .fetch_stream_with_headers(&active_url, Some(range))
@@ -630,6 +631,26 @@ fn chunked_stream(
                                         active_total_size = clen;
                                     }
                                 }
+                                let refreshed_proxy =
+                                    extractor::resolve_stream_proxy(&active_url).await;
+                                if refreshed_proxy.is_some() {
+                                    forced_proxy = refreshed_proxy;
+                                }
+                                client = match ProxyClient::new_with_proxy(
+                                    platform,
+                                    forced_proxy.clone(),
+                                ) {
+                                    Ok(c) => c,
+                                    Err(e) => {
+                                        let _ = tx
+                                            .send(Err(std::io::Error::other(format!(
+                                                "Failed to create proxy client: {}",
+                                                e
+                                            ))))
+                                            .await;
+                                        return;
+                                    }
+                                };
                                 continue;
                             }
                         }

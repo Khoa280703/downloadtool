@@ -4,7 +4,7 @@
 //! are not Send. The pool uses a semaphore to bound concurrent operations.
 
 use crate::runtime::ExtractorRuntime;
-use crate::types::{ExtractionError, VideoInfo};
+use crate::types::ExtractionError;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{debug, info};
@@ -34,60 +34,6 @@ impl ExtractorPool {
             js_bundle: Arc::new(js_bundle),
             pool_size: size,
         }
-    }
-
-    /// Extract video information from a URL
-    ///
-    /// JsRuntime is !Send, so work runs in spawn_blocking with its own runtime.
-    pub async fn extract(&self, platform: &str, url: &str) -> Result<VideoInfo, ExtractionError> {
-        // OwnedSemaphorePermit is Send + 'static, safe to move into spawn_blocking
-        let permit = Arc::clone(&self.semaphore)
-            .acquire_owned()
-            .await
-            .map_err(|e| ExtractionError::ScriptExecutionFailed(e.to_string()))?;
-
-        debug!("Acquired pool permit for {} extraction", platform);
-
-        let bundle = Arc::clone(&self.js_bundle);
-        let platform = platform.to_string();
-        let url = url.to_string();
-
-        // JsRuntime is !Send — must run on a dedicated std::thread (not spawn_blocking).
-        // Using spawn_blocking + rt.block_on() creates nested tokio contexts which
-        // prevents deno_core's async ops from polling correctly (they hang indefinitely).
-        // std::thread::spawn starts fresh with no existing runtime context, so
-        // LocalSet::block_on works properly and async ops (op_fetch) can resolve.
-        let (tx, rx) = tokio::sync::oneshot::channel();
-
-        std::thread::spawn(move || {
-            let _permit = permit; // released when thread exits
-
-            let rt = match tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-            {
-                Ok(rt) => rt,
-                Err(e) => {
-                    let _ = tx.send(Err(ExtractionError::ScriptExecutionFailed(e.to_string())));
-                    return;
-                }
-            };
-
-            let local = tokio::task::LocalSet::new();
-            let result = local.block_on(&rt, async move {
-                let mut runtime = ExtractorRuntime::new(&bundle)?;
-                runtime.extract(&platform, &url).await
-            });
-
-            let _ = tx.send(result);
-        });
-
-        let result = rx
-            .await
-            .map_err(|e| ExtractionError::ScriptExecutionFailed(e.to_string()))??;
-
-        debug!("Completed extraction");
-        Ok(result)
     }
 
     /// Extract playlist items from a URL.
@@ -162,11 +108,6 @@ impl PoolHandle {
         Self {
             inner: Arc::new(pool),
         }
-    }
-
-    /// Extract video information
-    pub async fn extract(&self, platform: &str, url: &str) -> Result<VideoInfo, ExtractionError> {
-        self.inner.extract(platform, url).await
     }
 
     /// Extract playlist items.

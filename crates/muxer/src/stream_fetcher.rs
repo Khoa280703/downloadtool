@@ -11,7 +11,6 @@ use proxy::Platform;
 use reqwest::StatusCode;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use tracing::{debug, error, info, warn};
 
 /// Chunk size for YouTube CDN throttle bypass: 9.5 MB.
@@ -56,25 +55,6 @@ pub struct FetchBothRefreshOptions {
 pub struct StreamFetcher;
 
 impl StreamFetcher {
-    /// Fetch both video and audio streams concurrently with CDN chunked bypass.
-    ///
-    /// If the URL contains a `clen` param (YouTube CDN), uses sequential range
-    /// chunk requests to bypass the per-file throttle. Otherwise falls back to
-    /// a single request.
-    pub async fn fetch_both(
-        video_url: &str,
-        audio_url: &str,
-        platform: Platform,
-    ) -> Result<(ByteStream, ByteStream), AntiBotError> {
-        Self::fetch_both_with_refresh(
-            video_url,
-            audio_url,
-            platform,
-            FetchBothRefreshOptions::default(),
-        )
-        .await
-    }
-
     /// Fetch both streams with optional refresh contexts for auth-like upstream failures.
     pub async fn fetch_both_with_refresh(
         video_url: &str,
@@ -95,8 +75,11 @@ impl StreamFetcher {
         video_proxy: Option<String>,
         audio_proxy: Option<String>,
     ) -> Result<(ByteStream, ByteStream), AntiBotError> {
-        info!("Fetching video stream from: {}", video_url);
-        info!("Fetching audio stream from: {}", audio_url);
+        debug!(
+            video_url_len = video_url.len(),
+            audio_url_len = audio_url.len(),
+            "Initializing concurrent stream fetch"
+        );
 
         let (video_result, audio_result) = tokio::join!(
             fetch_stream_chunked(platform, video_url, refresh.video, video_proxy),
@@ -108,28 +91,6 @@ impl StreamFetcher {
 
         debug!("Both streams initialized successfully");
         Ok((video_stream, audio_stream))
-    }
-
-    /// Fetch a video stream with range support.
-    pub async fn fetch_video(
-        url: &str,
-        range: Option<String>,
-        platform: Platform,
-    ) -> Result<ByteStream, AntiBotError> {
-        let client = AntiBotClient::new(platform)?;
-        let stream = client.fetch_stream(url, range).await?;
-        Ok(Box::pin(stream))
-    }
-
-    /// Fetch an audio stream with range support.
-    pub async fn fetch_audio(
-        url: &str,
-        range: Option<String>,
-        platform: Platform,
-    ) -> Result<ByteStream, AntiBotError> {
-        let client = AntiBotClient::new(platform)?;
-        let stream = client.fetch_stream(url, range).await?;
-        Ok(Box::pin(stream))
     }
 }
 
@@ -742,109 +703,9 @@ async fn fetch_stream_chunked(
     Ok(Box::pin(stream))
 }
 
-/// A combined stream that yields from both video and audio sources.
-///
-/// This is used internally by the muxer to interleave chunks.
-pub struct CombinedStream {
-    video: ByteStream,
-    audio: ByteStream,
-    video_done: bool,
-    audio_done: bool,
-}
-
-impl CombinedStream {
-    /// Create a new combined stream from video and audio sources.
-    pub fn new(video: ByteStream, audio: ByteStream) -> Self {
-        Self {
-            video,
-            audio,
-            video_done: false,
-            audio_done: false,
-        }
-    }
-
-    /// Check if both streams are complete.
-    pub fn is_complete(&self) -> bool {
-        self.video_done && self.audio_done
-    }
-
-    /// Get the next video chunk if available.
-    pub fn poll_video(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Bytes, AntiBotError>>> {
-        if self.video_done {
-            return Poll::Ready(None);
-        }
-        self.video.as_mut().poll_next(cx)
-    }
-
-    /// Get the next audio chunk if available.
-    pub fn poll_audio(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Bytes, AntiBotError>>> {
-        if self.audio_done {
-            return Poll::Ready(None);
-        }
-        self.audio.as_mut().poll_next(cx)
-    }
-}
-
-/// Error type for combined stream operations.
-#[derive(Debug)]
-pub enum CombinedStreamError {
-    /// Video stream error.
-    VideoError(AntiBotError),
-    /// Audio stream error.
-    AudioError(AntiBotError),
-    /// Both streams failed.
-    BothFailed {
-        /// Video error.
-        video: AntiBotError,
-        /// Audio error.
-        audio: AntiBotError,
-    },
-}
-
-impl std::fmt::Display for CombinedStreamError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CombinedStreamError::VideoError(e) => write!(f, "Video stream error: {}", e),
-            CombinedStreamError::AudioError(e) => write!(f, "Audio stream error: {}", e),
-            CombinedStreamError::BothFailed { video, audio } => {
-                write!(
-                    f,
-                    "Both streams failed - video: {}, audio: {}",
-                    video, audio
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for CombinedStreamError {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_combined_stream_creation() {
-        let video: ByteStream = Box::pin(futures::stream::empty());
-        let audio: ByteStream = Box::pin(futures::stream::empty());
-        let combined = CombinedStream::new(video, audio);
-        assert!(!combined.is_complete());
-    }
-
-    #[test]
-    fn test_combined_stream_error_display() {
-        let err = CombinedStreamError::VideoError(AntiBotError::InvalidUrl("test".to_string()));
-        assert!(err.to_string().contains("Video stream error"));
-
-        let err = CombinedStreamError::AudioError(AntiBotError::InvalidUrl("test".to_string()));
-        assert!(err.to_string().contains("Audio stream error"));
-    }
 
     #[test]
     fn test_extract_clen_from_url() {

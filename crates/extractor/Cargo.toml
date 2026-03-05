@@ -19,9 +19,6 @@ serde_json = { workspace = true }
 # HTTP client
 reqwest = { workspace = true, features = ["socks"] }
 
-# File watching for hot-reload
-notify = "6"
-
 # CPU count for pool sizing
 num_cpus = "1"
 
@@ -36,4 +33,3 @@ proxy = { path = "../proxy" }
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3"

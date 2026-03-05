@@ -21,19 +21,15 @@ use std::path::Path;
 use std::sync::OnceLock;
 use tracing::{debug, info};
 
-pub mod hot_reload;
 pub mod pool;
 pub mod runtime;
 pub mod types;
 pub mod ytdlp;
 
-pub use hot_reload::{HotReloader, ReloadableBundle};
-pub use pool::{ExtractorPool, PoolHandle};
-pub use runtime::ExtractorRuntime;
 pub use types::{ExtractionError, VideoFormat, VideoInfo};
 
 // Global pool instance for the simple API
-static GLOBAL_POOL: OnceLock<PoolHandle> = OnceLock::new();
+static GLOBAL_POOL: OnceLock<pool::PoolHandle> = OnceLock::new();
 
 /// Default bundle path - bundled at compile time
 const DEFAULT_BUNDLE: &str = include_str!(concat!(env!("OUT_DIR"), "/extractors_bundle.js"));
@@ -53,8 +49,8 @@ pub async fn init(bundle_path: Option<&Path>) -> Result<(), ExtractionError> {
         DEFAULT_BUNDLE.to_string()
     };
 
-    let pool = ExtractorPool::new(bundle, None);
-    let handle = PoolHandle::new(pool);
+    let pool = pool::ExtractorPool::new(bundle, None);
+    let handle = pool::PoolHandle::new(pool);
 
     GLOBAL_POOL
         .set(handle)
@@ -78,26 +74,6 @@ pub async fn resolve_stream_proxy(url: &str) -> Option<String> {
     ytdlp::resolve_stream_proxy(url).await
 }
 
-/// Extract video information with a specific platform
-///
-/// Use this when you already know the platform and want to skip auto-detection.
-///
-/// # Arguments
-/// * `platform` - The platform identifier (e.g., "youtube")
-/// * `url` - The video URL to extract
-pub async fn extract_with_platform(
-    platform: &str,
-    url: &str,
-) -> Result<VideoInfo, ExtractionError> {
-    let pool = GLOBAL_POOL.get().ok_or_else(|| {
-        ExtractionError::ScriptExecutionFailed(
-            "Extractor not initialized. Call extractor::init() first.".to_string(),
-        )
-    })?;
-
-    pool.extract(platform, url).await
-}
-
 /// Extract playlist items with a specific platform extractor.
 ///
 /// Returns raw JSON value from JavaScript extractor (expected array of entries).
@@ -112,23 +88,6 @@ pub async fn extract_playlist(
     })?;
 
     pool.extract_playlist(platform, url).await
-}
-
-/// Create a new extractor pool with custom settings
-///
-/// Use this for advanced use cases where you need multiple pools
-/// or custom configuration.
-///
-/// # Arguments
-/// * `js_bundle` - The bundled JavaScript containing extractors
-/// * `pool_size` - Number of concurrent workers (defaults to num_cpus)
-pub fn create_pool(js_bundle: String, pool_size: Option<usize>) -> ExtractorPool {
-    ExtractorPool::new(js_bundle, pool_size)
-}
-
-/// Get the default bundled JavaScript
-pub fn default_bundle() -> &'static str {
-    DEFAULT_BUNDLE
 }
 
 #[cfg(test)]

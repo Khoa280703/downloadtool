@@ -3,7 +3,7 @@
 //! This module initializes a V8 isolate with custom ops for HTTP fetching
 //! and logging, then loads the bundled TypeScript extractor scripts.
 
-use crate::types::{ExtractionError, VideoFormat, VideoInfo};
+use crate::types::ExtractionError;
 use deno_core::{op2, JsRuntime, PollEventLoopOptions, RuntimeOptions};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
@@ -104,65 +104,6 @@ impl ExtractorRuntime {
         Ok(Self { runtime })
     }
 
-    /// Extract video information by calling the JS extract function
-    pub async fn extract(
-        &mut self,
-        platform: &str,
-        url: &str,
-    ) -> Result<VideoInfo, ExtractionError> {
-        let platform_json = serde_json::to_string(platform).map_err(|e| {
-            ExtractionError::JavaScriptError(format!(
-                "Failed to serialize platform argument: {}",
-                e
-            ))
-        })?;
-        let url_json = serde_json::to_string(url).map_err(|e| {
-            ExtractionError::JavaScriptError(format!("Failed to serialize URL argument: {}", e))
-        })?;
-        let code = format!(
-            r#"
-            (async () => {{
-                const extractor = extractors[{}];
-                if (!extractor) {{
-                    throw new Error("Extractor not found");
-                }}
-                if (typeof extractor.extract !== "function") {{
-                    throw new Error("extract function not found on extractor");
-                }}
-                return await extractor.extract({});
-            }})()
-            "#,
-            platform_json, url_json
-        );
-
-        let result = self
-            .runtime
-            .execute_script("extract_call.js", code)
-            .map_err(|e| {
-                ExtractionError::JavaScriptError(format!("Script execution failed: {}", e))
-            })?;
-
-        // Resolve the promise while driving the event loop (required for async ops like op_fetch)
-        let resolve_fut = self.runtime.resolve(result);
-        let resolved = self
-            .runtime
-            .with_event_loop_promise(resolve_fut, PollEventLoopOptions::default())
-            .await
-            .map_err(|e| {
-                ExtractionError::JavaScriptError(format!("Promise resolution failed: {}", e))
-            })?;
-
-        // Convert to serde_json::Value
-        let scope = &mut self.runtime.handle_scope();
-        let local = deno_core::v8::Local::new(scope, &resolved);
-        let value =
-            deno_core::serde_v8::from_v8::<serde_json::Value>(scope, local).map_err(|e| {
-                ExtractionError::JavaScriptError(format!("Failed to deserialize result: {}", e))
-            })?;
-
-        parse_extraction_result(value, url)
-    }
-
     /// Extract playlist videos by calling the JS extractPlaylist function.
     pub async fn extract_playlist(
         &mut self,
@@ -219,162 +160,6 @@ impl ExtractorRuntime {
 
         Ok(value)
     }
-}
-
-/// Parse the extraction result from JS into VideoInfo
-fn parse_extraction_result(
-    value: serde_json::Value,
-    original_url: &str,
-) -> Result<VideoInfo, ExtractionError> {
-    let result = value.as_object().ok_or_else(|| {
-        ExtractionError::JavaScriptError("Expected object result from extractor".to_string())
-    })?;
-
-    let title = result
-        .get("title")
-        .and_then(|v| v.as_str())
-        .unwrap_or("Unknown")
-        .to_string();
-
-    let channel = result
-        .get("channel")
-        .and_then(|v| v.as_str())
-        .map(String::from);
-
-    let view_count = result.get("viewCount").and_then(parse_u64_value);
-
-    let description = result
-        .get("description")
-        .and_then(|v| v.as_str())
-        .map(String::from);
-
-    let duration = result.get("duration").and_then(|v| v.as_u64());
-
-    let thumbnail = result
-        .get("thumbnail")
-        .and_then(|v| v.as_str())
-        .map(String::from);
-
-    let streams = result
-        .get("streams")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| {
-            ExtractionError::JavaScriptError("Missing streams array in result".to_string())
-        })?;
-
-    let mut formats = Vec::new();
-
-    for (idx, stream) in streams.iter().enumerate() {
-        let stream_obj = stream.as_object().ok_or_else(|| {
-            ExtractionError::JavaScriptError(format!("Stream {} is not an object", idx))
-        })?;
-
-        let url = stream_obj
-            .get("url")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                ExtractionError::JavaScriptError(format!("Stream {} missing URL", idx))
-            })?;
-
-        let quality = stream_obj
-            .get("quality")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
-
-        let format = stream_obj
-            .get("format")
-            .and_then(|v| v.as_str())
-            .unwrap_or("mp4");
-
-        let mime = stream_obj
-            .get("mime")
-            .and_then(|v| v.as_str())
-            .unwrap_or("video/mp4");
-
-        let height = stream_obj
-            .get("height")
-            .and_then(|v| v.as_u64())
-            .map(|h| h as u32);
-
-        let width = stream_obj
-            .get("width")
-            .and_then(|v| v.as_u64())
-            .map(|w| w as u32);
-
-        let bitrate = stream_obj.get("bitrate").and_then(|v| v.as_u64());
-        let filesize = stream_obj
-            .get("filesize")
-            .and_then(parse_u64_value)
-            .or_else(|| stream_obj.get("contentLength").and_then(parse_u64_value))
-            .or_else(|| extract_clen_from_url(url));
-
-        let codec = stream_obj
-            .get("codec")
-            .and_then(|v| v.as_str())
-            .map(String::from);
-        let codec_label = stream_obj
-            .get("codecLabel")
-            .and_then(|v| v.as_str())
-            .map(String::from);
-        let has_audio = stream_obj
-            .get("hasAudio")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let is_audio_only = stream_obj
-            .get("isAudioOnly")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        formats.push(VideoFormat {
-            format_id: format!("{}-{}", format, idx),
-            quality: quality.to_string(),
-            vcodec: if mime.contains("video") {
-                codec.clone()
-            } else {
-                None
-            },
-            acodec: if mime.contains("audio") { codec } else { None },
-            codec_label,
-            has_audio,
-            is_audio_only,
-            width,
-            height,
-            fps: None,
-            bitrate,
-            ext: format.to_string(),
-            url: url.to_string(),
-            filesize,
-        });
-    }
-
-    Ok(VideoInfo {
-        title,
-        channel,
-        view_count,
-        description,
-        duration,
-        thumbnail,
-        formats,
-        original_url: original_url.to_string(),
-    })
-}
-
-/// Parse an integer-like JSON value to u64.
-///
-/// Accepts either number (`123`) or string (`"123"`).
-fn parse_u64_value(value: &serde_json::Value) -> Option<u64> {
-    value
-        .as_u64()
-        .or_else(|| value.as_str().and_then(|s| s.parse::<u64>().ok()))
-}
-
-/// Extract `clen` (content length) from CDN URL query params.
-fn extract_clen_from_url(url: &str) -> Option<u64> {
-    let parsed = reqwest::Url::parse(url).ok()?;
-    parsed
-        .query_pairs()
-        .find(|(k, _)| k == "clen")
-        .and_then(|(_, v)| v.parse::<u64>().ok())
 }
 
 /// Allowed domains for HTTP fetch (security whitelist)
@@ -565,7 +350,6 @@ fn op_log(#[string] level: String, #[string] message: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn test_should_use_socks5_youtube() {
@@ -597,23 +381,5 @@ mod tests {
     #[test]
     fn test_should_use_socks5_invalid_url_false() {
         assert!(!should_use_socks5("not-a-valid-url"));
-    }
-
-    #[test]
-    fn test_parse_u64_value_number_and_string() {
-        assert_eq!(parse_u64_value(&json!(12345)), Some(12_345));
-        assert_eq!(parse_u64_value(&json!("67890")), Some(67_890));
-        assert_eq!(parse_u64_value(&json!("not-a-number")), None);
-    }
-
-    #[test]
-    fn test_extract_clen_from_url() {
-        let url = "https://rr1.googlevideo.com/videoplayback?clen=20971520&mime=video%2Fmp4";
-        assert_eq!(extract_clen_from_url(url), Some(20_971_520));
-        assert_eq!(
-            extract_clen_from_url("https://example.com/video?foo=bar"),
-            None
-        );
-        assert_eq!(extract_clen_from_url("not-a-url"), None);
     }
 }
