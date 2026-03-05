@@ -113,6 +113,11 @@ fn should_mark_proxy_failed(stderr: &str) -> bool {
         || normalized.contains("unable to download")
 }
 
+fn should_quarantine_proxy(stderr: &str) -> bool {
+    let normalized = stderr.to_ascii_lowercase();
+    normalized.contains("sign in to confirm") || normalized.contains("not a bot")
+}
+
 /// Resolve pinned proxy URL for a previously extracted stream URL.
 pub async fn resolve_stream_proxy(url: &str) -> Option<String> {
     get_stream_proxy_cache()
@@ -260,7 +265,11 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         if let Some(proxy) = selected_proxy.filter(|proxy| proxy.from_pool) {
             if should_mark_proxy_failed(&stderr) {
                 if let Some(pool) = get_proxy_pool() {
-                    pool.mark_failed(&proxy.url);
+                    if should_quarantine_proxy(&stderr) {
+                        pool.quarantine(&proxy.url, "yt-dlp-bot-check");
+                    } else {
+                        pool.mark_failed(&proxy.url);
+                    }
                 }
             }
         }

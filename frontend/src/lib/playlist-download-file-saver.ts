@@ -15,7 +15,6 @@ type FileWritableHandle = WritableStream & {
 export interface SaveDownloadOptions {
 	requireFsaa?: boolean;
 	allowAnchorFallback?: boolean;
-	preflightAnchor?: boolean;
 }
 
 let saveDirectoryHandle: SaveDirectoryHandle | null = null;
@@ -60,7 +59,6 @@ export async function saveDownload(
 ): Promise<void> {
 	const requireFsaa = options.requireFsaa === true;
 	const allowAnchorFallback = options.allowAnchorFallback !== false;
-	const preflightAnchor = options.preflightAnchor !== false;
 
 	if (saveDirectoryHandle) {
 		try {
@@ -69,9 +67,6 @@ export async function saveDownload(
 		} catch (error) {
 			if (isAbortError(error)) throw error;
 			if (!allowAnchorFallback) throw error;
-			if (preflightAnchor) {
-				await preflightDownload(url, signal);
-			}
 			downloadViaAnchor(url, filename);
 			return;
 		}
@@ -85,9 +80,6 @@ export async function saveDownload(
 		throw new Error('Anchor fallback is disabled');
 	}
 
-	if (preflightAnchor) {
-		await preflightDownload(url, signal);
-	}
 	downloadViaAnchor(url, filename);
 }
 
@@ -120,17 +112,6 @@ async function saveWithDirectory(
 			}
 		}
 		throw error;
-	}
-}
-
-async function preflightDownload(url: string, signal: AbortSignal): Promise<void> {
-	const response = await fetchWithRetry(url, signal);
-	if (response.body) {
-		try {
-			await response.body.cancel();
-		} catch {
-			// Ignore cancellation errors from probe request.
-		}
 	}
 }
 

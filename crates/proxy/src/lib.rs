@@ -13,6 +13,7 @@ pub mod client;
 pub mod header_builder;
 pub mod platform;
 pub mod proxy_pool;
+mod proxy_quarantine;
 pub mod stream;
 pub mod throttle;
 

@@ -139,8 +139,7 @@
 			try {
 				const saveOpts = {
 					requireFsaa: false,
-					allowAnchorFallback: true,
-					preflightAnchor: true
+					allowAnchorFallback: true
 				} as const;
 
 				const saveSyncOrNormal = async (url: string): Promise<void> => {

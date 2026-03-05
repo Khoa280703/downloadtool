@@ -69,6 +69,9 @@ pnpm dev:down  # stop docker compose services
 - If you run full Docker stack (`api` + `frontend` containers), requests go to API container.
 - If you run `pnpm dev:be` + `pnpm dev:fe`, requests go to host API and logs appear in Terminal B.
 - Env source of truth is root `.env` (see `.env.example`) for secrets/runtime endpoints.
+- Proxy pool quarantine:
+- Khi extractor gặp lỗi bot-check (`Sign in to confirm you're not a bot`), proxy đó sẽ bị loại khỏi vòng xoay ngay lập tức.
+- Danh sách proxy bị loại được ghi riêng vào `PROXY_QUARANTINE_FILE` (mặc định: `/tmp/downloadtool-quarantined-proxies.txt`) để dễ thay proxy mới.
 - Runtime limits are now managed in `config/runtime-limit-profiles.json` with `local` and `production` objects.
 - Trong `runtime-limit-profiles.json`, đặt field = `null` để tắt guard tương ứng. Riêng `backend.mux_job_max_workers = null` thì auto scale theo CPU.
 - Runtime profile variable notes (`config/runtime-limit-profiles.json`):
