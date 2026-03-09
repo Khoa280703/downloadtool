@@ -10,22 +10,9 @@ services:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
-      - coolify
-
-  redis:
-    image: redis:7-alpine
-    container_name: downloadtool-redis
-    command: ["redis-server", "--appendonly", "yes"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    networks:
-      - coolify
+      internal:
+        aliases:
+          - downloadtool-postgres-internal
 
   api:
     build:
@@ -37,7 +24,7 @@ services:
       - RUST_LOG=info
       - SOCKS5_PROXY_URL=${SOCKS5_PROXY_URL}
       - PROXY_LIST=${PROXY_LIST}
-      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@downloadtool-postgres-internal:5432/downloadtool
       - REDIS_URL=${REDIS_URL}
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
       - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND}
@@ -57,10 +44,11 @@ services:
     depends_on:
       postgres:
         condition: service_started
-      redis:
-        condition: service_healthy
     networks:
-      - coolify
+      coolify:
+      internal:
+        aliases:
+          - downloadtool-api-internal
     labels:
       - "traefik.docker.network=coolify"
 
@@ -73,7 +61,7 @@ services:
       - RUST_LOG=info
       - SOCKS5_PROXY_URL=${SOCKS5_PROXY_URL}
       - PROXY_LIST=${PROXY_LIST}
-      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@downloadtool-postgres-internal:5432/downloadtool
       - REDIS_URL=${REDIS_URL}
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
       - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND}
@@ -86,10 +74,9 @@ services:
     depends_on:
       postgres:
         condition: service_started
-      redis:
-        condition: service_healthy
     networks:
-      - coolify
+      coolify:
+      internal:
 
   frontend:
     build:
@@ -103,13 +90,13 @@ services:
       - PORT=5168
       - HOST=0.0.0.0
       - ORIGIN=${ORIGIN}
-      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@downloadtool-postgres-internal:5432/downloadtool
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_TRUSTED_ORIGINS=${BETTER_AUTH_TRUSTED_ORIGINS}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - WHOP_PLAN_ID=${WHOP_PLAN_ID}
-      - RUST_API_URL=http://api:3068
+      - RUST_API_URL=http://downloadtool-api-internal:3068
     expose:
       - "5168"
     restart: unless-stopped
@@ -117,15 +104,16 @@ services:
       - postgres
       - api
     networks:
-      - coolify
+      coolify:
+      internal:
     labels:
       - "traefik.docker.network=coolify"
 
 volumes:
   api-data:
   postgres-data:
-  redis-data:
 
 networks:
   coolify:
     external: true
+  internal:
