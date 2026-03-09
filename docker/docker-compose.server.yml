@@ -12,9 +12,24 @@ services:
     networks:
       - coolify
 
+  redis:
+    image: redis:7-alpine
+    container_name: downloadtool-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - coolify
+
   api:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile.api
     container_name: downloadtool-api
     environment:
@@ -23,21 +38,78 @@ services:
       - SOCKS5_PROXY_URL=${SOCKS5_PROXY_URL}
       - PROXY_LIST=${PROXY_LIST}
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - REDIS_URL=${DOCKER_REDIS_URL:-redis://redis:6379}
+      - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM:-mux_jobs}
+      - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND:-localfs}
+      - MUX_DIRECT_DOWNLOAD=${MUX_DIRECT_DOWNLOAD:-false}
+      - MUX_JOB_MAX_ATTEMPTS=${MUX_JOB_MAX_ATTEMPTS:-3}
+      - MUX_FILE_TICKET_TTL_SECS=${MUX_FILE_TICKET_TTL_SECS:-900}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - S3_REGION=${S3_REGION:-}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-false}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - WHOP_WEBHOOK_SECRET=${WHOP_WEBHOOK_SECRET}
     expose:
       - "3068"
     volumes:
       - api-data:/app/data
+      - mux-artifacts:${DOCKER_MUX_JOB_OUTPUT_DIR:-/app/mux-artifacts}
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_healthy
     networks:
       - coolify
     labels:
       - "traefik.docker.network=coolify"
 
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    container_name: downloadtool-worker
+    environment:
+      - RUST_LOG=info
+      - SOCKS5_PROXY_URL=${SOCKS5_PROXY_URL}
+      - PROXY_LIST=${PROXY_LIST}
+      - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - REDIS_URL=${DOCKER_REDIS_URL:-redis://redis:6379}
+      - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM:-mux_jobs}
+      - MUX_QUEUE_GROUP=${MUX_QUEUE_GROUP:-mux-workers}
+      - MUX_WORKER_ID=${MUX_WORKER_ID}
+      - MUX_WORKER_LEASE_SECS=${MUX_WORKER_LEASE_SECS:-90}
+      - MUX_WORKER_RECLAIM_LIMIT=${MUX_WORKER_RECLAIM_LIMIT:-100}
+      - MUX_JOB_MAX_ATTEMPTS=${MUX_JOB_MAX_ATTEMPTS:-3}
+      - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND:-localfs}
+      - MUX_JOB_OUTPUT_DIR=${DOCKER_MUX_JOB_OUTPUT_DIR:-/app/mux-artifacts}
+      - MUX_ARTIFACT_TTL_SECS=${MUX_ARTIFACT_TTL_SECS:-86400}
+      - MUX_CLEANUP_INTERVAL_SECS=${MUX_CLEANUP_INTERVAL_SECS:-3600}
+      - MUX_CLEANUP_BATCH_LIMIT=${MUX_CLEANUP_BATCH_LIMIT:-50}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - S3_REGION=${S3_REGION:-}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-false}
+    volumes:
+      - mux-artifacts:${DOCKER_MUX_JOB_OUTPUT_DIR:-/app/mux-artifacts}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - coolify
+
   frontend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile.frontend
       args:
         - VITE_API_URL=${VITE_API_URL:-https://api-download.khoadangbui.online}
@@ -67,7 +139,9 @@ services:
 
 volumes:
   api-data:
+  mux-artifacts:
   postgres-data:
+  redis-data:
 
 networks:
   coolify:

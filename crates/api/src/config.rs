@@ -69,6 +69,21 @@ pub struct Config {
 }
 
 impl Config {
+    fn optional_env(name: &str) -> Option<String> {
+        env::var(name).ok().and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+    }
+
+    fn env_or_default(name: &str, default: &str) -> String {
+        Self::optional_env(name).unwrap_or_else(|| default.to_string())
+    }
+
     fn command_stdout_trimmed(command: &mut Command) -> Option<String> {
         let output = command.output().ok()?;
         if !output.status.success() {
@@ -94,7 +109,7 @@ impl Config {
         Self::command_stdout_trimmed(&mut inspect)
     }
 
-    fn resolve_postgres_container_ip() -> Option<String> {
+    fn resolve_compose_service_ip(service: &str, fallback_container_name: &str) -> Option<String> {
         // Preferred path: ask docker compose for postgres service container id.
         let mut compose_ps = Command::new("docker");
         compose_ps.args([
@@ -107,7 +122,7 @@ impl Config {
             "docker/docker-compose.server.yml",
             "ps",
             "-q",
-            "postgres",
+            service,
         ]);
 
         if let Some(container_id) = Self::command_stdout_trimmed(&mut compose_ps)
@@ -121,7 +136,7 @@ impl Config {
 
         // Fallback for environments where container names are prefixed by project id.
         let mut ps_filter = Command::new("docker");
-        ps_filter.args(["ps", "-q", "--filter", "name=downloadtool-postgres"]);
+        ps_filter.args(["ps", "-q", "--filter", &format!("name={fallback_container_name}")]);
 
         if let Some(container_id) = Self::command_stdout_trimmed(&mut ps_filter)
             .and_then(|stdout| stdout.lines().next().map(str::trim).map(str::to_string))
@@ -133,7 +148,21 @@ impl Config {
         }
 
         // Last fallback for exact container name.
-        Self::inspect_container_ip("downloadtool-postgres")
+        Self::inspect_container_ip(fallback_container_name)
+    }
+
+    fn replace_local_loopback_host(raw_url: &str, ip: &str) -> String {
+        if raw_url.contains("@127.0.0.1:") {
+            return raw_url.replacen("@127.0.0.1:", &format!("@{}:", ip), 1);
+        }
+        if raw_url.contains("@localhost:") {
+            return raw_url.replacen("@localhost:", &format!("@{}:", ip), 1);
+        }
+        if raw_url.contains("//127.0.0.1:") {
+            return raw_url.replacen("//127.0.0.1:", &format!("//{}:", ip), 1);
+        }
+
+        raw_url.replacen("//localhost:", &format!("//{}:", ip), 1)
     }
 
     fn resolve_local_database_url(raw_url: &str) -> String {
@@ -142,15 +171,24 @@ impl Config {
             return raw_url.to_string();
         }
 
-        let Some(ip) = Self::resolve_postgres_container_ip() else {
+        let Some(ip) = Self::resolve_compose_service_ip("postgres", "downloadtool-postgres") else {
             return raw_url.to_string();
         };
 
-        if raw_url.contains("@127.0.0.1:") {
-            return raw_url.replacen("@127.0.0.1:", &format!("@{}:", ip), 1);
+        Self::replace_local_loopback_host(raw_url, &ip)
+    }
+
+    fn resolve_local_redis_url(raw_url: &str) -> String {
+        let uses_localhost = raw_url.contains("//127.0.0.1:") || raw_url.contains("//localhost:");
+        if !uses_localhost {
+            return raw_url.to_string();
         }
 
-        raw_url.replacen("@localhost:", &format!("@{}:", ip), 1)
+        let Some(ip) = Self::resolve_compose_service_ip("redis", "downloadtool-redis") else {
+            return raw_url.to_string();
+        };
+
+        Self::replace_local_loopback_host(raw_url, &ip)
     }
 
     /// Load configuration from environment variables.
@@ -179,7 +217,7 @@ impl Config {
             .map_err(|_| anyhow::anyhow!("WHOP_WEBHOOK_SECRET env var is required"))?;
         let extract_rate_limit_enabled = backend_limit_profile().extract_rate_limit_enabled_value();
         let mux_artifact_backend =
-            MuxArtifactBackend::from_env(env::var("MUX_ARTIFACT_BACKEND").ok())?;
+            MuxArtifactBackend::from_env(Self::optional_env("MUX_ARTIFACT_BACKEND"))?;
         let mux_direct_download = env::var("MUX_DIRECT_DOWNLOAD")
             .ok()
             .map(|value| {
@@ -190,9 +228,8 @@ impl Config {
             })
             .unwrap_or(false);
         let redis_url =
-            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-        let mux_queue_stream =
-            env::var("MUX_QUEUE_STREAM").unwrap_or_else(|_| "mux_jobs".to_string());
+            Self::resolve_local_redis_url(&Self::env_or_default("REDIS_URL", "redis://127.0.0.1:6379"));
+        let mux_queue_stream = Self::env_or_default("MUX_QUEUE_STREAM", "mux_jobs");
         let mux_job_max_attempts = env::var("MUX_JOB_MAX_ATTEMPTS")
             .ok()
             .and_then(|value| value.parse().ok())
@@ -201,11 +238,11 @@ impl Config {
             .ok()
             .and_then(|value| value.parse().ok())
             .unwrap_or(900);
-        let s3_bucket = env::var("S3_BUCKET_NAME").ok();
-        let s3_region = env::var("S3_REGION").ok();
-        let s3_endpoint = env::var("S3_ENDPOINT").ok();
-        let s3_access_key_id = env::var("S3_ACCESS_KEY_ID").ok();
-        let s3_secret_access_key = env::var("S3_SECRET_ACCESS_KEY").ok();
+        let s3_bucket = Self::optional_env("S3_BUCKET_NAME");
+        let s3_region = Self::optional_env("S3_REGION");
+        let s3_endpoint = Self::optional_env("S3_ENDPOINT");
+        let s3_access_key_id = Self::optional_env("S3_ACCESS_KEY_ID");
+        let s3_secret_access_key = Self::optional_env("S3_SECRET_ACCESS_KEY");
         let s3_force_path_style = env::var("S3_FORCE_PATH_STYLE")
             .ok()
             .map(|value| {

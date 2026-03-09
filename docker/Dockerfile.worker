@@ -1,28 +1,20 @@
-# Dockerfile for API service deployment
-# Builds the API server and related components without GPU support
+# Dockerfile for mux worker deployment
 
-# Stage 0: Build injector JS (embedded into api crate via include_str! at compile time)
+# Stage 0: Build extractor TypeScript to IIFE format (required by crates/extractor/build.rs)
 FROM node:22-alpine AS js-builder
 
 WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy workspace manifests for pnpm resolution
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/api-client/package.json ./packages/api-client/
 COPY apps/injector/package.json ./apps/injector/
-
-# Copy injector source and shared packages
-COPY apps/injector/ ./apps/injector/
 COPY packages/ ./packages/
-
-# Install deps and build injector (produces dist/bm.js and dist/youtube-downloader.user.js)
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @downloadtool/injector build
-
-# Build extractor TypeScript to IIFE format (required by crates/extractor/build.rs)
+COPY apps/injector/ ./apps/injector/
 COPY extractors/ ./extractors/
+
+RUN pnpm install --frozen-lockfile
 RUN mkdir -p extractors/dist && \
     npx --yes esbuild extractors/types.ts --bundle --format=iife --global-name=types --platform=neutral --target=es2020 --outfile=extractors/dist/types.js && \
     npx --yes esbuild extractors/youtube.ts --bundle --format=iife --global-name=youtube --platform=neutral --target=es2020 --outfile=extractors/dist/youtube.js
@@ -32,43 +24,31 @@ FROM rust:1.91-bookworm AS builder
 
 WORKDIR /app
 
-# Install dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace configuration
 COPY Cargo.toml ./
 COPY Cargo.lock ./
-
-# Copy all crates
 COPY crates/ ./crates/
 COPY config/ ./config/
-
-# Copy injector dist (required by include_str! in crates/api/src/routes/static_files.rs)
-COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
-
-# Copy extractor source + pre-built IIFE dist (built by js-builder stage)
 COPY extractors/ ./extractors/
 COPY --from=js-builder /app/extractors/dist ./extractors/dist/
 
-# Build the release binary
-RUN cargo build --release --bin api-server
+RUN cargo build --release --bin mux-worker
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 
-# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install latest yt-dlp binary (newer than Debian package).
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
@@ -80,31 +60,17 @@ RUN set -eux; \
     chmod +x /usr/local/bin/yt-dlp; \
     /usr/local/bin/yt-dlp --version
 
-# Create non-root user
 RUN useradd -m -u 1000 -s /bin/bash appuser
 
-# Copy binary from builder
-COPY --from=builder /app/target/release/api-server /usr/local/bin/
+COPY --from=builder /app/target/release/mux-worker /usr/local/bin/
 
+RUN mkdir -p /app/extractors /app/mux-artifacts && chown -R appuser:appuser /app
 
-# Create directories
-RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
-
-# Switch to non-root user
 USER appuser
 
-# Environment variables
-ENV PORT=3068
 ENV EXTRACTOR_DIR=/app/extractors
 ENV YTDLP_PATH=/usr/local/bin/yt-dlp
 ENV RUST_LOG=info
+ENV MUX_JOB_OUTPUT_DIR=/app/mux-artifacts
 
-# Expose port
-EXPOSE 3068
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3068/health || exit 1
-
-# Run the server
-CMD ["api-server"]
+CMD ["mux-worker"]
