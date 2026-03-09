@@ -10,7 +10,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
-      internal:
+      app:
         aliases:
           - downloadtool-postgres-internal
 
@@ -45,10 +45,10 @@ services:
       postgres:
         condition: service_started
     networks:
-      coolify:
-      internal:
+      app:
         aliases:
           - downloadtool-api-internal
+      coolify:
     labels:
       - "traefik.docker.network=coolify"
 
@@ -75,8 +75,8 @@ services:
       postgres:
         condition: service_started
     networks:
+      app:
       coolify:
-      internal:
 
   frontend:
     build:
@@ -104,8 +104,7 @@ services:
       - postgres
       - api
     networks:
-      coolify:
-      internal:
+      app:
     labels:
       - "traefik.docker.network=coolify"
 
@@ -114,6 +113,6 @@ volumes:
   postgres-data:
 
 networks:
+  app:
   coolify:
     external: true
-  internal:
