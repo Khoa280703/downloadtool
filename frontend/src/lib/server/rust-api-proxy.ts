@@ -16,8 +16,17 @@ export async function buildRustApiHeaders(request: Request, hasJsonBody = false)
 	const headers = new Headers();
 	if (hasJsonBody) headers.set('content-type', 'application/json');
 
-	const jwt = await getJwtForRequest(auth, request.headers);
-	if (jwt) headers.set('Authorization', `Bearer ${jwt}`);
+	const cookieHeader = request.headers.get('cookie') ?? '';
+	if (!cookieHeader.includes('better-auth.')) {
+		return headers;
+	}
+
+	try {
+		const jwt = await getJwtForRequest(auth, request.headers);
+		if (jwt) headers.set('Authorization', `Bearer ${jwt}`);
+	} catch (error) {
+		console.error('Failed to resolve Better Auth JWT for Rust API proxy:', error);
+	}
 	return headers;
 }
 
