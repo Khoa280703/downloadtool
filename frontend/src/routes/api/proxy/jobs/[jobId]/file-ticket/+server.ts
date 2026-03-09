@@ -1,13 +1,18 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-import { buildRustApiHeaders, buildRustApiUrl } from '$lib/server/rust-api-proxy';
+import {
+	buildRustApiHeaders,
+	buildRustApiUrl,
+	ensureDownloadSessionId
+} from '$lib/server/rust-api-proxy';
 
-export const GET: RequestHandler = async ({ params, request, fetch }) => {
+export const GET: RequestHandler = async ({ params, request, fetch, cookies }) => {
+	const downloadSessionId = ensureDownloadSessionId(cookies);
 	const upstream = await fetch(
 		buildRustApiUrl(`/api/jobs/${encodeURIComponent(params.jobId)}/file-ticket`),
 		{
-			headers: await buildRustApiHeaders(request),
+			headers: await buildRustApiHeaders(request, false, downloadSessionId),
 			signal: request.signal
 		}
 	);

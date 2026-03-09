@@ -10,6 +10,13 @@ pub struct MuxJobRequest {
     pub title: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JobOwner {
+    pub user_id: Option<String>,
+    pub session_id: Option<String>,
+    pub scope_key: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JobStatus {
     Queued,
@@ -66,7 +73,8 @@ impl ArtifactStatus {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobRecord {
     pub id: String,
-    pub user_id: String,
+    pub user_id: Option<String>,
+    pub session_id: Option<String>,
     pub request_hash: String,
     pub dedupe_key: String,
     pub request: MuxJobRequest,

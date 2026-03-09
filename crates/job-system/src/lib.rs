@@ -8,7 +8,7 @@ pub mod repository_worker;
 
 pub use job_keying::{compute_dedupe_key, compute_request_hash};
 pub use job_models::{
-    ArtifactRecord, ArtifactStatus, JobArtifactDownload, JobCreationResult, JobRecord, JobStatus,
-    MuxJobRequest,
+    ArtifactRecord, ArtifactStatus, JobArtifactDownload, JobCreationResult, JobOwner, JobRecord,
+    JobStatus, MuxJobRequest,
 };
 pub use repository::JobRepository;

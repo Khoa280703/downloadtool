@@ -23,6 +23,7 @@ impl JobRepository {
         JobRecord {
             id: row.get("id"),
             user_id: row.get("user_id"),
+            session_id: row.get("session_id"),
             request_hash: row.get("request_hash"),
             dedupe_key: row.get("dedupe_key"),
             request: MuxJobRequest {

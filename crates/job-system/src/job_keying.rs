@@ -4,9 +4,9 @@ use crate::job_models::MuxJobRequest;
 
 const MUX_PROFILE_VERSION: &str = "mux-v1";
 
-pub fn compute_request_hash(user_id: &str, request: &MuxJobRequest) -> String {
+pub fn compute_request_hash(scope_key: &str, request: &MuxJobRequest) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(user_id.as_bytes());
+    hasher.update(scope_key.as_bytes());
     hasher.update([0]);
     hasher.update(request.video_url.as_bytes());
     hasher.update([0]);

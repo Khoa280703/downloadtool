@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use job_system::{
-    JobArtifactDownload, JobRecord as DurableJobRecord, JobRepository as DurableJobRepository,
-    JobStatus, MuxJobRequest,
+    JobArtifactDownload, JobOwner, JobRecord as DurableJobRecord,
+    JobRepository as DurableJobRepository, JobStatus, MuxJobRequest,
 };
 use queue::{JobQueuePublisher, QueueJobMessage};
 
@@ -58,15 +58,15 @@ impl JobControlPlaneService {
 
     pub async fn create_job(
         &self,
-        user_id: &str,
+        owner: &JobOwner,
         request: MuxJobRequest,
     ) -> anyhow::Result<JobCreationResult> {
-        let identity = derive_job_identity(user_id, &request);
+        let identity = derive_job_identity(owner, &request);
         let created = self
             .durable_repository
             .create_or_reuse_job(
                 &self.next_durable_job_id(),
-                user_id,
+                owner,
                 &identity.request_hash,
                 &identity.dedupe_key,
                 &request,
@@ -88,16 +88,16 @@ impl JobControlPlaneService {
     pub async fn get_job_for_user(
         &self,
         job_id: &str,
-        user_id: &str,
+        owner: &JobOwner,
     ) -> anyhow::Result<Option<JobStatusRecord>> {
-        let Some(job) = self.durable_repository.get_user_job(job_id, user_id).await? else {
+        let Some(job) = self.durable_repository.get_user_job(job_id, owner).await? else {
             return Ok(None);
         };
 
         if job.status == JobStatus::Ready {
             if let Some(download) = self
                 .durable_repository
-                .get_ready_artifact_for_user_job(job_id, user_id)
+                .get_ready_artifact_for_user_job(job_id, owner)
                 .await?
             {
                 return Ok(Some(map_durable_download(download)));
@@ -107,9 +107,9 @@ impl JobControlPlaneService {
         Ok(Some(map_durable_job(job)))
     }
 
-    pub async fn touch_release(&self, job_id: &str, user_id: &str) -> anyhow::Result<bool> {
+    pub async fn touch_release(&self, job_id: &str, owner: &JobOwner) -> anyhow::Result<bool> {
         self.durable_repository
-            .touch_artifact_access_for_user_job(job_id, user_id)
+            .touch_artifact_access_for_user_job(job_id, owner)
             .await
     }
 

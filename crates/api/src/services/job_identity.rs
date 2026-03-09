@@ -1,4 +1,4 @@
-use job_system::{compute_dedupe_key, compute_request_hash, MuxJobRequest};
+use job_system::{compute_dedupe_key, compute_request_hash, JobOwner, MuxJobRequest};
 
 #[derive(Debug, Clone)]
 pub struct JobIdentity {
@@ -6,9 +6,9 @@ pub struct JobIdentity {
     pub dedupe_key: String,
 }
 
-pub fn derive_job_identity(user_id: &str, request: &MuxJobRequest) -> JobIdentity {
+pub fn derive_job_identity(owner: &JobOwner, request: &MuxJobRequest) -> JobIdentity {
     JobIdentity {
-        request_hash: compute_request_hash(user_id, request),
+        request_hash: compute_request_hash(&owner.scope_key, request),
         dedupe_key: compute_dedupe_key(request),
     }
 }
@@ -28,7 +28,14 @@ mod tests {
             title: Some("Hello".to_string()),
         };
 
-        let identity = derive_job_identity("user-1", &request);
+        let identity = derive_job_identity(
+            &JobOwner {
+                user_id: Some("user-1".to_string()),
+                session_id: None,
+                scope_key: "user:user-1".to_string(),
+            },
+            &request,
+        );
 
         assert!(identity
             .dedupe_key

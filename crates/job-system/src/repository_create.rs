@@ -1,19 +1,19 @@
 use anyhow::Context;
 
-use crate::job_models::{JobCreationResult, JobRecord, JobStatus, MuxJobRequest};
+use crate::job_models::{JobCreationResult, JobOwner, JobRecord, JobStatus, MuxJobRequest};
 use crate::repository::{build_event_payload, now_ms, JobRepository};
 
 impl JobRepository {
     pub async fn create_or_reuse_job(
         &self,
         job_id: &str,
-        user_id: &str,
+        owner: &JobOwner,
         request_hash: &str,
         dedupe_key: &str,
         request: &MuxJobRequest,
         max_attempts: i32,
     ) -> anyhow::Result<JobCreationResult> {
-        if let Some(existing) = self.find_reusable_job(user_id, request_hash).await? {
+        if let Some(existing) = self.find_reusable_job(owner, request_hash).await? {
             self.record_event(
                 &existing.id,
                 "job_reused",
@@ -30,20 +30,21 @@ impl JobRepository {
         let row = sqlx::query(
             r#"
             INSERT INTO mux_jobs (
-                id, user_id, request_hash, dedupe_key, source_url, video_url, audio_url,
+                id, user_id, session_id, request_hash, dedupe_key, source_url, video_url, audio_url,
                 video_format_id, audio_format_id, title, status, attempt_count, max_attempts,
                 created_at_ms, updated_at_ms
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'queued', 0, $11, $12, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'queued', 0, $12, $13, $13)
             RETURNING
-                id, user_id, request_hash, dedupe_key, source_url, video_url, audio_url,
-                video_format_id, audio_format_id, title, status, artifact_id, attempt_count,
-                max_attempts, lease_owner, lease_expires_at_ms, last_error, created_at_ms,
-                updated_at_ms, NULL::bigint AS file_size_bytes
+                id, user_id, session_id, request_hash, dedupe_key, source_url, video_url,
+                audio_url, video_format_id, audio_format_id, title, status, artifact_id,
+                attempt_count, max_attempts, lease_owner, lease_expires_at_ms, last_error,
+                created_at_ms, updated_at_ms, NULL::bigint AS file_size_bytes
             "#,
         )
         .bind(job_id)
-        .bind(user_id)
+        .bind(owner.user_id.as_deref())
+        .bind(owner.session_id.as_deref())
         .bind(request_hash)
         .bind(dedupe_key)
         .bind(request.source_url.as_deref())
@@ -72,32 +73,58 @@ impl JobRepository {
         })
     }
 
-    async fn find_reusable_job(
-        &self,
-        user_id: &str,
-        request_hash: &str,
-    ) -> anyhow::Result<Option<JobRecord>> {
-        let row = sqlx::query(
-            r#"
-            SELECT
-                j.id, j.user_id, j.request_hash, j.dedupe_key, j.source_url, j.video_url,
-                j.audio_url, j.video_format_id, j.audio_format_id, j.title, j.status, j.artifact_id,
-                j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
-                j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes
-            FROM mux_jobs j
-            LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
-            WHERE j.user_id = $1
-              AND j.request_hash = $2
-              AND j.status IN ('queued', 'leased', 'processing', 'ready')
-              AND (j.delete_after_at IS NULL OR j.delete_after_at > NOW())
-            ORDER BY j.created_at_ms DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(user_id)
-        .bind(request_hash)
-        .fetch_optional(self.pool())
-        .await
+    async fn find_reusable_job(&self, owner: &JobOwner, request_hash: &str) -> anyhow::Result<Option<JobRecord>> {
+        let row = match (&owner.user_id, &owner.session_id) {
+            (Some(user_id), _) => {
+                sqlx::query(
+                    r#"
+                    SELECT
+                        j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
+                        j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
+                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
+                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
+                        a.size_bytes AS file_size_bytes
+                    FROM mux_jobs j
+                    LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
+                    WHERE j.user_id = $1
+                      AND j.request_hash = $2
+                      AND j.status IN ('queued', 'leased', 'processing', 'ready')
+                      AND (j.delete_after_at IS NULL OR j.delete_after_at > NOW())
+                    ORDER BY j.created_at_ms DESC
+                    LIMIT 1
+                    "#,
+                )
+                .bind(user_id)
+                .bind(request_hash)
+                .fetch_optional(self.pool())
+                .await
+            }
+            (None, Some(session_id)) => {
+                sqlx::query(
+                    r#"
+                    SELECT
+                        j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
+                        j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
+                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
+                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
+                        a.size_bytes AS file_size_bytes
+                    FROM mux_jobs j
+                    LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
+                    WHERE j.session_id = $1
+                      AND j.request_hash = $2
+                      AND j.status IN ('queued', 'leased', 'processing', 'ready')
+                      AND (j.delete_after_at IS NULL OR j.delete_after_at > NOW())
+                    ORDER BY j.created_at_ms DESC
+                    LIMIT 1
+                    "#,
+                )
+                .bind(session_id)
+                .bind(request_hash)
+                .fetch_optional(self.pool())
+                .await
+            }
+            (None, None) => Ok(None),
+        }
         .context("failed to query reusable mux job")?;
 
         Ok(row.map(|row| Self::row_to_job(&row)))

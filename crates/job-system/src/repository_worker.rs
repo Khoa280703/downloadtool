@@ -51,10 +51,10 @@ impl JobRepository {
             WHERE id = $1
               AND status = 'queued'
             RETURNING
-                id, user_id, request_hash, dedupe_key, source_url, video_url, audio_url,
-                video_format_id, audio_format_id, title, status, artifact_id, attempt_count,
-                max_attempts, lease_owner, lease_expires_at_ms, last_error, created_at_ms,
-                updated_at_ms, NULL::bigint AS file_size_bytes
+                id, user_id, session_id, request_hash, dedupe_key, source_url, video_url,
+                audio_url, video_format_id, audio_format_id, title, status, artifact_id,
+                attempt_count, max_attempts, lease_owner, lease_expires_at_ms, last_error,
+                created_at_ms, updated_at_ms, NULL::bigint AS file_size_bytes
             "#,
         )
         .bind(job_id)

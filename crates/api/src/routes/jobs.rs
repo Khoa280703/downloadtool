@@ -2,11 +2,11 @@ use std::io::ErrorKind;
 
 use axum::body::Body;
 use axum::extract::{Path, State};
-use axum::http::{header, HeaderValue, Response, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 use axum::response::{IntoResponse, Redirect};
 use axum::{Extension, Json};
 use futures::TryStreamExt;
-use job_system::{JobStatus, MuxJobRequest};
+use job_system::{JobOwner, JobStatus, MuxJobRequest};
 use serde::{Deserialize, Serialize};
 use tokio_util::io::ReaderStream;
 use utoipa::ToSchema;
@@ -17,6 +17,7 @@ use crate::AppState;
 const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
 const JOB_BUSY_RETRY_AFTER_SECS: u64 = 2;
 const JOB_POLL_RETRY_AFTER_SECS: u64 = 1;
+const DOWNLOAD_SESSION_HEADER: &str = "x-download-session-id";
 
 #[derive(Debug)]
 pub struct JobsApiError {
@@ -84,9 +85,10 @@ pub struct JobReleaseResponse {
 pub async fn create_job_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
+    headers: HeaderMap,
     Json(payload): Json<CreateJobRequest>,
 ) -> Result<(StatusCode, Json<CreateJobResponse>), JobsApiError> {
-    let user_id = require_authenticated_user(&user)?;
+    let owner = resolve_job_owner(&user, &headers)?;
     validate_create_payload(&payload)?;
 
     let request = MuxJobRequest {
@@ -100,7 +102,7 @@ pub async fn create_job_handler(
 
     let created = state
         .job_control_plane
-        .create_job(user_id, request)
+        .create_job(&owner, request)
         .await
         .map_err(map_control_plane_error)?;
 
@@ -122,12 +124,13 @@ pub async fn create_job_handler(
 pub async fn job_status_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
+    headers: HeaderMap,
     Path(job_id): Path<String>,
 ) -> Result<Json<JobStatusResponse>, JobsApiError> {
-    let user_id = require_authenticated_user(&user)?;
+    let owner = resolve_job_owner(&user, &headers)?;
     let snapshot = state
         .job_control_plane
-        .get_job_for_user(&job_id, user_id)
+        .get_job_for_user(&job_id, &owner)
         .await
         .map_err(map_control_plane_error)?
         .ok_or_else(not_found_error)?;
@@ -147,12 +150,13 @@ pub async fn job_status_handler(
 pub async fn job_file_ticket_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
+    headers: HeaderMap,
     Path(job_id): Path<String>,
 ) -> Result<Json<JobFileTicketResponse>, JobsApiError> {
-    let user_id = require_authenticated_user(&user)?;
+    let owner = resolve_job_owner(&user, &headers)?;
     let job = state
         .job_control_plane
-        .get_job_for_user(&job_id, user_id)
+        .get_job_for_user(&job_id, &owner)
         .await
         .map_err(map_control_plane_error)?
         .ok_or_else(not_found_error)?;
@@ -175,12 +179,13 @@ pub async fn job_file_ticket_handler(
 pub async fn job_file_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
+    headers: HeaderMap,
     Path(job_id): Path<String>,
 ) -> Result<axum::response::Response, JobsApiError> {
-    let user_id = require_authenticated_user(&user)?;
+    let owner = resolve_job_owner(&user, &headers)?;
     let job = state
         .job_control_plane
-        .get_job_for_user(&job_id, user_id)
+        .get_job_for_user(&job_id, &owner)
         .await
         .map_err(map_control_plane_error)?
         .ok_or_else(not_found_error)?;
@@ -245,31 +250,53 @@ pub async fn job_file_handler(
 pub async fn release_job_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
+    headers: HeaderMap,
     Path(job_id): Path<String>,
 ) -> Result<Json<JobReleaseResponse>, JobsApiError> {
-    let user_id = require_authenticated_user(&user)?;
+    let owner = resolve_job_owner(&user, &headers)?;
     let released = state
         .job_control_plane
-        .touch_release(&job_id, user_id)
+        .touch_release(&job_id, &owner)
         .await
         .map_err(map_control_plane_error)?;
     Ok(Json(JobReleaseResponse { released }))
 }
 
-fn require_authenticated_user(user: &AuthenticatedUser) -> Result<&str, JobsApiError> {
-    if !user.is_authenticated() {
-        return Err(JobsApiError {
-            message: "Authentication required".to_string(),
-            status: StatusCode::UNAUTHORIZED,
-            retry_after_secs: None,
+fn resolve_job_owner(user: &AuthenticatedUser, headers: &HeaderMap) -> Result<JobOwner, JobsApiError> {
+    if let Some(user_id) = user.user_id.as_deref().filter(|value| !value.trim().is_empty()) {
+        return Ok(JobOwner {
+            user_id: Some(user_id.to_string()),
+            session_id: None,
+            scope_key: format!("user:{user_id}"),
         });
     }
 
-    user.user_id.as_deref().ok_or(JobsApiError {
-        message: "Authentication required".to_string(),
-        status: StatusCode::UNAUTHORIZED,
-        retry_after_secs: None,
+    let Some(session_id) = headers
+        .get(DOWNLOAD_SESSION_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| is_valid_session_id(value))
+    else {
+        return Err(JobsApiError {
+            message: "Missing download session".to_string(),
+            status: StatusCode::UNAUTHORIZED,
+            retry_after_secs: None,
+        });
+    };
+
+    Ok(JobOwner {
+        user_id: None,
+        session_id: Some(session_id.to_string()),
+        scope_key: format!("session:{session_id}"),
     })
+}
+
+fn is_valid_session_id(value: &str) -> bool {
+    let len = value.len();
+    (16..=128).contains(&len)
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
 fn validate_create_payload(payload: &CreateJobRequest) -> Result<(), JobsApiError> {
