@@ -50,9 +50,6 @@ services:
         condition: service_started
       redis:
         condition: service_started
-    networks:
-      - default
-      - coolify
     labels:
       - "traefik.docker.network=coolify"
 
@@ -80,9 +77,6 @@ services:
         condition: service_started
       redis:
         condition: service_started
-    networks:
-      - default
-      - coolify
 
   frontend:
     build:
@@ -118,8 +112,3 @@ volumes:
   api-data:
   postgres-data:
   redis-data:
-
-networks:
-  default:
-  coolify:
-    external: true
