@@ -29,7 +29,7 @@ services:
 
   api:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.api
     container_name: downloadtool-api
     environment:
@@ -70,7 +70,7 @@ services:
 
   worker:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.worker
     container_name: downloadtool-worker
     environment:
@@ -109,7 +109,7 @@ services:
 
   frontend:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.frontend
       args:
         - VITE_API_URL=${VITE_API_URL:-https://api-download.khoadangbui.online}
