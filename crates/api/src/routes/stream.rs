@@ -1,7 +1,6 @@
 //! Stream proxy handler
 //!
 //! GET /api/stream - Proxy video stream from source to client
-//! GET /api/stream/muxed - Mux audio+video streams into fMP4
 
 use axum::body::Body;
 use axum::extract::Query;
@@ -13,7 +12,6 @@ use serde::Deserialize;
 use std::sync::{Arc, OnceLock};
 use tokio::sync::mpsc;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tokio::time::Duration;
 use tracing::{debug, error, info};
 
 use crate::limit_profiles::backend_limit_profile;
@@ -22,9 +20,6 @@ use proxy::client::ProxyError;
 use proxy::client::{parse_range_header, validate_stream_url, ProxyClient, Range};
 use proxy::stream::forward_stream_headers;
 use proxy::Platform;
-
-use muxer::stream_fetcher::{FetchBothRefreshOptions, StreamFetcher, StreamUrlRefreshContext};
-use muxer::{remux_streams, MuxerError};
 
 /// Chunk size for YouTube CDN throttle bypass: 9.5 MB.
 ///
@@ -36,10 +31,7 @@ const NO_STORE_CACHE_CONTROL: &str = "no-store, no-cache, must-revalidate";
 const BACKPRESSURE_RETRY_AFTER_SECS: u64 = 2;
 
 static STREAM_SEMAPHORE: OnceLock<Option<Arc<Semaphore>>> = OnceLock::new();
-static MUX_SEMAPHORE: OnceLock<Option<Arc<Semaphore>>> = OnceLock::new();
-static MUX_PREFLIGHT_TIMEOUT: OnceLock<Option<Duration>> = OnceLock::new();
 static STREAM_URL_REFRESH_MAX_ATTEMPTS: OnceLock<Option<usize>> = OnceLock::new();
-static MUX_URL_REFRESH_MAX_ATTEMPTS: OnceLock<Option<usize>> = OnceLock::new();
 
 /// Query parameters for stream proxy.
 #[derive(Debug, Deserialize)]
@@ -54,27 +46,6 @@ pub struct StreamParams {
     pub title: Option<String>,
     /// File format extension
     pub format: Option<String>,
-}
-
-/// Query parameters for muxed stream.
-#[derive(Debug, Deserialize, utoipa::ToSchema)]
-pub struct MuxedStreamParams {
-    /// Video stream URL (URL-encoded)
-    pub video_url: String,
-    /// Audio stream URL (URL-encoded)
-    pub audio_url: String,
-    /// Original watch URL used to extract formats (for refresh-on-auth-failure)
-    pub source_url: Option<String>,
-    /// Selected video format_id
-    pub video_format_id: Option<String>,
-    /// Selected audio format_id
-    pub audio_format_id: Option<String>,
-    /// Video codec (e.g., "h264", "vp9")
-    pub video_codec: Option<String>,
-    /// Audio codec (e.g., "aac", "opus")
-    pub audio_codec: Option<String>,
-    /// Video title for Content-Disposition header
-    pub title: Option<String>,
 }
 
 /// API error type.
@@ -103,16 +74,6 @@ impl IntoResponse for ApiError {
     }
 }
 
-impl From<MuxerError> for ApiError {
-    fn from(err: MuxerError) -> Self {
-        Self {
-            message: format!("Muxing error: {}", err),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            retry_after_secs: None,
-        }
-    }
-}
-
 fn stream_semaphore() -> Option<Arc<Semaphore>> {
     STREAM_SEMAPHORE
         .get_or_init(|| {
@@ -123,38 +84,15 @@ fn stream_semaphore() -> Option<Arc<Semaphore>> {
         .clone()
 }
 
-fn mux_semaphore() -> Option<Arc<Semaphore>> {
-    MUX_SEMAPHORE
-        .get_or_init(|| {
-            backend_limit_profile()
-                .mux_max_concurrent_value()
-                .map(|limit| Arc::new(Semaphore::new(limit)))
-        })
-        .clone()
-}
-
-fn mux_preflight_timeout() -> Option<Duration> {
-    *MUX_PREFLIGHT_TIMEOUT.get_or_init(|| backend_limit_profile().mux_preflight_timeout_value())
-}
-
 fn stream_url_refresh_max_attempts() -> Option<usize> {
     *STREAM_URL_REFRESH_MAX_ATTEMPTS
         .get_or_init(|| backend_limit_profile().stream_url_refresh_max_attempts_value())
-}
-
-fn mux_url_refresh_max_attempts() -> Option<usize> {
-    *MUX_URL_REFRESH_MAX_ATTEMPTS
-        .get_or_init(|| backend_limit_profile().mux_url_refresh_max_attempts_value())
 }
 
 fn within_retry_limit(attempts: usize, max_attempts: Option<usize>) -> bool {
     max_attempts
         .map(|max_attempts| attempts < max_attempts)
         .unwrap_or(true)
-}
-
-fn max_refresh_attempts_for_context(max_attempts: Option<usize>) -> usize {
-    max_attempts.unwrap_or(usize::MAX)
 }
 
 fn acquire_backpressure_permit(
@@ -203,13 +141,6 @@ fn proxy_error_status(error: &ProxyError) -> Option<StatusCode> {
     }
 }
 
-fn anti_bot_error_status(error: &AntiBotError) -> Option<StatusCode> {
-    match error {
-        AntiBotError::RequestFailed(err) => err.status(),
-        _ => None,
-    }
-}
-
 fn is_upstream_auth_status(status: StatusCode) -> bool {
     status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN
 }
@@ -229,17 +160,6 @@ fn is_auth_like_proxy_error(error: &ProxyError) -> bool {
         .map(is_upstream_auth_status)
         .unwrap_or(false)
         || is_auth_like_error_message(&error.to_string())
-}
-
-fn is_auth_like_antibot_error(error: &AntiBotError) -> bool {
-    anti_bot_error_status(error)
-        .map(is_upstream_auth_status)
-        .unwrap_or(false)
-        || is_auth_like_error_message(&error.to_string())
-}
-
-fn is_auth_like_muxer_error(error: &MuxerError) -> bool {
-    is_auth_like_error_message(&error.to_string())
 }
 
 fn find_refreshed_format_url(
@@ -309,66 +229,6 @@ async fn refresh_stream_url(
         expected_has_audio,
         expected_ext,
     )
-}
-
-async fn refresh_mux_stream_urls(
-    source_url: &str,
-    video_format_id: Option<&str>,
-    audio_format_id: Option<&str>,
-    fallback_video_url: &str,
-    fallback_audio_url: &str,
-) -> Option<(String, String)> {
-    let refreshed = extractor::extract(source_url).await.ok()?;
-    let next_video = find_refreshed_format_url(
-        &refreshed.formats,
-        video_format_id,
-        fallback_video_url,
-        Some(false),
-        Some(false),
-        None,
-    )?;
-    let next_audio = find_refreshed_format_url(
-        &refreshed.formats,
-        audio_format_id,
-        fallback_audio_url,
-        Some(true),
-        Some(true),
-        None,
-    )?;
-    Some((next_video, next_audio))
-}
-
-fn build_mux_refresh_options(
-    params: &MuxedStreamParams,
-    max_refresh_attempts: Option<usize>,
-) -> FetchBothRefreshOptions {
-    let Some(source_url) = params.source_url.clone() else {
-        return FetchBothRefreshOptions::default();
-    };
-    let max_refresh_attempts = max_refresh_attempts_for_context(max_refresh_attempts);
-
-    let video = StreamUrlRefreshContext {
-        source_url: source_url.clone(),
-        format_id: params.video_format_id.clone(),
-        expected_audio_only: Some(false),
-        expected_has_audio: Some(false),
-        expected_ext: None,
-        max_refresh_attempts,
-    };
-
-    let audio = StreamUrlRefreshContext {
-        source_url,
-        format_id: params.audio_format_id.clone(),
-        expected_audio_only: Some(true),
-        expected_has_audio: Some(true),
-        expected_ext: None,
-        max_refresh_attempts,
-    };
-
-    FetchBothRefreshOptions {
-        video: Some(video),
-        audio: Some(audio),
-    }
 }
 
 /// Stream proxy endpoint.
@@ -677,217 +537,6 @@ fn chunked_stream(
     })
 }
 
-/// Muxed stream endpoint.
-///
-/// GET /api/stream/muxed?video_url=<encoded>&audio_url=<encoded>&title=<encoded>
-pub async fn muxed_stream_handler(
-    Query(params): Query<MuxedStreamParams>,
-) -> Result<Response, ApiError> {
-    info!("Muxed stream request");
-    let permit = acquire_backpressure_permit(mux_semaphore(), "/api/stream/muxed")?;
-    debug!("Video URL: {}", params.video_url);
-    debug!("Audio URL: {}", params.audio_url);
-    if let Some(video_codec) = params.video_codec.as_deref() {
-        debug!("Requested video codec: {}", video_codec);
-    }
-    if let Some(audio_codec) = params.audio_codec.as_deref() {
-        debug!("Requested audio codec: {}", audio_codec);
-    }
-
-    let _ = validate_stream_url(&params.video_url).map_err(|e| ApiError {
-        message: format!("Video URL validation failed: {}", e),
-        status: StatusCode::BAD_REQUEST,
-        retry_after_secs: None,
-    })?;
-
-    let _ = validate_stream_url(&params.audio_url).map_err(|e| ApiError {
-        message: format!("Audio URL validation failed: {}", e),
-        status: StatusCode::BAD_REQUEST,
-        retry_after_secs: None,
-    })?;
-
-    // Detect WebM video streams early — before headers are sent.
-    // WebM uses EBML container, not ISO BMFF, so fMP4 remuxing is not supported.
-    // YouTube embeds mime=video%2Fwebm (URL-encoded) in the stream URL for VP9 streams.
-    if is_webm_mime(&params.video_url, "video") {
-        return Err(ApiError {
-            message: "WebM video streams cannot be muxed into fMP4. Select an H.264/AV1 (MP4) video stream instead.".into(),
-            status: StatusCode::UNPROCESSABLE_ENTITY,
-            retry_after_secs: None,
-        });
-    }
-    if is_webm_mime(&params.audio_url, "audio") {
-        return Err(ApiError {
-            message:
-                "WebM audio streams cannot be muxed into fMP4. Select an AAC/M4A audio stream instead."
-                    .into(),
-            status: StatusCode::UNPROCESSABLE_ENTITY,
-            retry_after_secs: None,
-        });
-    }
-
-    let platform = detect_platform(&params.video_url);
-    let mut video_url = params.video_url.clone();
-    let mut audio_url = params.audio_url.clone();
-    let max_refresh_attempts = mux_url_refresh_max_attempts();
-    let fetch_refresh_options = build_mux_refresh_options(&params, max_refresh_attempts);
-    let mut refresh_attempts = 0usize;
-    let preflight_timeout = mux_preflight_timeout();
-    let (first_chunk, muxed_stream) = loop {
-        let pinned_video_proxy = extractor::resolve_stream_proxy(&video_url).await;
-        let pinned_audio_proxy = extractor::resolve_stream_proxy(&audio_url).await;
-        let (video_stream, audio_stream) = match StreamFetcher::fetch_both_with_refresh_and_proxy(
-            &video_url,
-            &audio_url,
-            platform,
-            fetch_refresh_options.clone(),
-            pinned_video_proxy,
-            pinned_audio_proxy,
-        )
-        .await
-        {
-            Ok(streams) => streams,
-            Err(error) => {
-                let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
-                    && is_auth_like_antibot_error(&error)
-                    && params.source_url.is_some();
-
-                if can_refresh {
-                    refresh_attempts += 1;
-                    if let Some(source_url) = params.source_url.as_deref() {
-                        if let Some((next_video, next_audio)) = refresh_mux_stream_urls(
-                            source_url,
-                            params.video_format_id.as_deref(),
-                            params.audio_format_id.as_deref(),
-                            &video_url,
-                            &audio_url,
-                        )
-                        .await
-                        {
-                            info!(
-                                attempt = refresh_attempts,
-                                max_attempts = ?max_refresh_attempts,
-                                "Refreshed muxed URLs after upstream auth error"
-                            );
-                            video_url = next_video;
-                            audio_url = next_audio;
-                            continue;
-                        }
-                    }
-                }
-
-                return Err(ApiError {
-                    message: format!("Failed to fetch streams: {}", error),
-                    status: StatusCode::BAD_GATEWAY,
-                    retry_after_secs: None,
-                });
-            }
-        };
-
-        info!("Starting remux (copy-based fMP4 box remuxer)");
-        let mut candidate_muxed_stream = remux_streams(video_stream, audio_stream);
-
-        // Force a first-frame preflight so we don't commit HTTP 200 for a broken mux pipeline.
-        let preflight_result = if let Some(timeout) = preflight_timeout {
-            match tokio::time::timeout(timeout, candidate_muxed_stream.next()).await {
-                Ok(result) => result,
-                Err(_) => {
-                    return Err(ApiError {
-                        message: format!("Mux preflight timed out after {}s", timeout.as_secs()),
-                        status: StatusCode::GATEWAY_TIMEOUT,
-                        retry_after_secs: None,
-                    });
-                }
-            }
-        } else {
-            candidate_muxed_stream.next().await
-        };
-
-        match preflight_result {
-            Some(Ok(chunk)) => break (chunk, candidate_muxed_stream),
-            Some(Err(error)) => {
-                let can_refresh = within_retry_limit(refresh_attempts, max_refresh_attempts)
-                    && is_auth_like_muxer_error(&error)
-                    && params.source_url.is_some();
-
-                if can_refresh {
-                    refresh_attempts += 1;
-                    if let Some(source_url) = params.source_url.as_deref() {
-                        if let Some((next_video, next_audio)) = refresh_mux_stream_urls(
-                            source_url,
-                            params.video_format_id.as_deref(),
-                            params.audio_format_id.as_deref(),
-                            &video_url,
-                            &audio_url,
-                        )
-                        .await
-                        {
-                            info!(
-                                attempt = refresh_attempts,
-                                max_attempts = ?max_refresh_attempts,
-                                "Refreshed muxed URLs after mux preflight auth error"
-                            );
-                            video_url = next_video;
-                            audio_url = next_audio;
-                            continue;
-                        }
-                    }
-                }
-
-                error!("Mux preflight failed before response commit: {}", error);
-                return Err(ApiError {
-                    message: format!("Muxing error: {}", error),
-                    status: StatusCode::BAD_GATEWAY,
-                    retry_after_secs: None,
-                });
-            }
-            None => {
-                return Err(ApiError {
-                    message: "Muxing produced an empty stream".into(),
-                    status: StatusCode::BAD_GATEWAY,
-                    retry_after_secs: None,
-                });
-            }
-        }
-    };
-
-    let mut response_headers = HeaderMap::new();
-    response_headers.insert("Content-Type", HeaderValue::from_static("video/mp4"));
-
-    let filename = build_filename(&params.title, &Some("mp4".to_string()));
-    add_content_disposition(&mut response_headers, &filename);
-    add_cors_headers(&mut response_headers);
-    add_no_store_header(&mut response_headers);
-
-    let preface = futures::stream::once(async move { Ok::<Bytes, std::io::Error>(first_chunk) });
-    let compat_stream = preface.chain(stream_with_muxer_error(muxed_stream));
-    let guarded_stream = stream_with_permit_guard(compat_stream, permit);
-    let body = Body::from_stream(guarded_stream);
-
-    let mut rb = Response::builder();
-    for (k, v) in response_headers.iter() {
-        rb = rb.header(k.as_str(), v.as_bytes());
-    }
-    rb.body(body).map_err(|e| ApiError {
-        message: format!("Failed to build response: {}", e),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        retry_after_secs: None,
-    })
-}
-
-/// Convert a muxer error stream to std::io::Error for axum compatibility.
-fn stream_with_muxer_error(
-    stream: impl Stream<Item = Result<Bytes, MuxerError>> + Send + Unpin + 'static,
-) -> impl Stream<Item = Result<Bytes, std::io::Error>> + Send {
-    futures::stream::unfold(stream, |mut stream| async move {
-        match stream.next().await {
-            Some(Ok(bytes)) => Some((Ok(bytes), stream)),
-            Some(Err(e)) => Some((Err(std::io::Error::other(e.to_string())), stream)),
-            None => None,
-        }
-    })
-}
-
 /// Detect platform from URL (always YouTube for now).
 fn detect_platform(_url: &str) -> Platform {
     Platform::YouTube
@@ -905,12 +554,6 @@ fn extract_mime_type(url: &reqwest::Url) -> Option<String> {
     url.query_pairs()
         .find(|(k, _)| k == "mime")
         .map(|(_, v)| v.into_owned())
-}
-
-fn is_webm_mime(url: &str, media_kind: &str) -> bool {
-    let encoded = format!("mime={}%2Fwebm", media_kind);
-    let plain = format!("mime={}/webm", media_kind);
-    url.contains(&encoded) || url.contains(&plain)
 }
 
 /// Add Content-Disposition header for file download.
@@ -1079,19 +722,4 @@ mod tests {
         assert_eq!(extract_mime_type(&url).as_deref(), Some("video/mp4"));
     }
 
-    #[test]
-    fn test_is_webm_mime() {
-        assert!(is_webm_mime(
-            "https://x.test/videoplayback?mime=video%2Fwebm&itag=247",
-            "video"
-        ));
-        assert!(is_webm_mime(
-            "https://x.test/videoplayback?mime=audio/webm&itag=251",
-            "audio"
-        ));
-        assert!(!is_webm_mime(
-            "https://x.test/videoplayback?mime=audio%2Fmp4&itag=140",
-            "audio"
-        ));
-    }
 }

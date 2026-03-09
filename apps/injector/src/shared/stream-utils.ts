@@ -18,6 +18,8 @@ export interface MuxedPair {
   label: string;
   videoUrl: string;
   audioUrl: string;
+  videoFormatId?: string;
+  audioFormatId?: string;
   videoCodec?: string;
   audioCodec?: string;
 }
@@ -57,6 +59,8 @@ export function buildMuxedPairs(formats: StreamFormat[]): MuxedPair[] {
     label: v.quality,
     videoUrl: v.url,
     audioUrl: bestAudio.url,
+    videoFormatId: v.format_id,
+    audioFormatId: bestAudio.format_id,
     videoCodec: v.codec_label?.toLowerCase().includes('264') ? 'h264'
               : v.codec_label?.toLowerCase().includes('265') ? 'h265'
               : undefined,
@@ -66,14 +70,20 @@ export function buildMuxedPairs(formats: StreamFormat[]): MuxedPair[] {
   }));
 }
 
-/** Build the GET /api/stream/muxed URL for a given pair and title */
-export function buildMuxedUrl(apiBase: string, pair: MuxedPair, title: string): string {
+/** Build the launcher URL that creates a mux job on the app domain and starts download there. */
+export function buildMuxJobLaunchUrl(
+  apiBase: string,
+  pair: MuxedPair,
+  title: string,
+  sourceUrl?: string,
+): string {
   const params = new URLSearchParams({
     video_url: pair.videoUrl,
     audio_url: pair.audioUrl,
     title,
   });
-  if (pair.videoCodec) params.set('video_codec', pair.videoCodec);
-  if (pair.audioCodec) params.set('audio_codec', pair.audioCodec);
-  return `${apiBase}/api/stream/muxed?${params.toString()}`;
+  if (sourceUrl) params.set('source_url', sourceUrl);
+  if (pair.videoFormatId) params.set('video_format_id', pair.videoFormatId);
+  if (pair.audioFormatId) params.set('audio_format_id', pair.audioFormatId);
+  return `${apiBase}/download/mux-job?${params.toString()}`;
 }

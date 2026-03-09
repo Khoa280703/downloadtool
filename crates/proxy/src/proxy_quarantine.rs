@@ -96,4 +96,3 @@ fn extract_proxy_url(line: &str) -> Option<String> {
 
     None
 }
-

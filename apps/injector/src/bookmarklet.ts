@@ -7,7 +7,7 @@ import { showQualityPicker } from './shared/quality-picker.js';
 import {
   filterDownloadableFormats,
   buildMuxedPairs,
-  buildMuxedUrl,
+  buildMuxJobLaunchUrl,
   type StreamFormat,
 } from './shared/stream-utils.js';
 
@@ -57,7 +57,7 @@ async function handleDownload(): Promise<void> {
     showQualityPicker(
       pairs,
       (pair) => {
-        const url = buildMuxedUrl(API_BASE, pair, title);
+        const url = buildMuxJobLaunchUrl(API_BASE, pair, title, videoUrl);
         window.location.href = url;
       },
       resetButton,

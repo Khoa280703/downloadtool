@@ -205,7 +205,12 @@
   function buildMuxedPairs(formats) {
     const videoStreams = formats.filter((f) => !f.is_audio_only && !f.has_audio);
     const audioStreams = formats.filter((f) => f.is_audio_only);
-    const bestAudio = audioStreams.sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))[0];
+    const bestAudio = [...audioStreams].sort((a, b) => {
+      const aRank = a.ext === "m4a" || a.ext === "mp4" ? 0 : 1;
+      const bRank = b.ext === "m4a" || b.ext === "mp4" ? 0 : 1;
+      if (aRank !== bRank) return aRank - bRank;
+      return (b.bitrate ?? 0) - (a.bitrate ?? 0);
+    })[0];
     if (!bestAudio) return [];
     return videoStreams.map((v) => {
       var _a, _b, _c, _d;
@@ -213,20 +218,23 @@
         label: v.quality,
         videoUrl: v.url,
         audioUrl: bestAudio.url,
+        videoFormatId: v.format_id,
+        audioFormatId: bestAudio.format_id,
         videoCodec: ((_a = v.codec_label) == null ? void 0 : _a.toLowerCase().includes("264")) ? "h264" : ((_b = v.codec_label) == null ? void 0 : _b.toLowerCase().includes("265")) ? "h265" : void 0,
         audioCodec: ((_c = bestAudio.codec_label) == null ? void 0 : _c.toLowerCase().includes("aac")) ? "aac" : ((_d = bestAudio.codec_label) == null ? void 0 : _d.toLowerCase().includes("opus")) ? "opus" : void 0
       };
     });
   }
-  function buildMuxedUrl(apiBase, pair, title) {
+  function buildMuxJobLaunchUrl(apiBase, pair, title, sourceUrl) {
     const params = new URLSearchParams({
       video_url: pair.videoUrl,
       audio_url: pair.audioUrl,
       title
     });
-    if (pair.videoCodec) params.set("video_codec", pair.videoCodec);
-    if (pair.audioCodec) params.set("audio_codec", pair.audioCodec);
-    return `${apiBase}/api/stream/muxed?${params.toString()}`;
+    if (sourceUrl) params.set("source_url", sourceUrl);
+    if (pair.videoFormatId) params.set("video_format_id", pair.videoFormatId);
+    if (pair.audioFormatId) params.set("audio_format_id", pair.audioFormatId);
+    return `${apiBase}/download/mux-job?${params.toString()}`;
   }
   const API_BASE = "https://yourdomain.com";
   function gmFetch(url, options) {
@@ -273,7 +281,7 @@
       showQualityPicker(
         pairs,
         (pair) => {
-          window.location.href = buildMuxedUrl(API_BASE, pair, title);
+          window.location.href = buildMuxJobLaunchUrl(API_BASE, pair, title, videoUrl);
         },
         resetButton
       );

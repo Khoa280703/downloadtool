@@ -1,6 +1,6 @@
 # Code Standards & Codebase Structure
 
-**Last Updated:** 2026-03-01
+**Last Updated:** 2026-03-06
 
 ## Directory Structure
 
@@ -573,7 +573,39 @@ Output File
 - Frame rate management
 - Error propagation with `Result<T, PipelineError>`
 
-### 9. Legacy Architecture (Removed 2026-02-24)
+### 9. Runtime Limits Configuration (`config/runtime-limit-profiles.json`) [NEW 2026-03-06]
+
+**Purpose:** Centralized configuration for all backend/frontend runtime limits without code changes
+
+**Structure:**
+```json
+{
+  "local": { ... },      // Development profile
+  "production": { ... }  // Production profile
+}
+```
+
+**Key Fields:**
+- `backend.extract_rate_limit_enabled`: Toggle IP rate limit on `/api/extract`
+- `backend.stream_max_concurrent`: Concurrency guard for `/api/stream`
+- `backend.stream_url_refresh_max_attempts`: Refresh cap when upstream auth fails
+- `frontend.extract_*`: Extract retry (base/max delays, attempts)
+- `frontend.batch_*`: Batch reconnect (base/max delays, attempts)
+- `frontend.mux_job_*`: Poll interval + max wait for durable mux jobs
+- `frontend.playlist_worker_*`: Playlist worker concurrency, queue capacity, jitter settings
+
+**Active Values (as of 2026-03-06):**
+- Frontend extract retries: 4 attempts, 500-8000ms exponential backoff
+- Batch reconnects: 8 attempts, 1000-12000ms exponential backoff
+- Frontend mux jobs: configurable poll interval + max wait
+- Playlist worker: Max 1 concurrent, 0ms jitter
+- All values applied at runtime (no code recompilation needed)
+
+**Configuration Pattern:**
+- Set field to `null` to disable/use default
+- Most limits support null for "unlimited"
+
+---
 
 **Removed:** Old `fmp4_muxer.rs` module
 
@@ -711,7 +743,7 @@ pub fn function(param: Type) -> Result<Output, Error> {
 export async function extract(url: string): Promise<ExtractionResult>
 ```
 
-## Internationalization (i18n) Standards [PLANNED Phase 10]
+## Internationalization (i18n) Standards [Phase 10 - In Progress]
 
 **Framework:** Paraglide JS + Claude API → 34 languages
 
@@ -721,10 +753,12 @@ export async function extract(url: string): Promise<ExtractionResult>
 **File Location:** `frontend/src/lib/paraglide/messages/en.json`
 
 **Workflow:**
-1. Extract ~180 strings from Svelte → `messages/en.json`
-2. Claude API translation script → 34 language files
-3. LanguageSwitcher component + hreflang/sitemap.xml
-4. Test & deploy (see tasks #12-17 in plan)
+1. Extract ~180 strings from Svelte → `messages/en.json` (task #13, blocked by #12)
+2. Claude API translation script → 34 language files (task #14, blocked by #13)
+3. LanguageSwitcher component + hreflang/sitemap.xml (tasks #15-16, blocked by #14)
+4. Test & deploy (task #17, blocked by #15+#16)
+
+**Status:** Phase 1 (Paraglide setup) pending task #12
 
 ---
 
@@ -784,5 +818,5 @@ cargo audit
 
 ---
 
-**Version:** 1.3
-**Last Updated:** 2026-03-01 (Added i18n Standards, Frontend Auth Modal patterns, Performance optimization guidelines)
+**Version:** 1.4
+**Last Updated:** 2026-03-06 (Added runtime config section, i18n status update)

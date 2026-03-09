@@ -1,7 +1,6 @@
 import JSON5 from 'json5';
 import runtimeLimitProfilesRaw from '../../../config/runtime-limit-profiles.json?raw';
 
-const MB = 1024 * 1024;
 const DISABLED_NUMERIC_LIMIT = Number.MAX_SAFE_INTEGER;
 
 type FrontendLimitProfile = {
@@ -13,14 +12,6 @@ type FrontendLimitProfile = {
 	batch_reconnect_max_delay_ms?: number | null;
 	mux_job_poll_interval_ms?: number | null;
 	mux_job_max_wait_ms?: number | null;
-	mux_sync_active_hard_limit?: number | null;
-	mux_sync_active_soft_limit?: number | null;
-	mux_sync_duration_max_seconds?: number | null;
-	mux_force_job_duration_seconds?: number | null;
-	mux_sync_size_max_mb?: number | null;
-	mux_force_job_size_max_mb?: number | null;
-	mux_sync_resolution_max?: number | null;
-	mux_force_job_resolution_min?: number | null;
 	playlist_worker_max_concurrent?: number | null;
 	playlist_worker_ready_queue_max?: number | null;
 	playlist_worker_extract_jitter_min_ms?: number | null;
@@ -72,26 +63,6 @@ function getFrontendLimitProfile(): FrontendLimitProfile {
 }
 
 const profile = getFrontendLimitProfile();
-
-const muxSyncActiveHardLimit = toCapNumber(profile.mux_sync_active_hard_limit, 12, 1);
-const muxSyncActiveSoftRaw = toCapNumber(profile.mux_sync_active_soft_limit, 6, 1);
-const muxForceJobDurationSeconds = toThresholdNumber(profile.mux_force_job_duration_seconds, 90 * 60);
-const muxSyncDurationSecondsRaw = toThresholdNumber(profile.mux_sync_duration_max_seconds, 30 * 60);
-const muxForceJobSizeMb = toThresholdNumber(profile.mux_force_job_size_max_mb, 300, 1, false);
-const muxSyncSizeMbRaw = toThresholdNumber(profile.mux_sync_size_max_mb, 120, 1, false);
-const muxForceJobResolutionMin = toThresholdNumber(profile.mux_force_job_resolution_min, 1440);
-const muxSyncResolutionMaxRaw = toThresholdNumber(profile.mux_sync_resolution_max, 1080);
-
-export const muxRoutingLimitConfig = {
-	syncActiveHardLimit: muxSyncActiveHardLimit,
-	syncActiveSoftLimit: Math.min(muxSyncActiveSoftRaw, muxSyncActiveHardLimit),
-	forceJobDurationSeconds: muxForceJobDurationSeconds,
-	syncDurationMaxSeconds: Math.min(muxSyncDurationSecondsRaw, muxForceJobDurationSeconds),
-	forceJobSizeMaxBytes: Math.round(muxForceJobSizeMb * MB),
-	syncSizeMaxBytes: Math.round(Math.min(muxSyncSizeMbRaw, muxForceJobSizeMb) * MB),
-	forceJobResolutionMin: muxForceJobResolutionMin,
-	syncResolutionMax: Math.min(muxSyncResolutionMaxRaw, muxForceJobResolutionMin)
-} as const;
 
 export const muxJobClientLimitConfig = {
 	pollIntervalMs: toSafeNumber(profile.mux_job_poll_interval_ms, 1_200, 100),

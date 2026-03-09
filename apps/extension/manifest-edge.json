@@ -3,7 +3,7 @@
   "name": "YouTube Downloader",
   "version": "0.1.0",
   "description": "Download YouTube videos in the best quality",
-  "permissions": ["activeTab", "tabs", "downloads"],
+  "permissions": ["activeTab", "tabs"],
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",

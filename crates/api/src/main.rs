@@ -18,6 +18,9 @@ use axum::{
     Router,
 };
 use governor::{clock::DefaultClock, state::keyed::DefaultKeyedStateStore, Quota, RateLimiter};
+use object_store::backend_factory::{build_storage_backend, StorageBackendConfig};
+use queue::redis_streams::RedisStreamsQueue;
+use queue::JobQueuePublisher;
 use serde_json::json;
 use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::CorsLayer;
@@ -32,14 +35,16 @@ mod limit_profiles;
 mod routes;
 mod services;
 
-use config::Config;
+use config::{Config, MuxArtifactBackend};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db_pool: sqlx::PgPool,
     pub jwt_secret: String,
     pub whop_webhook_secret: String,
-    pub mux_jobs: Arc<services::muxed_job_queue::MuxedJobQueue>,
+    pub job_control_plane: Arc<services::job_control_plane::JobControlPlaneService>,
+    pub storage_ticket_service: Arc<services::storage_ticket_service::StorageTicketService>,
+    pub mux_direct_download: bool,
 }
 
 type KeyedLimiter = RateLimiter<IpAddr, DefaultKeyedStateStore<IpAddr>, DefaultClock>;
@@ -125,18 +130,16 @@ fn build_app(
     let protected_api = Router::new()
         .route("/api/extract", extract_route)
         .route("/api/stream", get(routes::stream_handler))
-        .route("/api/stream/muxed", get(routes::muxed_stream_handler))
+        .route("/api/jobs", post(routes::create_job_handler))
+        .route("/api/jobs/{job_id}", get(routes::job_status_handler))
         .route(
-            "/api/stream/muxed/jobs",
-            post(routes::create_muxed_job_handler),
+            "/api/jobs/{job_id}/file-ticket",
+            get(routes::job_file_ticket_handler),
         )
+        .route("/api/jobs/{job_id}/file", get(routes::job_file_handler))
         .route(
-            "/api/stream/muxed/jobs/{job_id}",
-            get(routes::muxed_job_status_handler),
-        )
-        .route(
-            "/api/stream/muxed/jobs/{job_id}/file",
-            get(routes::muxed_job_file_handler),
+            "/api/jobs/{job_id}/release",
+            post(routes::release_job_handler),
         )
         .route("/api/batch", get(routes::batch_handler))
         .layer(middleware::from_fn_with_state(
@@ -213,13 +216,50 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     sqlx::migrate!("./migrations").run(&db_pool).await?;
     info!("Database pool connected");
-    let mux_jobs = services::muxed_job_queue::MuxedJobQueue::from_env()?;
-
+    let durable_job_repository = Arc::new(job_system::JobRepository::new(db_pool.clone()));
+    let queue_publisher = Arc::new(RedisStreamsQueue::new(
+        &config.redis_url,
+        &config.mux_queue_stream,
+        "mux-workers",
+        "api-publisher",
+    )?) as Arc<dyn JobQueuePublisher>;
+    let storage_backend = if config.mux_artifact_backend == MuxArtifactBackend::LocalFs {
+        None
+    } else {
+        Some(
+            build_storage_backend(&StorageBackendConfig {
+                backend: config
+                    .mux_artifact_backend
+                    .storage_backend_name()
+                    .to_string(),
+                local_dir: Path::new("/tmp/downloadtool-api-object-store-fallback").to_path_buf(),
+                s3_bucket: config.s3_bucket.clone(),
+                s3_region: config.s3_region.clone(),
+                s3_endpoint: config.s3_endpoint.clone(),
+                s3_access_key_id: config.s3_access_key_id.clone(),
+                s3_secret_access_key: config.s3_secret_access_key.clone(),
+                s3_force_path_style: config.s3_force_path_style,
+                multipart_part_size_bytes: 8 * 1024 * 1024,
+            })
+            .await?,
+        )
+    };
+    let job_control_plane = services::job_control_plane::JobControlPlaneService::new(
+        durable_job_repository,
+        queue_publisher,
+        config.mux_job_max_attempts,
+    );
+    let storage_ticket_service = services::storage_ticket_service::StorageTicketService::new(
+        storage_backend,
+        config.mux_file_ticket_ttl_secs,
+    );
     let app_state = AppState {
         db_pool,
         jwt_secret: config.jwt_secret,
         whop_webhook_secret: config.whop_webhook_secret,
-        mux_jobs,
+        job_control_plane,
+        storage_ticket_service,
+        mux_direct_download: config.mux_direct_download,
     };
 
     info!("Starting API server on port {}", config.port);
@@ -231,6 +271,11 @@ async fn main() -> anyhow::Result<()> {
         } else {
             "disabled"
         }
+    );
+    info!(
+        mux_artifact_backend = config.mux_artifact_backend.storage_backend_name(),
+        mux_direct_download = config.mux_direct_download,
+        "Mux job runtime configuration loaded"
     );
     let app = build_app(app_state, limiter, config.extract_rate_limit_enabled);
 
@@ -256,14 +301,30 @@ mod tests {
             .max_connections(1)
             .connect_lazy("postgres://postgres:postgres@localhost:5432/postgres")
             .expect("valid postgres url for lazy pool");
-        let mux_jobs = services::muxed_job_queue::MuxedJobQueue::from_env()
-            .expect("test mux queue should initialize");
+        let durable_job_repository = Arc::new(job_system::JobRepository::new(db_pool.clone()));
+        let job_control_plane = services::job_control_plane::JobControlPlaneService::new(
+            durable_job_repository,
+            Arc::new(
+                RedisStreamsQueue::new(
+                    "redis://127.0.0.1:6379",
+                    "mux_jobs",
+                    "mux-workers",
+                    "api-test-publisher",
+                )
+                .expect("test redis queue should initialize"),
+            ),
+            3,
+        );
 
         AppState {
             db_pool,
             jwt_secret: "test-secret".to_string(),
             whop_webhook_secret: "test-whop-secret".to_string(),
-            mux_jobs,
+            job_control_plane,
+            storage_ticket_service: services::storage_ticket_service::StorageTicketService::new(
+                None, 900,
+            ),
+            mux_direct_download: false,
         }
     }
 

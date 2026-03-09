@@ -2,7 +2,7 @@
 
 Welcome to the downloadtool documentation. This folder contains comprehensive guides for users, developers, and operators.
 
-**Last Updated:** 2026-03-01
+**Last Updated:** 2026-03-06
 
 ## Quick Navigation
 
@@ -66,7 +66,7 @@ Deploy and maintain the system:
 
 ---
 
-### 3. Code Standards (640 lines)
+### 3. Code Standards (790 LOC)
 **Purpose:** Development guidelines and best practices
 
 **Contains:**
@@ -75,21 +75,23 @@ Deploy and maintain the system:
 - Naming conventions (Rust, TypeScript, Svelte)
 - Code organization principles
 - Error handling & logging patterns
-- 8 critical component walkthroughs:
-  - yt-dlp subprocess extractor (NEW: 536 LOC, moka cache, semaphore throttle)
-  - JWT middleware & claims (NEW: auth system)
-  - Whop webhook handler (NEW: subscription integration)
-  - Muxer architecture (dual-traf, 3,205 LOC, QuickTime fix)
-  - Anti-bot client (timeout fix explanation)
-  - YouTube n-transform module (algorithm & regex)
-  - GPU pipeline (hardware acceleration)
-  - Batch operations with SSE (NEW)
+- 9 critical component walkthroughs:
+  - yt-dlp subprocess extractor (536 LOC, moka cache, semaphore throttle)
+  - JWT middleware & claims (auth system with tier-based rate limiting)
+  - Whop webhook handler (subscription integration with HMAC verification)
+  - Muxer architecture (dual-traf, 3,205 LOC, QuickTime fix, WebM exclusion)
+  - Anti-bot client (timeout fix explanation, proxy quarantine system)
+  - YouTube n-transform module (algorithm & regex for CDN bypass)
+  - GPU pipeline (hardware acceleration architecture)
+  - Batch operations with SSE (real-time progress streaming)
+  - Runtime limits configuration (config/runtime-limit-profiles.json)
 - Testing & quality standards
 - Performance optimizations
-- Security practices (JWT, HMAC signatures)
+- Security practices (JWT, HMAC signatures, rate limiting)
 - Build & compilation
 - Common pitfalls & solutions
 - Deployment checklist
+- i18n standards (Paraglide JS integration)
 
 **Start here if:** You're implementing features or fixing bugs
 
@@ -120,6 +122,38 @@ Deploy and maintain the system:
 - Version history (v2.1 2026-02-24)
 
 **Start here if:** You need to understand requirements or plan features
+
+---
+
+## Key Changes (2026-03-06 — Runtime Limits & Config Management)
+
+### 1. Runtime Limits Configuration Active
+**File:** `config/runtime-limit-profiles.json`
+
+**Status:** Now ACTIVE with explicit values for local/production:
+- Frontend: Extract retry (4 attempts, 500-8000ms delays), batch reconnect (8 attempts, 1000-12000ms)
+- Frontend mux jobs: poll interval + max wait are configurable
+- Playlist worker: Max 1 concurrent, 0ms jitter
+- Backend: Active runtime guards are extract rate limit, stream concurrency, and stream URL refresh attempts
+
+**Impact:** Centralized runtime management without code changes
+
+### 2. Proxy Quarantine System Stabilized
+**File:** `crates/proxy/src/proxy_pool.rs`
+
+**Behavior:**
+- Bad proxies blocked after bot-check errors automatically
+- Quarantined list: `PROXY_QUARANTINE_FILE` (default: `/tmp/downloadtool-quarantined-proxies.txt`)
+- Zero manual intervention needed for proxy rotation
+
+**Impact:** More reliable anti-bot protection
+
+### 3. API Access Tracing Enabled
+**Files:** `crates/api/src/main.rs` (middleware setup)
+
+**Tracking:**
+- All API requests logged with context (user_id, tier, endpoint, latency)
+- Used for observability and debugging
 
 ---
 
@@ -173,9 +207,9 @@ Deploy and maintain the system:
 **File:** `frontend/src/lib/playlist-download-worker.ts`
 
 **Changes:**
-- Always uses `buildStreamUrl()` to construct proper muxed URLs
-- Was using raw CDN URL in some cases, breaking download attribute
-- Now consistent URL building for all stream types
+- Single-stream downloads use `buildStreamUrl()`
+- Video-only selections create durable mux jobs and wait for ready artifact URLs
+- No raw CDN fallback remains in playlist worker
 
 **Impact:** Batch downloads work reliably across all format combinations
 
@@ -339,8 +373,8 @@ A: See System Architecture → Performance Characteristics table or Project Over
 ## Reporting & Updates
 
 ### Latest Report
-- **File:** `/plans/reports/docs-manager-260224-1016-post-implementation-documentation-update.md`
-- **Date:** 2026-02-24
+- **File:** `/plans/reports/docs-manager-260306-0842-runtime-config-and-i18n-status-update.md`
+- **Date:** 2026-03-06
 - **Status:** In progress (this update)
 
 ### Report Contents
@@ -385,7 +419,7 @@ A: See System Architecture → Performance Characteristics table or Project Over
 - CI/CD: `/.github/workflows`
 
 ### Development Plans
-- Internationalization (i18n): `/plans/260301-1326-i18n-paraglide-claude-api/plan.md`
+- Internationalization (i18n): `/plans/260301-1326-i18n-paraglide-claude-api/plan.md` ✅ In Progress (Phase 1-5)
 
 ## Getting Help
 
@@ -397,8 +431,8 @@ A: See System Architecture → Performance Characteristics table or Project Over
 
 ---
 
-**Documentation Version:** 2.3
-**Last Generated:** 2026-03-01
-**Status:** Complete ✅ (Frontend Auth & Performance ✅, Phase 10 i18n Planned)
+**Documentation Version:** 2.4
+**Last Generated:** 2026-03-06
+**Status:** Complete ✅ (Runtime Config ✅, Frontend Auth & Performance ✅, Phase 10 i18n In Progress)
 
 For the latest updates, check `/plans/reports/` for implementation reports.

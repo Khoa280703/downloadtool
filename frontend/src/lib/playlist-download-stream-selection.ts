@@ -80,7 +80,7 @@ export function getStoredPlaylistDownloadMode(): PlaylistDownloadMode {
 export function pickBestStreams(
 	streams: Stream[],
 	quality: PlaylistQuality,
-	options: { preferMuxed?: boolean; mode?: PlaylistDownloadMode } = {}
+	options: { preferCombinedStream?: boolean; mode?: PlaylistDownloadMode } = {}
 ): { video: Stream | null; audio: Stream | null } {
 	const mode = options.mode ?? 'video';
 	const audio = selectBestAudioStream(streams);
@@ -89,17 +89,16 @@ export function pickBestStreams(
 		return { video: null, audio };
 	}
 
-	// Keep all video streams except WebM video-only (cannot be muxed by /api/stream/muxed).
-	// This ensures "Best available" can still pick the highest compatible quality
-	// instead of being locked to low progressive (muxed) streams.
+	// Keep all video streams except WebM video-only because fMP4 mux jobs only accept MP4/M4A.
+	// This keeps "Best available" free to choose the highest compatible stream pair.
 	const compatibleVideo = streams.filter((stream) => isCompatibleVideoStream(stream));
 
 	const sortedVideo = [...compatibleVideo].sort((a, b) => {
 		const resolutionDiff = resolutionScore(b.quality) - resolutionScore(a.quality);
 		if (resolutionDiff !== 0) return resolutionDiff;
 
-		// If asked to prefer muxed, only use it as a tie-breaker at same resolution.
-		if (options.preferMuxed && a.hasAudio !== b.hasAudio) return a.hasAudio ? -1 : 1;
+		// Prefer a stream that already includes audio before falling back to a mux job.
+		if (options.preferCombinedStream && a.hasAudio !== b.hasAudio) return a.hasAudio ? -1 : 1;
 
 		// Prefer MP4 over others when resolution is equal for better compatibility.
 		const formatDiff = formatRank(a.format) - formatRank(b.format);
@@ -141,7 +140,7 @@ function selectByTargetCeiling(
 
 function isCompatibleVideoStream(stream: Stream): boolean {
 	if (stream.isAudioOnly) return false;
-	// /api/stream/muxed currently rejects WebM video-only streams.
+	// Job-based fMP4 muxing rejects WebM video-only streams.
 	if (!stream.hasAudio && stream.format.toLowerCase() === 'webm') return false;
 	return true;
 }

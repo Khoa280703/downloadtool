@@ -1,18 +1,19 @@
 # Project Overview & Product Development Requirements (PDR)
 
-**Version:** 2.3
-**Last Updated:** 2026-03-01
-**Status:** Phase 9.1 Complete (Frontend Auth Modal ✅ Performance Optimizations ✅) | Phase 10 i18n Planned
+**Version:** 2.4
+**Last Updated:** 2026-03-06
+**Status:** Phase 9.1 Complete ✅ | Phase 10 i18n In Progress 🔄
 
 ## Executive Summary
 
 A high-performance, self-hosted video downloader platform enabling users to download content from YouTube with anti-bot protection, GPU-accelerated transcoding, and full-speed CDN downloads via YouTube n-parameter transformation.
 
-**Key Achievements (as of 2026-03-01):**
+**Key Achievements (as of 2026-03-06):**
 - Complete end-to-end video download pipeline
 - YouTube extraction via yt-dlp subprocess (auto handles PO Token, signature decryption)
 - YouTube throttle bypass via n-parameter transform
-- Anti-bot layer with proxy rotation & intelligent retry
+- Anti-bot layer with proxy rotation, quarantine system for blocked proxies
+- Intelligent retry with exponential backoff & domain throttling
 - GPU-accelerated transcoding with fMP4 muxing (dual-track, QuickTime-compatible)
 - Web-based UI with batch operations (SSE streaming, WebM filtering)
 - Ad integration for monetization
@@ -24,6 +25,9 @@ A high-performance, self-hosted video downloader platform enabling users to down
 - Font optimization: Material Symbols 1.1 MB → 4.5 KB (27-icon subset)
 - Homepage prerendering: Static HTML, CDN-cacheable
 - Cookie check optimization: Skips DB query for unauthenticated users
+- Runtime limits configuration: Centralized JSON config for all backend/frontend limits
+- API access tracing: All requests logged with user context
+- Proxy quarantine: Bad proxies automatically blocked and persisted
 
 ## Product Vision
 
@@ -346,6 +350,50 @@ Enable creators and power users to reliably download video content at maximum sp
   - [ ] Rate limiter middleware integration
   - [ ] Subscription status dashboard
 
+### 1. Runtime Limits Configuration Activated ✅
+**File:** `config/runtime-limit-profiles.json`
+
+**Changes:**
+- Local profile: Test/development settings (high concurrency, short timeouts)
+- Production profile: Conservative limits for stability
+- All values now active (no null defaults blocking features)
+- Frontend: 4 extract retries (500-8000ms), 8 batch reconnects (1000-12000ms)
+- Frontend mux jobs: poll interval + max wait are configurable
+- Playlist worker: Max 1 concurrent, 0ms jitter
+
+**Impact:** Centralized configuration management, no code changes needed for tuning
+
+### 2. Proxy Quarantine System Stabilized ✅
+**File:** `crates/proxy/src/proxy_pool.rs`
+
+**Features:**
+- Automatic blocking of bad proxies after bot-check errors
+- Persistent quarantine file: `/tmp/downloadtool-quarantined-proxies.txt`
+- Zero manual proxy management required
+- Faster failure detection and recovery
+
+**Impact:** More reliable anti-bot evasion, reduced manual ops work
+
+### 3. API Access Tracing Enabled ✅
+**Status:** All API requests logged with tracing context
+
+**Tracked Metrics:**
+- User ID & tier (JWT claims)
+- Endpoint & HTTP method
+- Request latency & status code
+- Error details (if any)
+
+**Impact:** Better observability, easier debugging
+
+### 4. Internationalization (i18n) Transitioned to In Progress 🔄
+**Plan:** `plans/260301-1326-i18n-paraglide-claude-api/`
+
+**Current Phase:** 1-5 active (Paraglide setup, string extraction, Claude translation)
+
+**Next Deliverable:** Phase 5 - LanguageSwitcher component
+
+---
+
 ## Recent Changes (2026-03-01 — Frontend Auth & Performance)
 
 ### 1. Auth Flow Migration to Modal ✅
@@ -384,8 +432,9 @@ Enable creators and power users to reliably download video content at maximum sp
 **File:** `frontend/src/lib/playlist-download-worker.ts`
 
 **Changes:**
-- Standardized to always use `buildStreamUrl()`
-- Was falling back to raw CDN URL in edge cases
+- Standardized direct downloads to use `buildStreamUrl()`
+- Mux-required downloads now go through durable `/api/jobs/*` flow
+- Removed raw CDN fallback from playlist worker
 
 **Impact:** Reliable batch downloads across all formats
 
@@ -660,14 +709,21 @@ docker-compose -f docker/docker-compose.server.yml up -d
 
 ---
 
-**Version:** 2.3
-**Last Updated:** 2026-03-01
-**Next Review:** 2026-03-31 (1 month)
-**Status:** Phase 9.1 Complete (Frontend Auth Modal ✅ Performance Optimizations ✅) | Phase 10 i18n Planned
+**Version:** 2.4
+**Last Updated:** 2026-03-06
+**Next Review:** 2026-04-06 (1 month)
+**Status:** Phase 9.1 Complete ✅ | Phase 10 i18n In Progress 🔄
 
 ---
 
 ## Appendix: Version History
+
+### v2.4 (2026-03-06)
+- Runtime limits configuration now active (config/runtime-limit-profiles.json)
+- Proxy quarantine system stabilized and documented
+- API access tracing enabled for observability
+- i18n status updated: Planned → In Progress
+- Deprecated/removed features documented (cookie extraction, yt-dlp profile fallback, preflight checks)
 
 ### v2.3 (2026-03-01)
 - Auth flow migration: `/login` route → modal on homepage

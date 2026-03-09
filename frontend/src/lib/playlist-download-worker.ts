@@ -1,16 +1,9 @@
 import {
-	buildMuxedStreamUrl,
 	buildStreamUrl,
 	createMuxedDownloadJob,
 	extract,
 	waitForMuxedDownloadJobReady
 } from '$lib/api';
-import {
-	decideMuxedDownloadRoute,
-	getActiveSyncMuxedDownloads,
-	isTimeoutLikeMuxedSyncError,
-	withSyncMuxedDownloadSlot
-} from '$lib/muxed-download-routing-policy';
 import { playlistWorkerLimitConfig } from '$lib/runtime-limit-config';
 import { updateBatchItemByVideoId } from '$stores/batch';
 import {
@@ -39,13 +32,6 @@ type ReadyEntry = {
 	entry: QueueEntry;
 	downloadUrl: string;
 	filename: string;
-	muxSyncPayload?: {
-		videoUrl: string;
-		audioUrl: string;
-		sourceUrl?: string;
-		videoFormatId?: string;
-		audioFormatId?: string;
-	};
 };
 
 const MAX_CONCURRENT = playlistWorkerLimitConfig.maxConcurrent;
@@ -274,32 +260,6 @@ async function saveReadyEntry(ready: ReadyEntry, signal: AbortSignal): Promise<v
 		allowAnchorFallback: true
 	} as const;
 
-	if (ready.muxSyncPayload) {
-		try {
-			await withSyncMuxedDownloadSlot(() =>
-				saveDownload(ready.downloadUrl, ready.filename, signal, saveOptions)
-			);
-			return;
-		} catch (error) {
-			if (!isTimeoutLikeMuxedSyncError(error)) throw error;
-
-			const { jobId } = await createMuxedDownloadJob(
-				ready.muxSyncPayload.videoUrl,
-				ready.muxSyncPayload.audioUrl,
-				ready.entry.title,
-				{
-					sourceUrl: ready.muxSyncPayload.sourceUrl,
-					videoFormatId: ready.muxSyncPayload.videoFormatId,
-					audioFormatId: ready.muxSyncPayload.audioFormatId
-				},
-				signal
-			);
-			const fallbackMuxedUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
-			await saveDownload(fallbackMuxedUrl, ready.filename, signal, saveOptions);
-			return;
-		}
-	}
-
 	await saveDownload(ready.downloadUrl, ready.filename, signal, saveOptions);
 }
 
@@ -314,62 +274,27 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 	const result = await extract(toWatchUrl(entry.videoId), signal);
 	const useFsaa = hasSelectedSaveDirectory();
 	const { video, audio } = pickBestStreams(result.streams, preferredQuality, {
-		preferMuxed: !useFsaa,
+		preferCombinedStream: !useFsaa,
 		mode: preferredDownloadMode
 	});
 
 	if (video && !video.hasAudio && audio) {
-		const muxPayload = {
-			videoUrl: video.url,
-			audioUrl: audio.url,
-			sourceUrl: result.originalUrl,
-			videoFormatId: video.formatId,
-			audioFormatId: audio.formatId
-		};
-		const routeDecision = decideMuxedDownloadRoute({
-			videoStream: video,
-			audioStream: audio,
-			durationSeconds: result.duration,
-			activeSyncMuxed: getActiveSyncMuxedDownloads()
-		});
-
-		if (routeDecision.route === 'jobs') {
-			const { jobId } = await createMuxedDownloadJob(
-				muxPayload.videoUrl,
-				muxPayload.audioUrl,
-				entry.title,
-				{
-					sourceUrl: muxPayload.sourceUrl,
-					videoFormatId: muxPayload.videoFormatId,
-					audioFormatId: muxPayload.audioFormatId
-				},
-				signal
-			);
-			const muxedFileUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
-
-			return {
-				entry,
-				downloadUrl: muxedFileUrl,
-				filename: safeFilename(entry.title, 'mp4')
-			};
-		}
-
-		const muxedSyncUrl = buildMuxedStreamUrl(
-			muxPayload.videoUrl,
-			muxPayload.audioUrl,
+		const { jobId } = await createMuxedDownloadJob(
+			video.url,
+			audio.url,
 			entry.title,
 			{
-				sourceUrl: muxPayload.sourceUrl,
-				videoFormatId: muxPayload.videoFormatId,
-				audioFormatId: muxPayload.audioFormatId
+				sourceUrl: result.originalUrl,
+				videoFormatId: video.formatId,
+				audioFormatId: audio.formatId
 			}
 		);
+		const muxedFileUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
 
 		return {
 			entry,
-			downloadUrl: muxedSyncUrl,
-			filename: safeFilename(entry.title, 'mp4'),
-			muxSyncPayload: muxPayload
+			downloadUrl: muxedFileUrl,
+			filename: safeFilename(entry.title, 'mp4')
 		};
 	}
 

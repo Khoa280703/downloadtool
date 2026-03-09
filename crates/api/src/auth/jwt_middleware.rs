@@ -6,32 +6,40 @@ use axum::{
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use tracing::debug;
 
-use crate::{auth::jwt_claims::JwtClaims, auth::user_tier::UserTier, AppState};
+use crate::{
+    auth::authenticated_user::AuthenticatedUser, auth::jwt_claims::JwtClaims,
+    auth::user_tier::UserTier, AppState,
+};
 
 pub async fn jwt_auth_middleware(
     State(state): State<AppState>,
     mut request: Request,
     next: Next,
 ) -> Response {
-    let tier = extract_user_tier(&request, &state.jwt_secret);
+    let user = extract_authenticated_user(&request, &state.jwt_secret);
+    let tier = user.tier.clone();
+    request.extensions_mut().insert(user);
     request.extensions_mut().insert(tier);
     next.run(request).await
 }
 
-fn extract_user_tier(request: &Request, secret: &str) -> UserTier {
+fn extract_authenticated_user(request: &Request, secret: &str) -> AuthenticatedUser {
     let Some(token) = extract_bearer_token(request) else {
-        return UserTier::Anonymous;
+        return AuthenticatedUser::default();
     };
 
     match decode_jwt(token, secret) {
-        Ok(claims) => match claims.tier.as_str() {
-            "premium" => UserTier::Premium,
-            "free" => UserTier::Free,
-            _ => UserTier::Anonymous,
+        Ok(claims) => AuthenticatedUser {
+            user_id: Some(claims.sub),
+            tier: match claims.tier.as_str() {
+                "premium" => UserTier::Premium,
+                "free" => UserTier::Free,
+                _ => UserTier::Anonymous,
+            },
         },
         Err(err) => {
             debug!("JWT decode failed: {err}");
-            UserTier::Anonymous
+            AuthenticatedUser::default()
         }
     }
 }
@@ -114,7 +122,9 @@ mod tests {
         let secret = "secret123";
         let token = build_token("premium", 300, secret);
         let req = request_with_auth_header(&format!("Bearer {token}"));
-        assert_eq!(extract_user_tier(&req, secret), UserTier::Premium);
+        let user = extract_authenticated_user(&req, secret);
+        assert_eq!(user.tier, UserTier::Premium);
+        assert_eq!(user.user_id.as_deref(), Some("user_1"));
     }
 
     #[test]
@@ -122,7 +132,10 @@ mod tests {
         let secret = "secret123";
         let token = build_token("premium", -3600, secret);
         let req = request_with_auth_header(&format!("Bearer {token}"));
-        assert_eq!(extract_user_tier(&req, secret), UserTier::Anonymous);
+        assert_eq!(
+            extract_authenticated_user(&req, secret),
+            AuthenticatedUser::default()
+        );
     }
 
     #[test]
@@ -131,13 +144,19 @@ mod tests {
             .uri("/api/extract")
             .body(Body::empty())
             .expect("request should build");
-        assert_eq!(extract_user_tier(&req, "secret123"), UserTier::Anonymous);
+        assert_eq!(
+            extract_authenticated_user(&req, "secret123"),
+            AuthenticatedUser::default()
+        );
     }
 
     #[test]
     fn invalid_signature_maps_to_anonymous() {
         let token = build_token("free", 300, "secret_a");
         let req = request_with_auth_header(&format!("Bearer {token}"));
-        assert_eq!(extract_user_tier(&req, "secret_b"), UserTier::Anonymous);
+        assert_eq!(
+            extract_authenticated_user(&req, "secret_b"),
+            AuthenticatedUser::default()
+        );
     }
 }

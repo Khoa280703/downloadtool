@@ -40,6 +40,11 @@ dotenvy = "0.15"
 # Bytes handling
 bytes = "1"
 futures = "0.3"
+async-trait = "0.1"
+base64 = "0.22"
+redis = { version = "0.27", features = ["tokio-comp"] }
+aws-config = "1"
+aws-sdk-s3 = "1"
 
 # OpenAPI spec generation
 utoipa = { version = "4", features = ["axum_extras"] }

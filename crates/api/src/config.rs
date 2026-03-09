@@ -7,6 +7,38 @@ use std::process::Command;
 
 use crate::limit_profiles::backend_limit_profile;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MuxArtifactBackend {
+    LocalFs,
+    Minio,
+    R2,
+}
+
+impl MuxArtifactBackend {
+    fn from_env(value: Option<String>) -> anyhow::Result<Self> {
+        match value
+            .unwrap_or_else(|| "localfs".to_string())
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "localfs" => Ok(Self::LocalFs),
+            "minio" => Ok(Self::Minio),
+            "r2" => Ok(Self::R2),
+            other => Err(anyhow::anyhow!(
+                "MUX_ARTIFACT_BACKEND must be 'localfs', 'minio', or 'r2', got '{other}'"
+            )),
+        }
+    }
+
+    pub fn storage_backend_name(self) -> &'static str {
+        match self {
+            Self::LocalFs => "localfs",
+            Self::Minio | Self::R2 => "s3",
+        }
+    }
+}
+
 /// Application configuration loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -22,6 +54,18 @@ pub struct Config {
     pub whop_webhook_secret: String,
     /// Toggle rate limiter for /api/extract (default: true)
     pub extract_rate_limit_enabled: bool,
+    pub mux_artifact_backend: MuxArtifactBackend,
+    pub mux_direct_download: bool,
+    pub redis_url: String,
+    pub mux_queue_stream: String,
+    pub mux_job_max_attempts: i32,
+    pub mux_file_ticket_ttl_secs: u64,
+    pub s3_bucket: Option<String>,
+    pub s3_region: Option<String>,
+    pub s3_endpoint: Option<String>,
+    pub s3_access_key_id: Option<String>,
+    pub s3_secret_access_key: Option<String>,
+    pub s3_force_path_style: bool,
 }
 
 impl Config {
@@ -134,6 +178,43 @@ impl Config {
         let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")
             .map_err(|_| anyhow::anyhow!("WHOP_WEBHOOK_SECRET env var is required"))?;
         let extract_rate_limit_enabled = backend_limit_profile().extract_rate_limit_enabled_value();
+        let mux_artifact_backend =
+            MuxArtifactBackend::from_env(env::var("MUX_ARTIFACT_BACKEND").ok())?;
+        let mux_direct_download = env::var("MUX_DIRECT_DOWNLOAD")
+            .ok()
+            .map(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes"
+                )
+            })
+            .unwrap_or(false);
+        let redis_url =
+            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let mux_queue_stream =
+            env::var("MUX_QUEUE_STREAM").unwrap_or_else(|_| "mux_jobs".to_string());
+        let mux_job_max_attempts = env::var("MUX_JOB_MAX_ATTEMPTS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(3);
+        let mux_file_ticket_ttl_secs = env::var("MUX_FILE_TICKET_TTL_SECS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(900);
+        let s3_bucket = env::var("S3_BUCKET_NAME").ok();
+        let s3_region = env::var("S3_REGION").ok();
+        let s3_endpoint = env::var("S3_ENDPOINT").ok();
+        let s3_access_key_id = env::var("S3_ACCESS_KEY_ID").ok();
+        let s3_secret_access_key = env::var("S3_SECRET_ACCESS_KEY").ok();
+        let s3_force_path_style = env::var("S3_FORCE_PATH_STYLE")
+            .ok()
+            .map(|value| {
+                matches!(
+                    value.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes"
+                )
+            })
+            .unwrap_or(false);
 
         Ok(Self {
             port,
@@ -142,6 +223,18 @@ impl Config {
             jwt_secret,
             whop_webhook_secret,
             extract_rate_limit_enabled,
+            mux_artifact_backend,
+            mux_direct_download,
+            redis_url,
+            mux_queue_stream,
+            mux_job_max_attempts,
+            mux_file_ticket_ttl_secs,
+            s3_bucket,
+            s3_region,
+            s3_endpoint,
+            s3_access_key_id,
+            s3_secret_access_key,
+            s3_force_path_style,
         })
     }
 }
@@ -159,6 +252,18 @@ mod tests {
             jwt_secret: "secret".to_string(),
             whop_webhook_secret: "whop_secret".to_string(),
             extract_rate_limit_enabled: true,
+            mux_artifact_backend: MuxArtifactBackend::LocalFs,
+            mux_direct_download: false,
+            redis_url: "redis://127.0.0.1:6379".to_string(),
+            mux_queue_stream: "mux_jobs".to_string(),
+            mux_job_max_attempts: 3,
+            mux_file_ticket_ttl_secs: 900,
+            s3_bucket: None,
+            s3_region: None,
+            s3_endpoint: None,
+            s3_access_key_id: None,
+            s3_secret_access_key: None,
+            s3_force_path_style: false,
         };
 
         assert_eq!(config.port, 3068);
@@ -167,5 +272,11 @@ mod tests {
         assert_eq!(config.jwt_secret, "secret");
         assert_eq!(config.whop_webhook_secret, "whop_secret");
         assert!(config.extract_rate_limit_enabled);
+        assert_eq!(config.mux_artifact_backend, MuxArtifactBackend::LocalFs);
+        assert!(!config.mux_direct_download);
+        assert_eq!(config.redis_url, "redis://127.0.0.1:6379");
+        assert_eq!(config.mux_queue_stream, "mux_jobs");
+        assert_eq!(config.mux_job_max_attempts, 3);
+        assert_eq!(config.mux_file_ticket_ttl_secs, 900);
     }
 }

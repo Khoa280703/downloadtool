@@ -3,7 +3,7 @@
 import {
   filterDownloadableFormats,
   buildMuxedPairs,
-  buildMuxedUrl,
+  buildMuxJobLaunchUrl,
   type StreamFormat,
   type MuxedPair,
 } from '../shared/stream-utils.js';
@@ -51,12 +51,12 @@ async function init(): Promise<void> {
         return;
       }
 
-      renderStreamList(pairs, title);
+      renderStreamList(pairs, title, tabUrl);
     },
   );
 }
 
-function renderStreamList(pairs: MuxedPair[], title: string): void {
+function renderStreamList(pairs: MuxedPair[], title: string, sourceUrl: string): void {
   const items = pairs
     .map(
       (pair) => `
@@ -64,6 +64,8 @@ function renderStreamList(pairs: MuxedPair[], title: string): void {
         <button data-video="${encodeURIComponent(pair.videoUrl)}"
                 data-audio="${encodeURIComponent(pair.audioUrl)}"
                 data-label="${encodeURIComponent(pair.label)}"
+                data-video-format-id="${pair.videoFormatId ?? ''}"
+                data-audio-format-id="${pair.audioFormatId ?? ''}"
                 data-vcodec="${pair.videoCodec ?? ''}"
                 data-acodec="${pair.audioCodec ?? ''}">
           <span>${pair.label}</span>
@@ -82,12 +84,13 @@ function renderStreamList(pairs: MuxedPair[], title: string): void {
         label: decodeURIComponent(btn.dataset.label ?? ''),
         videoUrl: decodeURIComponent(btn.dataset.video ?? ''),
         audioUrl: decodeURIComponent(btn.dataset.audio ?? ''),
+        videoFormatId: btn.dataset.videoFormatId || undefined,
+        audioFormatId: btn.dataset.audioFormatId || undefined,
         videoCodec: btn.dataset.vcodec || undefined,
         audioCodec: btn.dataset.acodec || undefined,
       };
-      const url = buildMuxedUrl(API_BASE, pair, title);
-      const filename = `${title} [${pair.label}].mp4`;
-      chrome.runtime.sendMessage({ type: 'DOWNLOAD', url, filename });
+      const url = buildMuxJobLaunchUrl(API_BASE, pair, title, sourceUrl);
+      chrome.tabs.create({ url });
       window.close();
     });
   });

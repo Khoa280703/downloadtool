@@ -1,6 +1,6 @@
 # Project Roadmap
 
-**Last Updated:** 2026-03-01
+**Last Updated:** 2026-03-06
 **Project Status:** Actively Developed
 
 ## Overview
@@ -20,7 +20,7 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ### Key Deliverables
 - `POST /api/extract` → Returns video metadata + stream list
-- `GET /api/stream/muxed` → Streams muxed fMP4 video
+- Durable mux downloads via `/api/jobs/*`
 - Hot-reloadable extractor scripts (`/extractors/youtube.ts`)
 - n-parameter transform for full CDN speed (bypasses 100 KB/s throttle)
 
@@ -185,9 +185,9 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-## Phase 5: Internationalization (i18n) (Planned)
+## Phase 5: Internationalization (i18n) (In Progress)
 
-**Status:** 📋 Planned | **Target:** Q1 2026 (March)
+**Status:** 🔄 In Progress | **Target:** Q1 2026 (March, currently active)
 
 ### Objectives
 - Paraglide JS integration for type-safe i18n
@@ -209,13 +209,63 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 - Locale switching < 200ms UX impact
 - SEO: Proper canonical/hreflang for all pages
 
-### Timeline
+### Current Phase Progress
 - Task #12: Install & configure Paraglide JS (pending)
 - Task #13: Extract strings → messages/en.json (blocked by #12)
 - Task #14: Claude API translation script (blocked by #13)
 - Task #15: hreflang + sitemap (blocked by #14)
 - Task #16: LanguageSwitcher component (blocked by #14)
 - Task #17: Test & deploy (blocked by #15, #16)
+
+---
+
+## Phase 3.6: Runtime Configuration & Telemetry (Completed)
+
+**Status:** ✅ Complete | **Completion Date:** 2026-03-06
+
+### Milestones
+- [x] Runtime limits configuration (config/runtime-limit-profiles.json)
+- [x] Proxy quarantine system documented
+- [x] API access tracing enabled
+
+### Key Deliverables
+- Centralized config for backend/frontend limits (zero code changes for tuning)
+- Automatic proxy blocking on detection failures
+- Structured logging of all API requests with user context
+
+### Testing Status
+- Runtime config values applied correctly at startup
+- Proxy quarantine persists across restarts
+- API tracing logs complete and queryable
+
+---
+
+## Phase 3.7: Job Control Plane / Worker Storage Redesign (Completed)
+
+**Status:** ✅ Complete | **Completion Date:** 2026-03-06
+
+### Milestones
+- [x] Durable `mux_jobs` / `mux_artifacts` / `mux_job_events` schema in PostgreSQL
+- [x] New `/api/jobs/*` control-plane contract with JWT ownership checks
+- [x] Redis Streams publish path for durable mux worker pipeline
+- [x] Standalone `crates/worker` process with lease reclaim + heartbeat
+- [x] `object-store` abstraction with `LocalFs` and S3-compatible multipart upload
+- [x] Frontend `/api/proxy/jobs/*` cutover for mux download flow
+- [x] Direct download ticket support for object storage + TTL cleanup runner
+
+### Key Deliverables
+- API can create/reuse durable jobs without relying on in-memory queue state
+- Worker claims jobs from Redis-backed queue and updates canonical state in Postgres
+- Browser can download ready artifacts through LocalFs proxy or direct presigned object-storage URL
+- Expired artifacts are cleaned up server-side even if frontend never sends release callback
+
+### Verification Status
+- `cargo test --workspace`
+- `cargo check --workspace`
+- `pnpm --filter frontend check`
+
+### Residual Follow-up
+- Sync mux path was removed; all mux downloads now converge on durable `/api/jobs/*`
 
 ---
 
@@ -269,7 +319,9 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 | Core API | 1.0.0 | ✅ Released | Q4 2025 |
 | Muxer | 1.1.0 | ✅ Released | 2026-02-15 |
 | Omnichannel | 1.2.0 | ✅ Released | 2026-02-24 |
+| Runtime Config | 1.2.1 | ✅ Released | 2026-03-06 |
 | GPU Acceleration | 1.3.0 | 🔄 In Progress | Q2 2026 |
+| i18n Integration | 1.4.0 | 🔄 In Progress | Q1 2026 (March) |
 | Batch & Scheduling | 2.0.0 | 📋 Planned | Q3 2026 |
 
 ---
@@ -339,5 +391,5 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-**Last Reviewed:** 2026-03-01
-**Next Review Date:** 2026-04-01
+**Last Reviewed:** 2026-03-06
+**Next Review Date:** 2026-04-06

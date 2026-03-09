@@ -198,7 +198,7 @@ const readyPct = accepted > 0 ? (((fc.ready || 0) / accepted) * 100).toFixed(2) 
 const row = [
   caseName,
   level,
-  '/api/stream/muxed/jobs',
+  '/api/jobs',
   createConc,
   pollConc,
   total,
@@ -289,8 +289,6 @@ EOF
   run_http_case "${level}-stream4k" "$level" "/api/stream" "$S4_C" "$S4_N" 20 'set +e; m=$(curl -sS --max-time 20 -o /dev/null -w "%{http_code}\t%{time_total}" -G "$API_BASE/api/stream" -H "Range: bytes=0-4095" --data-urlencode "url=$STREAM_URL" --data-urlencode "format_id=$STREAM_FORMAT_ID" --data-urlencode "title=stress" --data-urlencode "format=mp4"); rc=$?; set -e; c=$(echo "$m"|cut -f1); t=$(echo "$m"|cut -f2); [ -z "$c" ]&&c=000; [ -z "$t" ]&&t=0; echo -e "$c\t$t\t0\t$rc"'
 
   run_http_case "${level}-stream1m" "$level" "/api/stream" "$S1_C" "$S1_N" 30 'set +e; m=$(curl -sS --max-time 30 -o /dev/null -w "%{http_code}\t%{time_total}" -G "$API_BASE/api/stream" -H "Range: bytes=0-1048575" --data-urlencode "url=$STREAM_URL" --data-urlencode "format_id=$STREAM_FORMAT_ID" --data-urlencode "title=stress" --data-urlencode "format=mp4"); rc=$?; set -e; c=$(echo "$m"|cut -f1); t=$(echo "$m"|cut -f2); [ -z "$c" ]&&c=000; [ -z "$t" ]&&t=0; echo -e "$c\t$t\t0\t$rc"'
-
-  run_http_case "${level}-muxed-sync" "$level" "/api/stream/muxed" "$MX_C" "$MX_N" 35 'set +e; m=$(curl -sS --max-time 35 -o /dev/null -w "%{http_code}\t%{time_total}" -G "$API_BASE/api/stream/muxed" --data-urlencode "video_url=$VIDEO_URL_ENC" --data-urlencode "audio_url=$AUDIO_URL_ENC" --data-urlencode "video_format_id=$VIDEO_FORMAT_ID" --data-urlencode "audio_format_id=$AUDIO_FORMAT_ID" --data-urlencode "title=stress"); rc=$?; set -e; c=$(echo "$m"|cut -f1); t=$(echo "$m"|cut -f2); [ -z "$c" ]&&c=000; [ -z "$t" ]&&t=0; echo -e "$c\t$t\t0\t$rc"'
 
   run_batch_case "${level}-batch" "$level" "$B_C" "$B_N" 120
   run_async_case "${level}-muxed-async" "$level" "$AX_N" "$AX_C" "$AX_P" "$AX_T"

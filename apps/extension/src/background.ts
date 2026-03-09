@@ -1,5 +1,5 @@
 // Background service worker
-// Handles API calls (bypasses CORS) and triggers chrome.downloads
+// Handles API extract calls for the popup/content script.
 
 // Injected at build time via vite define
 declare const __API_BASE__: string;
@@ -12,10 +12,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
 
-  if (msg.type === 'DOWNLOAD') {
-    handleDownload(msg.url, msg.filename);
-    sendResponse({ ok: true });
-  }
 });
 
 async function handleExtract(videoUrl: string): Promise<{ formats?: unknown[]; title?: string; error?: string }> {
@@ -35,12 +31,4 @@ async function handleExtract(videoUrl: string): Promise<{ formats?: unknown[]; t
     formats: data.metadata?.formats ?? [],
     title: data.metadata?.title ?? 'video',
   };
-}
-
-function handleDownload(url: string, filename: string): void {
-  chrome.downloads.download({
-    url,
-    filename: filename.endsWith('.mp4') ? filename : `${filename}.mp4`,
-    saveAs: false,
-  });
 }

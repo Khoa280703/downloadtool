@@ -699,7 +699,6 @@
 										stream={$currentDownload.selectedStream}
 										audioStream={selectedAudioStream}
 										sourceUrl={extractResult.originalUrl}
-										durationSeconds={extractResult.duration}
 										title={extractResult.title}
 									/>
 								</div>

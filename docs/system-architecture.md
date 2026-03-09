@@ -1,8 +1,44 @@
 # System Architecture
 
-**Last Updated:** 2026-03-01
+**Last Updated:** 2026-03-06
 
 ## High-Level Architecture
+
+### Job Control Plane / Worker Pipeline (2026-03-06)
+
+```
+Browser (SvelteKit)
+   │
+   ├─► POST /api/proxy/jobs
+   │    └─► Rust API /api/jobs
+   │         • JWT ownership check
+   │         • Request hash + dedupe key
+   │         • Postgres job row create/reuse
+   │         • Redis Streams publish (worker mode)
+   │
+   ├─► Poll /api/proxy/jobs/{id}
+   │    └─► Postgres-backed status read
+   │
+   └─► GET /api/proxy/jobs/{id}/file-ticket
+        ├─► LocalFs backend: app proxy /api/jobs/{id}/file
+        └─► S3/MinIO/R2 backend: pre-signed URL direct to object storage
+
+Redis Streams (`mux_jobs`)
+   │
+   ▼
+Rust Worker (`crates/worker`)
+   • Claim lease in Postgres
+   • Heartbeat lease while mux/upload runs
+   • Reuse ready artifact by dedupe key when possible
+   • Stream muxed bytes into LocalFs or S3 multipart upload
+   • Mark artifact/job ready or failed
+   • Periodic TTL cleanup deletes expired artifacts from storage
+
+PostgreSQL
+   • `mux_jobs` = user request lifecycle
+   • `mux_artifacts` = dedupable physical output metadata
+   • `mux_job_events` = auditable state/event trail
+```
 
 ```
 Internet
@@ -20,6 +56,11 @@ Internet
    │ • Fallback: alternate player client on error   │
    │ • Returns: JSON (video_id, formats[])         │
    └────────┬─────────────────────────────────────────┘
+            │
+            ├─► Proxy Quarantine System
+            │   • Bad proxies auto-blocked
+            │   • Persistent quarantine file
+            │   • Faster failure detection
             │
             ├─► YouTube N-Transform (extractors/youtube-n-transform.ts)
             │   • Fetches player.js
@@ -47,6 +88,7 @@ Internet
    │   - POST /whop-webhook → subscription update   │
    │ • Request validation & rate limiting           │
    │ • PostgreSQL connection pool (subscriptions)   │
+   │ • API access tracing (all requests logged)     │
    └────────┬─────────────────────────────────────────┘
             │
    ┌────────┴──────┬──────────────────┬──────────────┐
@@ -197,6 +239,12 @@ YouTube Stream URL (with throttled n-param)
 ```
 
 ### 3. GPU Transcoding Flow
+
+#### Durable Job Pipeline Notes
+
+- `/api/jobs/*` now always runs through the durable worker pipeline backed by PostgreSQL + Redis Streams + standalone `crates/worker`.
+- `MUX_ARTIFACT_BACKEND=localfs|minio|r2` selects LocalFs proxy download or S3-compatible storage with presigned ticket flow.
+- Frontend mux downloads now prefer job flow and can consume absolute object-storage tickets directly.
 
 ```
 Video Stream (proxy/CDN)
@@ -517,17 +565,58 @@ enum Platform {
 | **Retry** | Exponential backoff | 200ms delays, max 3 retries |
 | **N-Parameter** | Anti-throttle | Extracted from player.js, cached |
 
-## Performance Characteristics
+## Recent Changes (2026-03-06 — Runtime Config & Proxy Quarantine)
+
+### 1. Runtime Limits Configuration Activated
+**File:** `config/runtime-limit-profiles.json`
+
+**Integration Points:**
+- API startup reads local/production profile
+- All limits applied at runtime (no code recompilation)
+- Frontend components respect `frontend.*` limits
+- Backend routes enforce `backend.*` limits
+
+**Example:** Lower `backend.stream_max_concurrent` in production profile to shed load on `/api/stream` without redeploying the API
+
+### 2. Proxy Quarantine System Enhanced
+**File:** `crates/proxy/src/proxy_pool.rs`
+
+**Workflow:**
+1. Request fails with 403 (bot detection)
+2. Proxy marked unhealthy
+3. IP written to `PROXY_QUARANTINE_FILE`
+4. Next request uses different proxy
+5. Quarantine file persists across restarts
+
+**Impact:** Reduced manual proxy management
+
+### 3. API Access Tracing Documented
+**Location:** `crates/api/src/main.rs`
+
+**Logged per request:**
+- User ID (from JWT claims)
+- Subscription tier
+- Endpoint & HTTP method
+- Response status & latency
+- Error details (if any)
+
+**Use:** Debugging, observability, SLA monitoring
+
+---
+
+## Performance Characteristics (Updated 2026-03-06)
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| **Extraction** | <1s | InnerTube API, usually 200-500ms |
+| **Extraction** | <1s | yt-dlp subprocess, usually 200-500ms cached |
 | **N-Transform Cache** | ~10ms first, <1ms cached | Player.js fetch ~5-10s first |
-| **Proxy Rotation** | ~50ms overhead | Per-request proxy selection |
+| **Proxy Rotation** | ~50ms overhead | Per-request proxy selection + quarantine check |
 | **CDN Download** | 2-3 Mbps | With n-param (vs 100 KB/s without) |
 | **GPU Transcode** | Hardware-dependent | Real-time or faster |
+| **Homepage Load (LCP)** | ~2-3s expected | Was 7.5s before font/prerender optimizations |
+| **Auth Modal** | <100ms | No server roundtrip after static load |
 
-## Deployment Architecture
+---
 
 ```
 ┌─────────────────────┐
@@ -562,14 +651,16 @@ Output: Video files → CDN/S3 → Browser download
 | Error | Handling | Recovery |
 |-------|----------|----------|
 | **WebM video stream** | Return 422 UNPROCESSABLE_ENTITY | User selects H.264/AV1 MP4 stream |
+| **Proxy marked bad (quarantine)** | Block & persist to file | Try next proxy in pool |
 | **InnerTube fails** | Log & fallback | Try HTML scraping |
 | **Bot detection (403/429)** | Mark proxy failed | Rotate proxy, retry |
 | **Timeout (30s+ connect)** | Log & retry | Use different proxy |
 | **Extraction fails** | ExtractionError | Return error to frontend |
 | **GPU job fails** | Log error | Return error response |
+| **Rate limit exceeded** | Return 429 with user tier info | User upgrades or waits |
 | **QuickTime playback (wrong duration)** | Now fixed in moov_merger | Both video & audio mdhd zeroed |
 
-## Frontend Architecture (Updated 2026-03-01)
+## Frontend Architecture (Updated 2026-03-06)
 
 ### Auth Modal Flow
 ```
@@ -604,8 +695,8 @@ hooks.server.ts runs (check better-auth cookie)
 3. **Cookie Check:** Skips DB query for 95%+ unauthenticated visitors
 4. **Lazy Loading:** Images load on demand, `font-display: swap`
 
-**Expected LCP Improvement:** 7.5s → ~2-3s (pending full metrics)
+**Expected LCP Improvement:** 7.5s → ~2-3s (pending full metrics, actual depends on network conditions)
 
 ---
 
-**Version:** 2.2 (Updated with Frontend Auth Modal, Performance Optimizations, i18n Planning)
+**Version:** 2.3 (Updated with runtime config, proxy quarantine, API tracing, performance metrics)

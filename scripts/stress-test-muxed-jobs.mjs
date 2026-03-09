@@ -42,7 +42,7 @@ const payload = JSON.parse(await fs.readFile(PAYLOAD_FILE, 'utf8'));
 const creates = await pool(TOTAL, CREATE_CONC, async () => {
   const t0 = Date.now();
   try {
-    const response = await fetch(`${API}/api/stream/muxed/jobs`, {
+    const response = await fetch(`${API}/api/jobs`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
@@ -65,7 +65,7 @@ const creates = await pool(TOTAL, CREATE_CONC, async () => {
   }
 });
 
-const accepted = creates.filter((x) => x.code === 202 && x.jobId);
+const accepted = creates.filter((x) => (x.code === 200 || x.code === 202) && x.jobId);
 async function pollAcceptedJobs() {
   if (!accepted.length) return { polls: [], httpStatusCounts: {} };
 
@@ -80,7 +80,7 @@ async function pollAcceptedJobs() {
 
   async function pollOne(state) {
     try {
-      const response = await fetch(`${API}/api/stream/muxed/jobs/${encodeURIComponent(state.jobId)}`);
+      const response = await fetch(`${API}/api/jobs/${encodeURIComponent(state.jobId)}`);
       const statusCode = String(response.status);
       httpStatusCounts[statusCode] = (httpStatusCounts[statusCode] || 0) + 1;
       if (response.status === 200) {

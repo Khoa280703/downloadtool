@@ -24,15 +24,23 @@ export type BatchSubscription = {
 type CreateMuxJobApiResponse = {
 	job_id: string;
 	status: string;
-	status_url: string;
-	file_url: string;
+	poll_url?: string;
+	status_url?: string;
+	file_ticket_url?: string;
+	file_url?: string;
 };
 
 type MuxJobStatusApiResponse = {
 	job_id: string;
-	status: 'queued' | 'processing' | 'ready' | 'failed';
+	status: 'queued' | 'leased' | 'processing' | 'ready' | 'failed' | 'expired';
 	error?: string | null;
+	file_ticket_url?: string | null;
 	file_url?: string | null;
+};
+
+type FileTicketApiResponse = {
+	job_id: string;
+	download_url: string;
 };
 
 function stripErrorPrefix(message: string): string {
@@ -148,6 +156,15 @@ function toAbsoluteApiUrl(url: string): string {
 	if (url.startsWith('http://') || url.startsWith('https://')) return url;
 	if (url.startsWith('/')) return `${normalizeApiBase(RAW_API_BASE)}${url}`;
 	return `${normalizeApiBase(RAW_API_BASE)}/${url}`;
+}
+
+function toAbsoluteDownloadUrl(url: string): string {
+	if (url.startsWith('http://') || url.startsWith('https://')) return url;
+	if (url.startsWith('/api/proxy/')) {
+		if (typeof window !== 'undefined') return `${window.location.origin}${url}`;
+		return url;
+	}
+	return toAbsoluteApiUrl(url);
 }
 
 async function parseApiError(response: Response, fallbackMessage: string): Promise<Error & { status?: number }> {
@@ -362,34 +379,6 @@ export function buildStreamUrl(
 	return `${buildApiUrl('/api/stream')}?${params.toString()}`;
 }
 
-/**
- * Build muxed stream download URL (video + audio → fMP4)
- * @param videoUrl - Video-only stream URL
- * @param audioUrl - Audio-only stream URL
- * @param title - Video title for filename
- * @returns Full muxed download URL
- */
-export function buildMuxedStreamUrl(
-	videoUrl: string,
-	audioUrl: string,
-	title: string,
-	options?: {
-		sourceUrl?: string;
-		videoFormatId?: string;
-		audioFormatId?: string;
-	}
-): string {
-	const params = new URLSearchParams({
-		video_url: videoUrl,
-		audio_url: audioUrl,
-		title
-	});
-	if (options?.sourceUrl) params.set('source_url', options.sourceUrl);
-	if (options?.videoFormatId) params.set('video_format_id', options.videoFormatId);
-	if (options?.audioFormatId) params.set('audio_format_id', options.audioFormatId);
-	return `${buildApiUrl('/api/stream/muxed')}?${params.toString()}`;
-}
-
 export async function createMuxedDownloadJob(
 	videoUrl: string,
 	audioUrl: string,
@@ -401,7 +390,7 @@ export async function createMuxedDownloadJob(
 	},
 	signal?: AbortSignal
 ): Promise<{ jobId: string; statusUrl: string; fileUrl: string }> {
-	const response = await fetch(buildApiUrl('/api/stream/muxed/jobs'), {
+	const response = await fetch('/api/proxy/jobs', {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json'
@@ -424,8 +413,10 @@ export async function createMuxedDownloadJob(
 	const data = (await response.json()) as CreateMuxJobApiResponse;
 	return {
 		jobId: data.job_id,
-		statusUrl: toAbsoluteApiUrl(data.status_url),
-		fileUrl: toAbsoluteApiUrl(data.file_url)
+		statusUrl: toAbsoluteApiUrl(data.poll_url ?? data.status_url ?? `/api/jobs/${data.job_id}`),
+		fileUrl: toAbsoluteApiUrl(
+			data.file_ticket_url ?? data.file_url ?? `/api/jobs/${data.job_id}/file-ticket`
+		)
 	};
 }
 
@@ -440,7 +431,8 @@ export async function waitForMuxedDownloadJobReady(
 	const startedAt = Date.now();
 	const timeoutMs = options?.timeoutMs ?? MUX_JOB_MAX_WAIT_MS;
 	const pollIntervalMs = options?.pollIntervalMs ?? MUX_JOB_POLL_INTERVAL_MS;
-	const statusUrl = buildApiUrl(`/api/stream/muxed/jobs/${encodeURIComponent(jobId)}`);
+	const statusUrl = `/api/proxy/jobs/${encodeURIComponent(jobId)}`;
+	const fileTicketUrl = `/api/proxy/jobs/${encodeURIComponent(jobId)}/file-ticket`;
 
 	while (true) {
 		if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
@@ -454,15 +446,43 @@ export async function waitForMuxedDownloadJobReady(
 		}
 
 		const status = (await response.json()) as MuxJobStatusApiResponse;
-		if (status.status === 'ready' && status.file_url) {
-			return toAbsoluteApiUrl(status.file_url);
+		if (status.status === 'ready') {
+			const ticketResponse = await fetch(fileTicketUrl, { signal });
+			if (!ticketResponse.ok) {
+				throw await parseApiError(
+					ticketResponse,
+					`Failed to get mux file ticket (${ticketResponse.status})`
+				);
+			}
+			const ticket = (await ticketResponse.json()) as FileTicketApiResponse;
+			return toAbsoluteDownloadUrl(ticket.download_url);
 		}
 		if (status.status === 'failed') {
 			throw new Error(status.error || 'Mux job failed');
 		}
+		if (status.status === 'expired') {
+			throw new Error(status.error || 'Mux job expired before download completed');
+		}
 
 		await sleep(pollIntervalMs, signal);
 	}
+}
+
+export async function releaseMuxedDownloadJob(
+	jobId: string,
+	signal?: AbortSignal
+): Promise<boolean> {
+	const response = await fetch(`/api/proxy/jobs/${encodeURIComponent(jobId)}/release`, {
+		method: 'POST',
+		signal
+	});
+
+	if (!response.ok) {
+		throw await parseApiError(response, `Failed to release mux job (${response.status})`);
+	}
+
+	const payload = (await response.json()) as { released?: boolean };
+	return payload.released === true;
 }
 
 /**

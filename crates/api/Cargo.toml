@@ -57,7 +57,9 @@ hex = { workspace = true }
 # Internal crates
 extractor = { path = "../extractor" }
 proxy = { path = "../proxy" }
-muxer = { path = "../muxer" }
+job-system = { path = "../job-system" }
+queue = { path = "../queue" }
+object-store = { path = "../object-store" }
 
 [[bin]]
 name = "api-server"

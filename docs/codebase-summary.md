@@ -1,6 +1,6 @@
 # Codebase Summary
 
-**Generated:** 2026-03-01
+**Generated:** 2026-03-06
 **Total Files:** 110 | **Total Tokens:** ~160,000
 
 ## Project Overview
@@ -73,6 +73,12 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `user_tier.rs` - User tier enumeration (Free, Pro, Premium) with rate limit quotas
 - **Config:** Environment variables (DATABASE_URL, JWT_SECRET, WHOP_API_KEY, etc.)
 
+### 2.1 **Durable Job Control Plane** (`crates/api/src/routes/jobs.rs`, `crates/api/src/services/*`)
+- `job_control_plane.rs` - Owns durable `/api/jobs/*` orchestration over PostgreSQL + Redis Streams
+- `job_identity.rs` - Computes request hash / dedupe key for idempotent create
+- `storage_ticket_service.rs` - Builds LocalFs proxy ticket or S3-compatible presigned ticket
+- `/api/jobs/*` - Create job, poll status, fetch file ticket, stream/redirect ready file, send release hint
+
 ### 3. **Extractor Engine** (`crates/extractor`)
 - **Purpose:** Dynamic extraction of video metadata from various platforms
 - **Architecture:**
@@ -117,6 +123,18 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `stream_fetcher.rs` - Fetch & buffer streams (264 LOC)
   - `mux_router.rs` - Route streams to appropriate muxer (255 LOC)
   - `codec.rs` - Codec identification/classification (189 LOC)
+
+### 6.1 **Job System & Worker Runtime** (`crates/job-system`, `crates/queue`, `crates/object-store`, `crates/worker`)
+- `crates/job-system/`
+  - Owns durable job/artifact/event repository logic on PostgreSQL
+  - Handles request reuse, dedupe lock, worker lease claim/reclaim, artifact ready/fail transitions
+- `crates/queue/`
+  - Redis Streams publisher/consumer abstraction for `mux_jobs`
+- `crates/object-store/`
+  - Shared storage trait with `LocalFs` and S3-compatible multipart implementations
+- `crates/worker/`
+  - Standalone mux worker process
+  - Claims jobs, heartbeats leases, uploads artifacts, and deletes expired storage objects
 
 ### 7. **GPU Worker** (`crates/gpu-worker`)
 - **Purpose:** Standalone process for GPU transcoding
@@ -187,7 +205,7 @@ The platform now reaches users via 4 independent channels:
 - `apps/injector/src/shared/`:
   - `inject-button.ts`: Reused by bookmarklet + userscript
   - `quality-picker.ts`: Reused by bookmarklet + userscript + extension
-  - `stream-utils.ts`: Filters WebM-only streams, builds muxed URLs for all 4 channels
+  - `stream-utils.ts`: Filters WebM-only streams and builds mux-job launcher URLs for external channels
 - Extension and injector share identical logic, different delivery mechanisms
 
 ### Backend Integration
@@ -195,7 +213,42 @@ The platform now reaches users via 4 independent channels:
 - `GET /openapi.json`: Serves OpenAPI spec (utoipa auto-generated)
 - `GET /bm.js`: Serves bookmarklet (compile-time embed via `include_str!`)
 - `GET /userscript`: Serves userscript (compile-time embed via `include_str!`)
-- No new API endpoints required; uses existing `POST /api/extract` + `GET /api/stream/muxed`
+- External clients use `POST /api/extract` plus app-domain launcher `/download/mux-job`, which then drives durable `/api/jobs/*`
+
+## Recent Changes (2026-03-06 — Runtime Config & Proxy Quarantine)
+
+### 1. **Runtime Limits Configuration Activated** ✅
+**File:** `config/runtime-limit-profiles.json`
+
+**Changes:**
+- Local profile: Generous limits for development (4 extract retries, 8 batch reconnects, max 1 playlist worker)
+- Production profile: Conservative limits for stability
+- All values now explicitly set (previously had null defaults)
+- Frontend: Extract retry 500-8000ms, batch reconnect 1000-12000ms
+- Frontend mux jobs: poll interval + max wait are configurable without redeploy
+- Backend runtime profile now only exposes the active guards still read by code
+
+**Impact:** Zero-downtime configuration changes without code deployment
+
+### 2. **Proxy Quarantine System Documented** ✅
+**File:** `crates/proxy/src/proxy_pool.rs`
+
+**Feature:**
+- Bad proxies automatically blocked after bot-check errors
+- Persistent quarantine file: `/tmp/downloadtool-quarantined-proxies.txt`
+- Faster failure detection reduces latency
+
+**Impact:** More reliable anti-bot evasion
+
+### 3. **API Access Tracing Added** ✅
+**Location:** `crates/api/src/main.rs` (middleware setup)
+
+**Capabilities:**
+- All API requests logged with user_id, tier, endpoint, latency
+- Structured logging for observability dashboards
+- Error tracking with context
+
+---
 
 ## Recent Changes (2026-03-01 — Frontend Auth & Performance)
 
@@ -236,8 +289,9 @@ The platform now reaches users via 4 independent channels:
 **File:** `frontend/src/lib/playlist-download-worker.ts`
 
 **Fix:**
-- Always use `buildStreamUrl()` for URL construction
-- Was using raw CDN URL in fallback, breaking downloads
+- Single-stream downloads use `buildStreamUrl()`
+- Mux-required downloads create durable jobs and wait for ready artifact URLs
+- Raw CDN fallback has been removed from playlist worker
 
 **Impact:** Batch downloads reliable across all formats
 
@@ -432,5 +486,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-03-01
-**Status:** Complete & Operational (Frontend Auth Modal ✅ + Performance Optimizations ✅)
+**Last Updated:** 2026-03-06
+**Status:** Complete & Operational (Runtime Config ✅ | Frontend Auth Modal ✅ | Performance Optimizations ✅)
