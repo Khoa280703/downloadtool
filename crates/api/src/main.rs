@@ -214,6 +214,7 @@ async fn main() -> anyhow::Result<()> {
         .max_connections(5)
         .connect(&config.database_url)
         .await?;
+    services::auth_schema_bootstrap::ensure_better_auth_schema(&db_pool).await?;
     sqlx::migrate!("./migrations").run(&db_pool).await?;
     info!("Database pool connected");
     let durable_job_repository = Arc::new(job_system::JobRepository::new(db_pool.clone()));

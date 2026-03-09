@@ -111,7 +111,6 @@ services:
 volumes:
   api-data:
   postgres-data:
-    name: downloadtool_postgres-data
 
 networks:
   default:
