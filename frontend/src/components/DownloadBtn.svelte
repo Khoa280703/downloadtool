@@ -66,6 +66,14 @@
 		if (!stream) return;
 
 		trackDownloadStarted('youtube', stream.quality || 'unknown', stream.format || 'mp4');
+		console.info('[downloadtool] download button clicked', {
+			title,
+			streamUrl: stream.url,
+			audioStreamUrl: audioStream?.url ?? null,
+			streamFormatId: stream.formatId ?? null,
+			audioFormatId: audioStream?.formatId ?? null,
+			useMux: Boolean(audioStream && !stream.hasAudio)
+		});
 
 		isLoading = true;
 		setDownloading(true);
@@ -91,19 +99,36 @@
 					controller.signal
 				);
 				muxJobId = created.jobId;
+				console.info('[downloadtool] mux job created', {
+					jobId: created.jobId,
+					statusUrl: created.statusUrl,
+					fileUrl: created.fileUrl
+				});
 				downloadUrl = await waitForMuxedDownloadJobReady(
 					created.jobId,
 					undefined,
 					controller.signal
 				);
+				console.info('[downloadtool] mux job ready', {
+					jobId: created.jobId,
+					downloadUrl
+				});
 			} else {
 				downloadUrl = buildStreamUrl(stream.url, title, stream.format, {
 					sourceUrl: sourceUrl ?? undefined,
 					formatId: stream.formatId
 				});
+				console.info('[downloadtool] direct stream download prepared', {
+					downloadUrl
+				});
 			}
 
 			const secureDownloadUrl = enforceHttps(downloadUrl);
+			console.info('[downloadtool] invoking saveDownload', {
+				muxJobId,
+				downloadUrl: secureDownloadUrl,
+				filename
+			});
 
 			const progressInterval = setInterval(() => {
 				downloadProgress.update((p) => Math.min(p + 10, 90));
@@ -116,9 +141,16 @@
 				} as const;
 
 				await saveDownload(secureDownloadUrl, filename, controller.signal, saveOpts);
+				console.info('[downloadtool] saveDownload resolved', {
+					muxJobId,
+					filename
+				});
 				if (muxJobId) {
 					try {
 						await releaseMuxedDownloadJob(muxJobId, controller.signal);
+						console.info('[downloadtool] mux job released', {
+							jobId: muxJobId
+						});
 					} catch (releaseError) {
 						console.warn('Failed to release mux job hint:', releaseError);
 					}

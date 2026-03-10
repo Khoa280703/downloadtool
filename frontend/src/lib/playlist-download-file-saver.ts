@@ -62,11 +62,20 @@ export async function saveDownload(
 
 	if (saveDirectoryHandle) {
 		try {
+			console.info('[downloadtool] saveDownload using File System Access API', {
+				filename,
+				url
+			});
 			await saveWithDirectory(url, filename, saveDirectoryHandle, signal);
 			return;
 		} catch (error) {
 			if (isAbortError(error)) throw error;
 			if (!allowAnchorFallback) throw error;
+			console.warn('[downloadtool] saveDownload falling back to anchor after FSAA failure', {
+				filename,
+				url,
+				error
+			});
 			downloadViaAnchor(url, filename);
 			return;
 		}
@@ -80,6 +89,10 @@ export async function saveDownload(
 		throw new Error('Anchor fallback is disabled');
 	}
 
+	console.info('[downloadtool] saveDownload using anchor fallback', {
+		filename,
+		url
+	});
 	downloadViaAnchor(url, filename);
 }
 
@@ -214,6 +227,10 @@ async function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 function downloadViaAnchor(url: string, filename: string): void {
+	console.info('[downloadtool] anchor download click', {
+		filename,
+		url
+	});
 	const anchor = document.createElement('a');
 	anchor.href = url;
 	anchor.download = filename;

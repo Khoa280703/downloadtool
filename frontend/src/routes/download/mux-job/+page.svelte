@@ -50,6 +50,7 @@
 		try {
 			stage = 'Đang tạo job...';
 			detail = 'Frontend sẽ chuyển yêu cầu sang worker pipeline.';
+			console.info('[downloadtool] launcher bootstrap start', payload);
 			const created = await createMuxedDownloadJob(
 				payload.videoUrl,
 				payload.audioUrl,
@@ -60,15 +61,22 @@
 					audioFormatId: payload.audioFormatId
 				}
 			);
+			console.info('[downloadtool] launcher mux job created', created);
 
 			stage = 'Đang đợi worker hoàn tất...';
 			detail = `Job ${created.jobId} đang mux và upload artifact.`;
 			const downloadUrl = await waitForMuxedDownloadJobReady(created.jobId);
+			console.info('[downloadtool] launcher mux job ready', {
+				jobId: created.jobId,
+				downloadUrl
+			});
 
 			stage = 'Đang bắt đầu tải...';
 			detail = 'Nếu trình duyệt không tự tải, hãy kiểm tra popup chặn tải xuống.';
+			console.info('[downloadtool] launcher redirecting to download url', downloadUrl);
 			window.location.replace(downloadUrl);
 		} catch (error) {
+			console.error('[downloadtool] launcher failed', error);
 			const status = typeof error === 'object' && error !== null && 'status' in error
 				? Number((error as { status?: number }).status)
 				: undefined;
