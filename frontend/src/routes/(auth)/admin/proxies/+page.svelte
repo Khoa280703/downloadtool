@@ -1,127 +1,100 @@
 <script lang="ts">
 	import type { ActionData, PageData } from './$types';
-	import AdminBarChart from '$components/admin/AdminBarChart.svelte';
 	import AdminProxyTable from '$components/admin/AdminProxyTable.svelte';
-	import AdminSectionHeader from '$components/admin/AdminSectionHeader.svelte';
-	import AdminStatCard from '$components/admin/AdminStatCard.svelte';
 
-let { data, form }: { data: PageData; form: ActionData } = $props();
-
-const fleetChart = $derived([
-	{ label: 'Active', value: data.overview.activeProxies, tone: 'green' as const },
-	{ label: 'Quarantined', value: data.overview.quarantinedProxies, tone: 'red' as const },
-	{ label: 'Disabled', value: data.overview.disabledProxies, tone: 'amber' as const }
-]);
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
 
 <svelte:head>
 	<title>Admin Proxies</title>
 </svelte:head>
 
-<header class="admin-panel border border-slate-200 bg-white px-5 py-5 md:px-6">
-	<AdminSectionHeader
-		eyebrow="Proxies"
-		title="Fleet management"
-		description="Quản lý inventory proxy, quarantine state và thêm proxy mới vào hệ thống."
-	/>
-</header>
+<div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+	<div>
+		<h2 class="text-3xl font-black tracking-tight text-slate-900">Proxy Management</h2>
+		<p class="mt-1 text-sm text-slate-500">Quản lý inventory proxy, trạng thái health và ghi chú vận hành.</p>
+	</div>
+	<a
+		href="#add-proxy"
+		class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-6 py-3 font-bold text-white shadow-lg shadow-[#137fec]/25 transition-all hover:opacity-90"
+	>
+		<span class="material-symbols-outlined">add</span>
+		<span>Add Proxy</span>
+	</a>
+</div>
 
 {#if form?.error}
-	<p class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-		{form.error}
-	</p>
+	<p class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{form.error}</p>
 {/if}
 
 {#if form?.success}
-	<p class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-		{form.success}
-	</p>
+	<p class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{form.success}</p>
 {/if}
 
-<div class="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
-	<section class="admin-panel border border-slate-200 bg-white">
-		<div class="border-b border-slate-200 px-5 py-4 md:px-6">
-			<AdminSectionHeader
-				eyebrow="Proxy fleet"
-				title="Inventory"
-				description="Theo dõi trạng thái, quarantine reason, event gần nhất và update trực tiếp."
+<section class="admin-panel mb-6 overflow-hidden border border-slate-200 bg-white">
+	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
+		<h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Fleet Summary</h3>
+	</div>
+	<div class="overflow-x-auto">
+		<table class="w-full border-collapse text-left">
+			<thead>
+				<tr class="border-b border-slate-200 bg-slate-50/60">
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">State</th>
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Count</th>
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Detail</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-slate-100 text-sm">
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Active</td><td class="px-6 py-4">{data.overview.activeProxies}</td><td class="px-6 py-4 text-slate-500">Có thể phục vụ extract/download.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Quarantined</td><td class="px-6 py-4">{data.overview.quarantinedProxies}</td><td class="px-6 py-4 text-slate-500">Tạm loại do gặp issue upstream.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Disabled</td><td class="px-6 py-4">{data.overview.disabledProxies}</td><td class="px-6 py-4 text-slate-500">Tắt thủ công, không đưa vào vòng xoay.</td></tr>
+			</tbody>
+		</table>
+	</div>
+</section>
+
+<section class="admin-panel mb-6 overflow-hidden border border-slate-200 bg-white">
+	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
+		<h3 class="text-sm font-bold text-slate-900">Proxy Inventory</h3>
+		<p class="mt-1 text-sm text-slate-500">Cập nhật status và reason trực tiếp trên từng dòng.</p>
+	</div>
+	<AdminProxyTable proxies={data.proxies} />
+</section>
+
+<section id="add-proxy" class="admin-panel overflow-hidden border border-slate-200 bg-white">
+	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
+		<h3 class="text-sm font-bold text-slate-900">Add Proxy</h3>
+		<p class="mt-1 text-sm text-slate-500">Nhập URL đầy đủ hoặc chuỗi raw host:port:user:pass.</p>
+	</div>
+	<form method="POST" action="?/createProxy" class="grid gap-4 p-6">
+		<input
+			type="text"
+			name="proxyUrl"
+			placeholder="socks5h://user:pass@host:port"
+			class="admin-field rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:ring-0"
+		/>
+		<div class="grid gap-4 md:grid-cols-2">
+			<input
+				type="text"
+				name="displayName"
+				placeholder="Display name"
+				class="admin-field rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:ring-0"
+			/>
+			<input
+				type="text"
+				name="notes"
+				placeholder="Notes"
+				class="admin-field rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:ring-0"
 			/>
 		</div>
-		<AdminProxyTable proxies={data.proxies} />
-	</section>
-
-	<div class="space-y-6">
-		<section class="admin-panel border border-slate-200 bg-white p-5">
-			<AdminSectionHeader
-				eyebrow="Fleet health"
-				title="Proxy distribution"
-				description="Tỷ trọng trạng thái hiện tại của inventory."
-			/>
-			<div class="mt-5">
-				<AdminBarChart title="Proxy state mix" description="Snapshot toàn fleet." items={fleetChart} />
-			</div>
-		</section>
-
-		<section class="admin-panel border border-slate-200 bg-white p-5">
-			<AdminSectionHeader
-				eyebrow="Proxy controls"
-				title="Add proxy"
-				description="Nhận full URL hoặc định dạng raw host:port:user:pass."
-			/>
-			<form method="POST" action="?/createProxy" class="mt-5 grid gap-3">
-				<input
-					type="text"
-					name="proxyUrl"
-					placeholder="socks5h://user:pass@host:port"
-					class="admin-field rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:ring-0"
-				/>
-				<input
-					type="text"
-					name="displayName"
-					placeholder="Display name"
-					class="admin-field rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:ring-0"
-				/>
-				<textarea
-					name="notes"
-					rows="4"
-					placeholder="Notes"
-					class="admin-field rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:ring-0"
-				></textarea>
-				<button
-					type="submit"
-					class="rounded-md bg-slate-950 px-4 py-3 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-slate-800"
-				>
-					Save proxy
-				</button>
-			</form>
-		</section>
-
-		<section class="admin-panel border border-slate-200 bg-white p-5">
-			<AdminSectionHeader
-				eyebrow="Capacity"
-				title="Proxy capacity"
-				description="Sức chứa hiện tại của inventory proxy."
-			/>
-			<div class="mt-5 grid gap-3">
-				<AdminStatCard
-					label="Active proxies"
-					value={data.overview.activeProxies}
-					caption="Proxy có thể phục vụ request"
-					tone="emerald"
-				/>
-				<AdminStatCard
-					label="Disabled proxies"
-					value={data.overview.disabledProxies}
-					caption="Bị tắt thủ công"
-					tone="amber"
-				/>
-				<AdminStatCard
-					label="Quarantined proxies"
-					value={data.overview.quarantinedProxies}
-					caption="Cần kiểm tra trước khi tái sử dụng"
-					tone="rose"
-				/>
-			</div>
-		</section>
-	</div>
-</div>
+		<div>
+			<button
+				type="submit"
+				class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-6 py-3 font-bold text-white shadow-lg shadow-[#137fec]/25 transition-all hover:opacity-90"
+			>
+				<span class="material-symbols-outlined">save</span>
+				<span>Save Proxy</span>
+			</button>
+		</div>
+	</form>
+</section>

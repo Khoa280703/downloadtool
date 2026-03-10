@@ -1,96 +1,61 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import AdminBarChart from '$components/admin/AdminBarChart.svelte';
-	import AdminMiniMetric from '$components/admin/AdminMiniMetric.svelte';
-	import AdminSectionHeader from '$components/admin/AdminSectionHeader.svelte';
-	import AdminStatCard from '$components/admin/AdminStatCard.svelte';
-	import { buildAdminDashboardViewModel } from '$lib/admin/dashboard-view-model';
 
 	let { data }: { data: PageData } = $props();
-
-	const model = $derived(buildAdminDashboardViewModel(data.overview));
-	const pipelineChart = $derived([
-		{ label: 'Backlog', value: model.queueBacklog, tone: 'amber' as const },
-		{ label: 'Active workers', value: model.activeJobs, tone: 'blue' as const },
-		{ label: 'Ready artifacts', value: data.overview.readyArtifacts, tone: 'green' as const },
-		{ label: 'Quarantined proxies', value: data.overview.quarantinedProxies, tone: 'red' as const }
-	]);
-	const storageChart = $derived([
-		{ label: 'Building artifacts', value: data.overview.buildingArtifacts, tone: 'blue' as const },
-		{ label: 'Ready artifacts', value: data.overview.readyArtifacts, tone: 'green' as const }
-	]);
 </script>
 
 <svelte:head>
 	<title>Admin Capacity</title>
 </svelte:head>
 
-<header class="admin-panel border border-slate-200 bg-white px-5 py-5 md:px-6">
-	<AdminSectionHeader
-		eyebrow="Capacity"
-		title="Pipeline headroom"
-		description="Đánh giá sức chứa hiện tại của worker, artifact cache và proxy fleet."
-	/>
-</header>
-
-<div class="grid gap-5 xl:grid-cols-2">
-	<AdminBarChart
-		title="Pipeline pressure"
-		description="Đo headroom hiện tại giữa queue, worker load và proxy risk."
-		items={pipelineChart}
-	/>
-	<AdminBarChart
-		title="Artifact storage"
-		description="So sánh artifact đang build với artifact đã sẵn sàng."
-		items={storageChart}
-	/>
+<div class="mb-8">
+	<h2 class="text-3xl font-black tracking-tight text-slate-900">Capacity</h2>
+	<p class="mt-1 text-sm text-slate-500">Đọc nhanh headroom hiện tại của worker, storage cache và proxy fleet.</p>
 </div>
 
-<div class="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_420px]">
-	<section class="admin-panel border border-slate-200 bg-white p-5 md:p-6">
-		<AdminSectionHeader
-			eyebrow="Capacity"
-			title="Key capacity signals"
-			description="Các chỉ số chính phản ánh tình trạng headroom của pipeline."
-		/>
-		<div class="mt-5 grid gap-4 md:grid-cols-2">
-			<AdminStatCard
-				label="Building artifacts"
-				value={data.overview.buildingArtifacts}
-				caption="Đang mux và upload lên storage"
-				tone="sky"
-			/>
-			<AdminStatCard
-				label="Ready artifacts"
-				value={data.overview.readyArtifacts}
-				caption="File đã có sẵn để cấp ticket"
-				tone="emerald"
-			/>
-			<AdminStatCard
-				label="Queue backlog"
-				value={model.queueBacklog}
-				caption="Tổng queued và leased"
-				tone={model.queueBacklog > 0 ? 'amber' : 'neutral'}
-			/>
-			<AdminStatCard
-				label="Worker load"
-				value={model.activeJobs}
-				caption="Tổng leased và processing"
-				tone={model.activeJobs > 0 ? 'sky' : 'neutral'}
-			/>
-		</div>
-	</section>
+<section class="admin-panel mb-6 overflow-hidden border border-slate-200 bg-white">
+	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
+		<h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Capacity Summary</h3>
+	</div>
+	<div class="overflow-x-auto">
+		<table class="w-full border-collapse text-left">
+			<thead>
+				<tr class="border-b border-slate-200 bg-slate-50/60">
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Signal</th>
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Value</th>
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Interpretation</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-slate-100 text-sm">
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Queue Backlog</td><td class="px-6 py-4">{data.overview.queuedJobs + data.overview.leasedJobs}</td><td class="px-6 py-4 text-slate-500">Áp lực đang chờ worker xử lý.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Processing Load</td><td class="px-6 py-4">{data.overview.processingJobs + data.overview.leasedJobs}</td><td class="px-6 py-4 text-slate-500">Mức tải đang chạy trong pipeline.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Building Artifacts</td><td class="px-6 py-4">{data.overview.buildingArtifacts}</td><td class="px-6 py-4 text-slate-500">Số artifact đang mux/upload.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Ready Artifacts</td><td class="px-6 py-4">{data.overview.readyArtifacts}</td><td class="px-6 py-4 text-slate-500">Cache hiện có để reuse và cấp ticket.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Active Proxies</td><td class="px-6 py-4">{data.overview.activeProxies}</td><td class="px-6 py-4 text-slate-500">Độ phủ thực tế của fleet.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Quarantined Proxies</td><td class="px-6 py-4">{data.overview.quarantinedProxies}</td><td class="px-6 py-4 text-slate-500">Rủi ro thiếu proxy nếu tăng tiếp.</td></tr>
+			</tbody>
+		</table>
+	</div>
+</section>
 
-	<section class="admin-panel border border-slate-200 bg-white p-5">
-		<AdminSectionHeader
-			eyebrow="System posture"
-			title="Operational snapshot"
-			description="Tóm tắt các vùng áp lực nhất theo thời điểm."
-		/>
-		<div class="mt-5 grid gap-3">
-			{#each model.snapshotStats as stat}
-				<AdminMiniMetric label={stat.label} value={stat.value} caption={stat.caption} />
-			{/each}
-		</div>
-	</section>
-</div>
+<section class="admin-panel overflow-hidden border border-slate-200 bg-white">
+	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
+		<h3 class="text-sm font-bold text-slate-900">Operational Notes</h3>
+		<p class="mt-1 text-sm text-slate-500">Guidance đơn giản cho operator khi capacity thay đổi.</p>
+	</div>
+	<div class="overflow-x-auto">
+		<table class="w-full border-collapse text-left">
+			<thead>
+				<tr class="border-b border-slate-200 bg-slate-50/60">
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Condition</th>
+					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Action</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-slate-100 text-sm">
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Failed + expired tăng liên tục</td><td class="px-6 py-4 text-slate-500">Kiểm tra proxy health, upstream extract và lease timeout.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Building artifacts cao nhưng ready thấp</td><td class="px-6 py-4 text-slate-500">Xem worker throughput, upload latency và storage backend.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Quarantined proxies tăng nhanh</td><td class="px-6 py-4 text-slate-500">Bổ sung proxy mới hoặc tạm giảm load extract.</td></tr>
+			</tbody>
+		</table>
+	</div>
+</section>
