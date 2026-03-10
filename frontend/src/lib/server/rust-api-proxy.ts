@@ -6,6 +6,7 @@ import { getJwtForRequest } from '$lib/server/auth-utils';
 
 const DOWNLOAD_SESSION_COOKIE = 'downloadtool_session';
 const DOWNLOAD_SESSION_HEADER = 'x-download-session-id';
+const NO_STORE_CACHE_CONTROL = 'no-store, no-cache, must-revalidate';
 
 function normalizeBaseUrl(url: string | undefined): string {
 	if (!url) return 'http://127.0.0.1:3068';
@@ -65,6 +66,11 @@ export function copyRustResponseHeaders(upstream: Response): Headers {
 	return headers;
 }
 
+export function applyNoStoreCache(headers: Headers): Headers {
+	headers.set('cache-control', NO_STORE_CACHE_CONTROL);
+	return headers;
+}
+
 export async function forwardRustJson(
 	request: Request,
 	fetchFn: typeof fetch,
@@ -84,6 +90,6 @@ export async function forwardRustJson(
 	});
 	return new Response(upstream.body, {
 		status: upstream.status,
-		headers: copyRustResponseHeaders(upstream)
+		headers: applyNoStoreCache(copyRustResponseHeaders(upstream))
 	});
 }

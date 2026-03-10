@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 import {
+	applyNoStoreCache,
 	buildRustApiHeaders,
 	buildRustApiUrl,
 	ensureDownloadSessionId
@@ -20,13 +21,22 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies }) =
 	if (!upstream.ok) {
 		return new Response(upstream.body, {
 			status: upstream.status,
-			headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' }
+			headers: applyNoStoreCache(
+				new Headers({
+					'content-type': upstream.headers.get('content-type') ?? 'application/json'
+				})
+			)
 		});
 	}
 
 	// Always force browser downloads through same-origin proxy.
 	// Direct presigned R2 URLs cause some browsers to navigate instead of downloading.
-	return json({
-		download_url: `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file`
-	});
+	return json(
+		{
+			download_url: `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file`
+		},
+		{
+			headers: applyNoStoreCache(new Headers())
+		}
+	);
 };

@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 
 import {
+	applyNoStoreCache,
 	buildRustApiHeaders,
 	buildRustApiUrl,
 	copyRustResponseHeaders,
@@ -21,7 +22,7 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies }) =
 	if (!ticketUpstream.ok) {
 		return new Response(ticketUpstream.body, {
 			status: ticketUpstream.status,
-			headers: copyRustResponseHeaders(ticketUpstream)
+			headers: applyNoStoreCache(copyRustResponseHeaders(ticketUpstream))
 		});
 	}
 
@@ -44,9 +45,7 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies }) =
 			`attachment; filename="${encodeURIComponent(params.jobId)}.mp4"`
 		);
 	}
-	if (!headers.has('cache-control')) {
-		headers.set('cache-control', 'no-store, no-cache, must-revalidate');
-	}
+	applyNoStoreCache(headers);
 
 	return new Response(upstream.body, {
 		status: upstream.status,
