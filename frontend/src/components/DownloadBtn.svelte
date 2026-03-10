@@ -29,6 +29,8 @@
 		disabled = false
 	}: Props = $props();
 	let isLoading = $state(false);
+	let progressLabel = $state('');
+	let progressIndeterminate = $state(false);
 
 	function enforceHttps(url: string): string {
 		if (
@@ -61,6 +63,23 @@
 		return m.download_btn_download_now_plain();
 	}
 
+	function setProgressState(
+		label: string,
+		options: { value?: number; indeterminate?: boolean } = {}
+	): void {
+		progressLabel = label;
+		progressIndeterminate = options.indeterminate ?? false;
+		if (typeof options.value === 'number') {
+			downloadProgress.set(options.value);
+		}
+	}
+
+	function resetProgressState(): void {
+		progressLabel = '';
+		progressIndeterminate = false;
+		downloadProgress.set(0);
+	}
+
 	/** Trigger browser download */
 	async function handleDownload(): Promise<void> {
 		if (!stream) return;
@@ -75,12 +94,17 @@
 			useMux: Boolean(audioStream && !stream.hasAudio)
 		});
 
+		const muxAudioStream = audioStream && !stream.hasAudio ? audioStream : null;
+		const useMux = muxAudioStream !== null;
 		isLoading = true;
 		setDownloading(true);
-		downloadProgress.set(0);
+		resetProgressState();
+		setProgressState(
+			useMux ? 'Queueing mux job...' : 'Preparing browser download...',
+			{ value: useMux ? 8 : 20, indeterminate: true }
+		);
 
 		try {
-			const useMux = audioStream && !stream.hasAudio;
 			const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
 			const controller = new AbortController();
 			let downloadUrl: string;
@@ -89,12 +113,12 @@
 			if (useMux) {
 				const created = await createMuxedDownloadJob(
 					stream.url,
-					audioStream.url,
+					muxAudioStream.url,
 					title,
 					{
 						sourceUrl: sourceUrl ?? undefined,
 						videoFormatId: stream.formatId,
-						audioFormatId: audioStream.formatId
+						audioFormatId: muxAudioStream.formatId
 					},
 					controller.signal
 				);
@@ -103,6 +127,10 @@
 					jobId: created.jobId,
 					statusUrl: created.statusUrl,
 					fileUrl: created.fileUrl
+				});
+				setProgressState('Muxing video on server...', {
+					value: 18,
+					indeterminate: true
 				});
 				downloadUrl = await waitForMuxedDownloadJobReady(
 					created.jobId,
@@ -113,6 +141,10 @@
 					jobId: created.jobId,
 					downloadUrl
 				});
+				setProgressState('Starting browser download...', {
+					value: 92,
+					indeterminate: true
+				});
 			} else {
 				downloadUrl = buildStreamUrl(stream.url, title, stream.format, {
 					sourceUrl: sourceUrl ?? undefined,
@@ -120,6 +152,10 @@
 				});
 				console.info('[downloadtool] direct stream download prepared', {
 					downloadUrl
+				});
+				setProgressState('Starting browser download...', {
+					value: 92,
+					indeterminate: true
 				});
 			}
 
@@ -130,45 +166,39 @@
 				filename
 			});
 
-			const progressInterval = setInterval(() => {
-				downloadProgress.update((p) => Math.min(p + 10, 90));
-			}, 200);
+			const saveOpts = {
+				requireFsaa: false,
+				allowAnchorFallback: true
+			} as const;
 
-			try {
-				const saveOpts = {
-					requireFsaa: false,
-					allowAnchorFallback: true
-				} as const;
-
-				await saveDownload(secureDownloadUrl, filename, controller.signal, saveOpts);
-				console.info('[downloadtool] saveDownload resolved', {
-					muxJobId,
-					filename
-				});
-				if (muxJobId) {
-					try {
-						await releaseMuxedDownloadJob(muxJobId, controller.signal);
-						console.info('[downloadtool] mux job released', {
-							jobId: muxJobId
-						});
-					} catch (releaseError) {
-						console.warn('Failed to release mux job hint:', releaseError);
-					}
+			await saveDownload(secureDownloadUrl, filename, controller.signal, saveOpts);
+			console.info('[downloadtool] saveDownload resolved', {
+				muxJobId,
+				filename
+			});
+			if (muxJobId) {
+				try {
+					await releaseMuxedDownloadJob(muxJobId, controller.signal);
+					console.info('[downloadtool] mux job released', {
+						jobId: muxJobId
+					});
+				} catch (releaseError) {
+					console.warn('Failed to release mux job hint:', releaseError);
 				}
-
-				downloadProgress.set(100);
-				currentDownload.update((state) => ({ ...state, error: null }));
-			} finally {
-				clearInterval(progressInterval);
 			}
+
+			setProgressState('Browser download started', { value: 100 });
+			currentDownload.update((state) => ({ ...state, error: null }));
 
 			isLoading = false;
 			setDownloading(false);
+			resetProgressState();
 		} catch (err) {
 			console.error('Download failed:', err);
 			currentDownload.update((state) => ({ ...state, error: 'Download failed. Please retry.' }));
 			isLoading = false;
 			setDownloading(false);
+			resetProgressState();
 		}
 	}
 </script>
@@ -194,10 +224,19 @@
 
 	{#if $currentDownload.isDownloading}
 		<div class="progress-row" aria-live="polite">
-			<div class="progress-track">
-				<div class="progress-fill" style:width="{$downloadProgress}%"></div>
+			<div class:indeterminate={progressIndeterminate} class="progress-track">
+				<div
+					class:indeterminate={progressIndeterminate}
+					class="progress-fill"
+					style:width={progressIndeterminate ? undefined : `${$downloadProgress}%`}
+				></div>
 			</div>
-			<span class="progress-text">{$downloadProgress}%</span>
+			<div class="progress-meta">
+				<span class="progress-text">{progressLabel || 'Preparing download...'}</span>
+				{#if !progressIndeterminate}
+					<span class="progress-percent">{$downloadProgress}%</span>
+				{/if}
+			</div>
 		</div>
 	{:else}
 		<p class="legal-note">
@@ -271,16 +310,20 @@
 
 	.progress-row {
 		display: flex;
-		align-items: center;
-		gap: 0.65rem;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.45rem;
 	}
 
 	.progress-track {
-		flex: 1;
 		height: 0.36rem;
 		border-radius: 999px;
 		background: #e2e8f0;
 		overflow: hidden;
+	}
+
+	.progress-track.indeterminate {
+		position: relative;
 	}
 
 	.progress-fill {
@@ -290,12 +333,30 @@
 		transition: width 0.3s ease;
 	}
 
+	.progress-fill.indeterminate {
+		width: 32%;
+		animation: progress-sweep 1.15s ease-in-out infinite;
+	}
+
+	.progress-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+
 	.progress-text {
 		font-size: 0.72rem;
 		font-weight: 800;
 		color: #475569;
-		min-width: 2.4rem;
-		text-align: right;
+		text-align: left;
+	}
+
+	.progress-percent {
+		flex: 0 0 auto;
+		font-size: 0.72rem;
+		font-weight: 800;
+		color: #475569;
 	}
 
 	.legal-note {
@@ -321,6 +382,15 @@
 			font-size: 0.92rem;
 			height: 3.25rem;
 			padding-inline: 0.9rem;
+		}
+	}
+
+	@keyframes progress-sweep {
+		0% {
+			transform: translateX(-120%);
+		}
+		100% {
+			transform: translateX(320%);
 		}
 	}
 </style>
