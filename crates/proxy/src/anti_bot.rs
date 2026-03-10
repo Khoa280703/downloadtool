@@ -59,13 +59,15 @@ impl AntiBotClient {
     ) -> Result<Self, AntiBotError> {
         let header_builder = HeaderBuilder::new();
         let throttle = Arc::new(DomainThrottle::new());
-        let active_proxy = forced_proxy.or_else(|| proxy_pool.next_owned());
-        let client = Self::build_client(active_proxy.as_deref())?;
+        let active_proxy = forced_proxy
+            .or_else(|| proxy_pool.next_owned())
+            .ok_or(AntiBotError::NoHealthyProxies)?;
+        let client = Self::build_client(Some(active_proxy.as_str()))?;
 
         Ok(Self {
             platform,
             proxy_pool,
-            active_proxy,
+            active_proxy: Some(active_proxy),
             header_builder,
             throttle,
             client,
@@ -303,8 +305,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_antibot_client_creation() {
+    fn test_antibot_client_requires_proxy() {
         let client = AntiBotClient::new(Platform::YouTube);
+        assert!(matches!(client, Err(AntiBotError::NoHealthyProxies)));
+    }
+
+    #[test]
+    fn test_antibot_client_creation_with_forced_proxy() {
+        let client = AntiBotClient::new_with_proxy(
+            Platform::YouTube,
+            Some("http://proxy.example:8080".to_string()),
+        );
         assert!(client.is_ok());
     }
 

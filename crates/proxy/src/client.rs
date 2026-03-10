@@ -249,8 +249,20 @@ mod tests {
     }
 
     #[test]
-    fn test_proxy_client_creation() {
+    fn test_proxy_client_requires_proxy() {
         let client = ProxyClient::new(Platform::YouTube);
+        assert!(matches!(
+            client,
+            Err(ProxyError::AntiBotFailed(AntiBotError::NoHealthyProxies))
+        ));
+    }
+
+    #[test]
+    fn test_proxy_client_creation_with_forced_proxy() {
+        let client = ProxyClient::new_with_proxy(
+            Platform::YouTube,
+            Some("http://proxy.example:8080".to_string()),
+        );
         assert!(client.is_ok());
     }
 }

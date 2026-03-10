@@ -103,6 +103,14 @@ fn select_proxy() -> Option<SelectedProxy> {
         })
 }
 
+fn require_proxy() -> Result<SelectedProxy, ExtractionError> {
+    select_proxy().ok_or_else(|| {
+        ExtractionError::ScriptExecutionFailed(
+            "proxy-only mode requires at least one healthy proxy".to_string(),
+        )
+    })
+}
+
 fn should_mark_proxy_failed(stderr: &str) -> bool {
     let normalized = stderr.to_ascii_lowercase();
     normalized.contains("sign in to confirm")
@@ -244,42 +252,36 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
     let mut last_error: Option<String> = None;
 
     for attempt in 0..max_attempts {
-        let selected_proxy = select_proxy();
-        let proxy_log = selected_proxy
-            .as_ref()
-            .map(|proxy| proxy.url.as_str())
-            .unwrap_or("direct");
+        let selected_proxy = require_proxy()?;
         debug!(
             "yt-dlp attempt {}/{} for {} using {}",
             attempt + 1,
             max_attempts,
             url,
-            proxy_log
+            selected_proxy.url
         );
 
-        let output = run_ytdlp_command(&url, selected_proxy.as_ref()).await?;
+        let output = run_ytdlp_command(&url, &selected_proxy).await?;
         if output.status.success() {
-            if let Some(proxy) = selected_proxy.as_ref().filter(|proxy| proxy.from_pool) {
+            if selected_proxy.from_pool {
                 if let Some(pool) = get_proxy_pool() {
-                    pool.mark_success(&proxy.url);
+                    pool.mark_success(&selected_proxy.url);
                 }
             }
 
             let info = parse_ytdlp_success(&output.stdout, &url)?;
-            if let Some(proxy) = selected_proxy.as_ref() {
-                remember_stream_proxy(&info.formats, &proxy.url).await;
-            }
+            remember_stream_proxy(&info.formats, &selected_proxy.url).await;
             return Ok(Arc::new(info));
         }
 
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        if let Some(proxy) = selected_proxy.filter(|proxy| proxy.from_pool) {
+        if selected_proxy.from_pool {
             if should_mark_proxy_failed(&stderr) {
                 if let Some(pool) = get_proxy_pool() {
                     if should_quarantine_proxy(&stderr) {
-                        pool.quarantine(&proxy.url, "yt-dlp-bot-check");
+                        pool.quarantine(&selected_proxy.url, "yt-dlp-bot-check");
                     } else {
-                        pool.mark_failed(&proxy.url);
+                        pool.mark_failed(&selected_proxy.url);
                     }
                 }
             }
@@ -310,7 +312,7 @@ struct YtdlpAttemptOutput {
 
 async fn run_ytdlp_command(
     url: &str,
-    proxy: Option<&SelectedProxy>,
+    proxy: &SelectedProxy,
 ) -> Result<YtdlpAttemptOutput, ExtractionError> {
     let mut command = build_command(url, proxy);
     let output = command
@@ -337,7 +339,7 @@ fn parse_ytdlp_success(stdout: &[u8], url: &str) -> Result<VideoInfo, Extraction
 }
 
 /// Build the yt-dlp Command with appropriate flags
-fn build_command(url: &str, proxy: Option<&SelectedProxy>) -> Command {
+fn build_command(url: &str, proxy: &SelectedProxy) -> Command {
     let mut cmd = Command::new(resolve_ytdlp_binary());
     cmd.args([
         "-J",            // Dump JSON metadata to stdout
@@ -348,10 +350,8 @@ fn build_command(url: &str, proxy: Option<&SelectedProxy>) -> Command {
         "--no-check-certificates",
     ]);
 
-    if let Some(proxy) = proxy {
-        cmd.args(["--proxy", &proxy.url]);
-        debug!("yt-dlp routing through proxy: {}", proxy.url);
-    }
+    cmd.args(["--proxy", &proxy.url]);
+    debug!("yt-dlp routing through proxy: {}", proxy.url);
 
     cmd.arg(url);
     cmd
