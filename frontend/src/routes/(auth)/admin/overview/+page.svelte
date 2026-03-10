@@ -104,7 +104,16 @@
 				description="Danh sách proxy không ở trạng thái active để operator xử lý nhanh."
 			/>
 		</div>
-		<AdminProxyTable proxies={proxyAlerts} />
+		{#if proxyAlerts.length > 0}
+			<AdminProxyTable proxies={proxyAlerts} />
+		{:else}
+			<div class="px-5 py-8 md:px-6">
+				<p class="text-sm font-semibold text-slate-900">Không có proxy issue đang mở.</p>
+				<p class="mt-2 text-sm leading-6 text-slate-600">
+					Toàn bộ proxy trong inventory hiện đang ở trạng thái active.
+				</p>
+			</div>
+		{/if}
 	</section>
 </div>
 

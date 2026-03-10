@@ -137,24 +137,6 @@
 			</header>
 
 			<div class="space-y-5 px-4 py-5 md:px-6 md:py-6">
-				<div class="xl:hidden">
-					<div class="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-						{#each adminSectionItems as section}
-							<a
-								href={section.href}
-								class={`inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition ${
-									isActive(section.href)
-										? 'border-slate-900 bg-slate-900 text-white'
-										: 'border-slate-300 bg-white text-slate-700'
-								}`}
-							>
-								<span class="material-symbols-outlined text-base">{section.icon}</span>
-								{section.label}
-							</a>
-						{/each}
-					</div>
-				</div>
-
 				{@render children()}
 			</div>
 		</div>
