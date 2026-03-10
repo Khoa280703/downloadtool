@@ -1,152 +1,159 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import AdminActivityTable from '$components/admin/AdminActivityTable.svelte';
-	import AdminBarChart from '$components/admin/AdminBarChart.svelte';
-	import AdminJobsTable from '$components/admin/AdminJobsTable.svelte';
-	import AdminMiniMetric from '$components/admin/AdminMiniMetric.svelte';
-	import AdminProxyTable from '$components/admin/AdminProxyTable.svelte';
-	import AdminSectionHeader from '$components/admin/AdminSectionHeader.svelte';
-	import AdminStatCard from '$components/admin/AdminStatCard.svelte';
-	import { buildAdminDashboardViewModel } from '$lib/admin/dashboard-view-model';
+	import AdminDonutChart from '$components/admin/AdminDonutChart.svelte';
+	import AdminLineChart from '$components/admin/AdminLineChart.svelte';
+	import AdminOverviewMetricCard from '$components/admin/AdminOverviewMetricCard.svelte';
 
 	let { data }: { data: PageData } = $props();
 
-	const model = $derived(buildAdminDashboardViewModel(data.overview));
-	const queueChart = $derived([
-		{ label: 'Queued', value: data.overview.queuedJobs, tone: 'amber' as const },
-		{ label: 'Leased', value: data.overview.leasedJobs, tone: 'blue' as const },
-		{ label: 'Processing', value: data.overview.processingJobs, tone: 'blue' as const },
-		{ label: 'Ready', value: data.overview.readyJobs, tone: 'green' as const },
-		{ label: 'Failed', value: data.overview.failedJobs, tone: 'red' as const },
-		{ label: 'Expired', value: data.overview.expiredJobs, tone: 'red' as const }
+	const backlog = $derived(data.overview.queuedJobs + data.overview.leasedJobs);
+	const activeLoad = $derived(data.overview.processingJobs + data.overview.leasedJobs);
+	const proxyAlerts = $derived(data.overview.quarantinedProxies + data.overview.disabledProxies);
+	const pipelinePoints = $derived([
+		{ label: 'Queued', value: data.overview.queuedJobs },
+		{ label: 'Leased', value: data.overview.leasedJobs },
+		{ label: 'Process', value: data.overview.processingJobs },
+		{ label: 'Ready', value: data.overview.readyJobs },
+		{ label: 'Build', value: data.overview.buildingArtifacts },
+		{ label: 'Cache', value: data.overview.readyArtifacts }
 	]);
-	const proxyChart = $derived([
-		{ label: 'Active', value: data.overview.activeProxies, tone: 'green' as const },
-		{ label: 'Quarantined', value: data.overview.quarantinedProxies, tone: 'red' as const },
-		{ label: 'Disabled', value: data.overview.disabledProxies, tone: 'amber' as const }
+	const fleetSegments = $derived([
+		{ label: 'Active proxies', value: data.overview.activeProxies, color: '#137fec' },
+		{ label: 'Quarantined', value: data.overview.quarantinedProxies, color: '#8b5cf6' },
+		{ label: 'Disabled', value: data.overview.disabledProxies, color: '#f59e0b' }
 	]);
-	const attentionJobs = $derived(
-		data.jobs.filter((job) => ['failed', 'expired', 'queued', 'leased'].includes(job.status)).slice(0, 8)
+	const recentActivity = $derived(data.activity.slice(0, 8));
+	const attentionRows = $derived(
+		data.jobs.filter((job) => ['failed', 'expired', 'queued', 'leased'].includes(job.status)).slice(0, 5)
 	);
-	const proxyAlerts = $derived(data.proxies.filter((proxy) => proxy.status !== 'active').slice(0, 8));
-	const recentActivity = $derived(data.activity.slice(0, 10));
 </script>
 
 <svelte:head>
 	<title>Admin Overview</title>
 </svelte:head>
 
-<header class="admin-panel border border-slate-200 bg-white px-5 py-5 md:px-6">
-	<div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-		<div>
-			<p class="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Overview</p>
-			<h2 class="mt-1 text-2xl font-bold tracking-[-0.03em] text-slate-950">Operational dashboard</h2>
-			<p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-				Bảng điều hành chính cho queue mux, proxy fleet, artifact storage và activity stream.
-			</p>
-		</div>
-		<div class="grid gap-2 sm:grid-cols-3 xl:min-w-[460px]">
-			<AdminMiniMetric label="Backlog" value={model.queueBacklog} caption="queued + leased" />
-			<AdminMiniMetric label="Artifacts" value={model.totalArtifacts} caption="building + ready" />
-			<AdminMiniMetric label="Events / 24h" value={data.overview.eventsLast24h} caption="jobs + proxies" />
-		</div>
+<div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+	<div>
+		<h2 class="text-[1.8rem] font-bold tracking-[-0.03em] text-slate-950">Dashboard Overview</h2>
+		<p class="text-sm text-slate-500">Welcome back. Đây là snapshot vận hành mới nhất của hệ thống.</p>
 	</div>
-</header>
-
-<section class="admin-panel border border-slate-200 bg-white p-5 md:p-6">
-	<AdminSectionHeader
-		eyebrow="System overview"
-		title="Primary signals"
-		description="Nhóm KPI cốt lõi để nhìn thấy backlog, failure, cache artifact và độ phủ proxy."
-	/>
-	<div class="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-		{#each model.topStats as stat}
-			<AdminStatCard
-				label={stat.label}
-				value={stat.value}
-				caption={stat.caption}
-				tone={stat.tone}
-			/>
-		{/each}
+	<div class="flex items-center gap-3">
+		<a
+			href="/admin/activity"
+			class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+		>
+			<span class="material-symbols-outlined text-lg">timeline</span>
+			View Activity
+		</a>
+		<a
+			href="/admin/jobs"
+			class="inline-flex items-center gap-2 rounded-lg bg-[#137fec] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_28px_-18px_rgba(19,127,236,0.8)] transition hover:opacity-95"
+		>
+			<span class="material-symbols-outlined text-lg">add</span>
+			Open Queue
+		</a>
 	</div>
-</section>
+</div>
 
-<div class="grid gap-5 xl:grid-cols-2">
-	<AdminBarChart
-		title="Queue distribution"
-		description="Phân bố trạng thái hiện tại của mux jobs."
-		items={queueChart}
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+	<AdminOverviewMetricCard
+		label="Queue Backlog"
+		value={backlog}
+		icon="work_history"
+		badge={`${data.overview.processingJobs} processing`}
+		badgeTone="primary"
+		description="Queued và leased jobs đang chờ pipeline giải quyết."
 	/>
-	<AdminBarChart
-		title="Proxy fleet distribution"
-		description="Phân bố inventory theo trạng thái phục vụ."
-		items={proxyChart}
+	<AdminOverviewMetricCard
+		label="Ready Artifacts"
+		value={data.overview.readyArtifacts}
+		icon="inventory_2"
+		badge={`${data.overview.buildingArtifacts} building`}
+		badgeTone="emerald"
+		description="File đã sẵn sàng để cấp vé tải hoặc dedupe reuse."
+	/>
+	<AdminOverviewMetricCard
+		label="Active Load"
+		value={activeLoad}
+		icon="rocket_launch"
+		badge={`${data.overview.readyJobs} ready jobs`}
+		badgeTone="violet"
+		description="Tổng processing và leased, phản ánh áp lực worker hiện tại."
+	/>
+	<AdminOverviewMetricCard
+		label="Proxy Alerts"
+		value={proxyAlerts}
+		icon="shield"
+		badge={`${data.overview.activeProxies} healthy`}
+		badgeTone={proxyAlerts > 0 ? 'amber' : 'emerald'}
+		description="Proxy bị quarantine hoặc disabled cần operator kiểm tra."
 	/>
 </div>
 
-<div class="grid gap-5 xl:grid-cols-2">
-	<section class="admin-panel border border-slate-200 bg-white">
-		<div class="border-b border-slate-200 px-5 py-4 md:px-6">
-			<AdminSectionHeader
-				eyebrow="Jobs"
-				title="Needs attention"
-				description="Ưu tiên các job đang lỗi, hết hạn, chưa được worker lấy hoặc còn treo lease."
-			/>
-		</div>
-		<AdminJobsTable jobs={attentionJobs} />
-	</section>
+<div class="grid grid-cols-1 gap-8 xl:grid-cols-3">
+	<div class="xl:col-span-2">
+		<AdminLineChart
+			title="Pipeline Flow"
+			description="Diễn biến phân bố tải dọc theo các stage chính của hệ thống."
+			points={pipelinePoints}
+		/>
+	</div>
+	<div>
+		<AdminDonutChart
+			title="Proxy Distribution"
+			description="Tỷ trọng fleet hiện tại theo tình trạng vận hành."
+			totalLabel="TOTAL"
+			segments={fleetSegments}
+		/>
+	</div>
+</div>
 
-	<section class="admin-panel border border-slate-200 bg-white">
-		<div class="border-b border-slate-200 px-5 py-4 md:px-6">
-			<AdminSectionHeader
-				eyebrow="Proxies"
-				title="Proxy issues"
-				description="Danh sách proxy không ở trạng thái active để operator xử lý nhanh."
-			/>
-		</div>
-		{#if proxyAlerts.length > 0}
-			<AdminProxyTable proxies={proxyAlerts} />
-		{:else}
-			<div class="px-5 py-8 md:px-6">
-				<p class="text-sm font-semibold text-slate-900">Không có proxy issue đang mở.</p>
-				<p class="mt-2 text-sm leading-6 text-slate-600">
-					Toàn bộ proxy trong inventory hiện đang ở trạng thái active.
-				</p>
+<div class="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+	<section class="admin-panel border border-slate-200 bg-white shadow-sm">
+		<div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+			<div>
+				<h3 class="text-lg font-bold text-slate-950">Recent Activities</h3>
+				<p class="mt-1 text-sm text-slate-500">Activity stream mới nhất từ jobs và proxy health.</p>
 			</div>
-		{/if}
-	</section>
-</div>
-
-<div class="grid gap-5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
-	<section class="admin-panel border border-slate-200 bg-white">
-		<div class="border-b border-slate-200 px-5 py-4 md:px-6">
-			<AdminSectionHeader
-				eyebrow="Activity"
-				title="Recent activity stream"
-				description="Activity feed hợp nhất từ mux jobs và proxy health events."
-			/>
+			<a href="/admin/activity" class="text-sm font-semibold text-[#137fec] hover:underline">View all</a>
 		</div>
 		<AdminActivityTable activity={recentActivity} />
 	</section>
 
-	<section class="admin-panel border border-slate-200 bg-white p-5">
-		<AdminSectionHeader
-			eyebrow="Snapshot"
-			title="Operational notes"
-			description="Các vùng áp lực chính theo góc nhìn vận hành hiện tại."
-		/>
-		<div class="mt-5 grid gap-3">
-			{#each model.snapshotStats as stat}
-				<AdminMiniMetric label={stat.label} value={stat.value} caption={stat.caption} />
-			{/each}
+	<section class="admin-panel border border-slate-200 bg-white p-6 shadow-sm">
+		<div class="flex items-center justify-between">
+			<div>
+				<h3 class="text-lg font-bold text-slate-950">Attention Queue</h3>
+				<p class="mt-1 text-sm text-slate-500">Các job nên được xử lý trước ở thời điểm này.</p>
+			</div>
+			<a href="/admin/jobs" class="text-sm font-semibold text-[#137fec] hover:underline">Open jobs</a>
 		</div>
-		<div class="mt-5 border-t border-slate-200 pt-5">
-			<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Operator guidance</p>
-			<ul class="mt-3 space-y-3 text-sm text-slate-600">
-				<li>Nếu failed + expired tăng liên tục, kiểm tra proxy health và upstream extract trước.</li>
-				<li>Nếu building artifacts cao nhưng ready tăng chậm, tập trung vào worker throughput hoặc storage.</li>
-				<li>Nếu quarantined proxies chiếm tỷ trọng lớn, inventory hiện tại đang hụt độ ổn định.</li>
-			</ul>
+
+		<div class="mt-5 space-y-3">
+			{#if attentionRows.length > 0}
+				{#each attentionRows as job}
+					<a
+						href="/admin/jobs"
+						class="block rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-slate-300 hover:bg-slate-100"
+					>
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="truncate text-sm font-semibold text-slate-900">{job.title ?? job.id}</p>
+								<p class="mt-1 text-xs text-slate-500">{job.id}</p>
+							</div>
+							<span class="rounded-full bg-white px-2 py-1 text-[11px] font-bold uppercase text-slate-600">
+								{job.status}
+							</span>
+						</div>
+						<p class="mt-2 text-[13px] text-slate-500">{job.attemptLabel} • {job.backend ?? 'no backend'}</p>
+					</a>
+				{/each}
+			{:else}
+				<div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+					Không có job nào đang cần operator can thiệp.
+				</div>
+			{/if}
 		</div>
 	</section>
 </div>
