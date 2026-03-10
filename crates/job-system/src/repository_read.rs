@@ -4,7 +4,11 @@ use crate::job_models::{ArtifactRecord, JobArtifactDownload, JobOwner, JobRecord
 use crate::repository::JobRepository;
 
 impl JobRepository {
-    pub async fn get_user_job(&self, job_id: &str, owner: &JobOwner) -> anyhow::Result<Option<JobRecord>> {
+    pub async fn get_user_job(
+        &self,
+        job_id: &str,
+        owner: &JobOwner,
+    ) -> anyhow::Result<Option<JobRecord>> {
         let row = match (&owner.user_id, &owner.session_id) {
             (Some(user_id), _) => {
                 sqlx::query(

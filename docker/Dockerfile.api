@@ -88,7 +88,7 @@ COPY --from=builder /app/target/release/api-server /usr/local/bin/
 
 
 # Create directories
-RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
+RUN mkdir -p /app/extractors /app/data /app/proxy-state && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser

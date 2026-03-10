@@ -28,6 +28,7 @@ services:
       - RUST_LOG=info
       - SOCKS5_PROXY_URL=${SOCKS5_PROXY_URL}
       - PROXY_LIST=${PROXY_LIST}
+      - PROXY_QUARANTINE_FILE=/app/proxy-state/quarantined-proxies.txt
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
       - REDIS_URL=redis://redis:6379
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
@@ -45,6 +46,7 @@ services:
       - "3068"
     volumes:
       - api-data:/app/data
+      - proxy-quarantine-data:/app/proxy-state
     restart: unless-stopped
     depends_on:
       postgres:
@@ -63,6 +65,7 @@ services:
       - RUST_LOG=info
       - SOCKS5_PROXY_URL=${SOCKS5_PROXY_URL}
       - PROXY_LIST=${PROXY_LIST}
+      - PROXY_QUARANTINE_FILE=/app/proxy-state/quarantined-proxies.txt
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
       - REDIS_URL=redis://redis:6379
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
@@ -74,6 +77,8 @@ services:
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
       - S3_REGION=${S3_REGION}
+    volumes:
+      - proxy-quarantine-data:/app/proxy-state
     restart: unless-stopped
     depends_on:
       postgres:
@@ -115,3 +120,4 @@ volumes:
   api-data:
   postgres-data:
   redis-data:
+  proxy-quarantine-data:

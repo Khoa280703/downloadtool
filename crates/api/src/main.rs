@@ -19,6 +19,7 @@ use axum::{
 };
 use governor::{clock::DefaultClock, state::keyed::DefaultKeyedStateStore, Quota, RateLimiter};
 use object_store::backend_factory::{build_storage_backend, StorageBackendConfig};
+use proxy::init_global_proxy_pool;
 use queue::redis_streams::RedisStreamsQueue;
 use queue::JobQueuePublisher;
 use serde_json::json;
@@ -216,6 +217,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     services::auth_schema_bootstrap::ensure_better_auth_schema(&db_pool).await?;
     sqlx::migrate!("./migrations").run(&db_pool).await?;
+    init_global_proxy_pool(db_pool.clone(), &config.redis_url).await?;
     info!("Database pool connected");
     let durable_job_repository = Arc::new(job_system::JobRepository::new(db_pool.clone()));
     let queue_publisher = Arc::new(RedisStreamsQueue::new(

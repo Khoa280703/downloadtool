@@ -12,8 +12,11 @@ pub mod anti_bot;
 pub mod client;
 pub mod header_builder;
 pub mod platform;
+mod proxy_health_store;
+mod proxy_inventory_store;
 pub mod proxy_pool;
 mod proxy_quarantine;
+pub mod proxy_runtime;
 pub mod stream;
 pub mod throttle;
 
@@ -22,6 +25,7 @@ pub use client::ProxyClient;
 pub use header_builder::HeaderBuilder;
 pub use platform::Platform;
 pub use proxy_pool::ProxyPool;
+pub use proxy_runtime::{global_proxy_pool, init_global_proxy_pool};
 pub use stream::StreamProxy;
 pub use throttle::DomainThrottle;
 

@@ -262,8 +262,15 @@ pub async fn release_job_handler(
     Ok(Json(JobReleaseResponse { released }))
 }
 
-fn resolve_job_owner(user: &AuthenticatedUser, headers: &HeaderMap) -> Result<JobOwner, JobsApiError> {
-    if let Some(user_id) = user.user_id.as_deref().filter(|value| !value.trim().is_empty()) {
+fn resolve_job_owner(
+    user: &AuthenticatedUser,
+    headers: &HeaderMap,
+) -> Result<JobOwner, JobsApiError> {
+    if let Some(user_id) = user
+        .user_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
         return Ok(JobOwner {
             user_id: Some(user_id.to_string()),
             session_id: None,

@@ -1,26 +1,30 @@
-//! Proxy pool with round-robin rotation and cooldown-based failover.
+//! Proxy pool with round-robin rotation and shared runtime health.
 //!
 //! Supports both:
 //! - Full proxy URLs (`socks5h://user:pass@host:port`, `http://...`)
 //! - Raw records (`host:port:user:pass`) commonly used by proxy providers.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+
+use sqlx::PgPool;
+use tracing::{debug, warn};
+
+use crate::proxy_health_store::{ProxyHealthStore, ProxyRuntimeHealth};
+use crate::proxy_inventory_store::{ProxyInventoryRecord, ProxyInventoryStore};
 use crate::proxy_quarantine::{
     append_quarantine_record, load_quarantined_proxies, proxy_quarantine_file_from_env,
 };
-use std::collections::HashSet;
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
-use tracing::{debug, warn};
+use crate::proxy_runtime::global_proxy_pool;
 
 /// Maximum consecutive failures before marking proxy as unhealthy.
-const MAX_FAILURES: usize = 3;
+pub const MAX_FAILURES: usize = 3;
 /// Default cooldown period for failed proxies.
-const FAILURE_COOLDOWN: Duration = Duration::from_secs(1800);
+pub const FAILURE_COOLDOWN: Duration = Duration::from_secs(1800);
 
-/// Entry in the proxy pool with health tracking.
 struct ProxyEntry {
     url: String,
     quarantined: AtomicBool,
@@ -53,6 +57,7 @@ impl ProxyEntry {
                 return instant.elapsed() > FAILURE_COOLDOWN;
             }
         }
+
         false
     }
 
@@ -102,54 +107,78 @@ impl ProxyEntry {
         }
         false
     }
+
+    fn set_quarantined(&self, quarantined: bool) {
+        self.quarantined.store(quarantined, Ordering::Relaxed);
+        if !quarantined {
+            self.failed_count.store(0, Ordering::Relaxed);
+            if let Ok(mut last_failed) = self.last_failed.write() {
+                *last_failed = None;
+            }
+        }
+    }
+
+    fn apply_runtime_health(&self, health: &ProxyRuntimeHealth) {
+        if self.is_quarantined() {
+            return;
+        }
+
+        self.failed_count
+            .store(health.fail_count.min(MAX_FAILURES), Ordering::Relaxed);
+
+        if let Ok(mut last_failed) = self.last_failed.write() {
+            *last_failed = if health.cooldown_active || health.fail_count > 0 {
+                Some(Instant::now())
+            } else {
+                None
+            };
+        }
+    }
 }
 
 /// Pool of proxies with round-robin selection.
 pub struct ProxyPool {
-    proxies: Vec<Arc<ProxyEntry>>,
+    proxies: RwLock<Vec<Arc<ProxyEntry>>>,
     current: AtomicUsize,
     quarantine_file: Option<PathBuf>,
+    inventory_pool: Option<PgPool>,
+    health_store: Option<ProxyHealthStore>,
 }
 
 impl ProxyPool {
     /// Create a new proxy pool from a list of fully qualified proxy URLs.
     pub fn new(urls: Vec<String>) -> Self {
-        Self::new_with_quarantine(urls, None, HashSet::new())
-    }
-
-    fn new_with_quarantine(
-        urls: Vec<String>,
-        quarantine_file: Option<PathBuf>,
-        quarantined_urls: HashSet<String>,
-    ) -> Self {
-        let proxies = urls
+        let records = urls
             .into_iter()
-            .filter(|url| !url.trim().is_empty())
-            .map(|url| {
-                let is_quarantined = quarantined_urls.contains(&url);
-                Arc::new(ProxyEntry::new(url, is_quarantined))
+            .map(|proxy_url| ProxyInventoryRecord {
+                proxy_url,
+                status: "active".to_string(),
             })
             .collect();
+        Self::new_with_runtime(records, None, None, None)
+    }
 
+    pub fn new_with_runtime(
+        inventory_records: Vec<ProxyInventoryRecord>,
+        quarantine_file: Option<PathBuf>,
+        inventory_pool: Option<PgPool>,
+        health_store: Option<ProxyHealthStore>,
+    ) -> Self {
         Self {
-            proxies,
+            proxies: RwLock::new(build_entries(inventory_records, None)),
             current: AtomicUsize::new(0),
             quarantine_file,
+            inventory_pool,
+            health_store,
         }
     }
 
     /// Create a pool from raw proxy records (`host:port:user:pass`), one per line.
     pub fn from_raw_list(raw_list: &str) -> Self {
-        let urls = parse_proxy_tokens(raw_list);
-        Self::new(urls)
+        Self::new(parse_proxy_tokens(raw_list))
     }
 
     /// Create a proxy pool from environment variable `PROXY_LIST`.
-    ///
-    /// Accepts comma/newline separated values in either of these formats:
-    /// - `socks5h://user:pass@host:port`
-    /// - `http://user:pass@host:port`
-    /// - `host:port:user:pass` (auto-converted to `socks5h://...`)
     pub fn from_env() -> Option<Self> {
         let raw = std::env::var("PROXY_LIST").ok()?;
         let urls = parse_proxy_tokens(&raw);
@@ -173,36 +202,50 @@ impl ProxyPool {
             quarantined_count
         );
 
-        Some(Self::new_with_quarantine(
-            urls,
+        Some(Self::new_with_runtime(
+            urls.into_iter()
+                .map(|proxy_url| ProxyInventoryRecord {
+                    status: if quarantined_urls.contains(&proxy_url) {
+                        "quarantined".to_string()
+                    } else {
+                        "active".to_string()
+                    },
+                    proxy_url,
+                })
+                .collect(),
             quarantine_file,
-            quarantined_urls,
+            None,
+            None,
         ))
     }
 
+    pub fn global_or_env() -> Option<Arc<Self>> {
+        global_proxy_pool().or_else(|| Self::from_env().map(Arc::new))
+    }
+
     /// Get next healthy proxy by round-robin.
-    pub fn next(&self) -> Option<&str> {
-        if self.proxies.is_empty() {
+    pub fn next(&self) -> Option<String> {
+        let start_idx = self.current.fetch_add(1, Ordering::Relaxed);
+        let guard = self.proxies.read().ok()?;
+        if guard.is_empty() {
             return None;
         }
 
-        let start_idx = self.current.fetch_add(1, Ordering::Relaxed);
-        let proxy_count = self.proxies.len();
-
+        let proxy_count = guard.len();
         for i in 0..proxy_count {
             let idx = (start_idx + i) % proxy_count;
-            let entry = &self.proxies[idx];
+            let entry = &guard[idx];
             if entry.is_healthy() {
-                return Some(&entry.url);
+                return Some(entry.url.clone());
             }
         }
 
         for i in 0..proxy_count {
             let idx = (start_idx + i) % proxy_count;
-            let entry = &self.proxies[idx];
+            let entry = &guard[idx];
             if !entry.is_quarantined() {
                 warn!("No healthy proxies available, falling back to non-quarantined proxy");
-                return Some(&entry.url);
+                return Some(entry.url.clone());
             }
         }
 
@@ -212,53 +255,124 @@ impl ProxyPool {
 
     /// Owned version of [`Self::next`], useful for async call sites.
     pub fn next_owned(&self) -> Option<String> {
-        self.next().map(ToString::to_string)
+        self.next()
     }
 
     /// Mark a specific proxy as failed.
     pub fn mark_failed(&self, proxy_url: &str) {
-        for entry in &self.proxies {
-            if entry.url == proxy_url {
-                entry.mark_failed();
-                return;
+        if let Some(entry) = self.find_entry(proxy_url) {
+            entry.mark_failed();
+            if let Some(health_store) = self.health_store.clone() {
+                let proxy_url = proxy_url.to_string();
+                tokio::spawn(async move {
+                    if let Err(error) = health_store.mark_failed(&proxy_url, "request-failed").await
+                    {
+                        warn!(err = %error, "Failed to persist proxy failure to redis");
+                    }
+                });
             }
         }
     }
 
     /// Mark a specific proxy as healthy again.
     pub fn mark_success(&self, proxy_url: &str) {
-        for entry in &self.proxies {
-            if entry.url == proxy_url {
-                entry.mark_success();
-                return;
+        if let Some(entry) = self.find_entry(proxy_url) {
+            entry.mark_success();
+        }
+    }
+
+    /// Quarantine a proxy and persist it for operator/admin review.
+    pub fn quarantine(&self, proxy_url: &str, reason: &str) {
+        if let Some(entry) = self.find_entry(proxy_url) {
+            if entry.quarantine() {
+                if let Some(path) = self.quarantine_file.as_ref() {
+                    append_quarantine_record(path, proxy_url, reason);
+                }
+                if let Some(inventory_pool) = self.inventory_pool.clone() {
+                    let proxy_url = proxy_url.to_string();
+                    let reason = reason.to_string();
+                    persist_quarantine_blocking(inventory_pool, proxy_url, reason);
+                }
+                warn!(
+                    "Proxy {} quarantined and removed from rotation. reason={}",
+                    proxy_url, reason
+                );
             }
         }
     }
 
-    /// Quarantine a proxy and persist it to a separate file for operator replacement.
-    pub fn quarantine(&self, proxy_url: &str, reason: &str) {
-        for entry in &self.proxies {
-            if entry.url == proxy_url {
-                if entry.quarantine() {
-                    if let Some(path) = self.quarantine_file.as_ref() {
-                        append_quarantine_record(path, proxy_url, reason);
-                    }
-                    warn!(
-                        "Proxy {} quarantined and removed from rotation. reason={}",
-                        proxy_url, reason
-                    );
-                }
-                return;
-            }
+    pub async fn refresh_from_runtime(&self) -> anyhow::Result<()> {
+        if let Some(inventory_pool) = self.inventory_pool.clone() {
+            let store = ProxyInventoryStore::new(inventory_pool);
+            let inventory_records = store.list_runtime_records().await?;
+            self.replace_inventory(inventory_records);
         }
+
+        if let Some(health_store) = self.health_store.clone() {
+            let urls = self.all_urls();
+            let snapshot = health_store.load_snapshot(&urls).await?;
+            self.apply_runtime_snapshot(snapshot);
+        }
+
+        Ok(())
     }
 
     pub fn len(&self) -> usize {
-        self.proxies.len()
+        self.proxies
+            .read()
+            .map(|guard| guard.len())
+            .unwrap_or_default()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.proxies.is_empty()
+        self.len() == 0
+    }
+
+    pub fn is_proxy_usable(&self, proxy_url: &str) -> bool {
+        self.find_entry(proxy_url)
+            .map(|entry| entry.is_healthy())
+            .unwrap_or(false)
+    }
+
+    fn all_urls(&self) -> Vec<String> {
+        self.proxies
+            .read()
+            .map(|guard| guard.iter().map(|entry| entry.url.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    fn find_entry(&self, proxy_url: &str) -> Option<Arc<ProxyEntry>> {
+        self.proxies
+            .read()
+            .ok()
+            .and_then(|guard| guard.iter().find(|entry| entry.url == proxy_url).cloned())
+    }
+
+    fn replace_inventory(&self, inventory_records: Vec<ProxyInventoryRecord>) {
+        let previous_entries = self
+            .proxies
+            .read()
+            .map(|guard| {
+                guard
+                    .iter()
+                    .map(|entry| (entry.url.clone(), Arc::clone(entry)))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+
+        let replacement = build_entries(inventory_records, Some(&previous_entries));
+        if let Ok(mut guard) = self.proxies.write() {
+            *guard = replacement;
+        }
+    }
+
+    fn apply_runtime_snapshot(&self, snapshot: HashMap<String, ProxyRuntimeHealth>) {
+        if let Ok(guard) = self.proxies.read() {
+            for entry in guard.iter() {
+                let health = snapshot.get(&entry.url).cloned().unwrap_or_default();
+                entry.apply_runtime_health(&health);
+            }
+        }
     }
 }
 
@@ -268,7 +382,7 @@ impl Default for ProxyPool {
     }
 }
 
-fn parse_proxy_tokens(raw: &str) -> Vec<String> {
+pub fn parse_proxy_tokens(raw: &str) -> Vec<String> {
     raw.lines()
         .flat_map(|line| line.split(','))
         .map(str::trim)
@@ -277,12 +391,75 @@ fn parse_proxy_tokens(raw: &str) -> Vec<String> {
         .collect()
 }
 
+fn build_entries(
+    inventory_records: Vec<ProxyInventoryRecord>,
+    previous_entries: Option<&HashMap<String, Arc<ProxyEntry>>>,
+) -> Vec<Arc<ProxyEntry>> {
+    inventory_records
+        .into_iter()
+        .filter(|record| !record.proxy_url.trim().is_empty())
+        .filter(|record| record.status != "disabled")
+        .map(|record| {
+            if let Some(existing) =
+                previous_entries.and_then(|entries| entries.get(&record.proxy_url))
+            {
+                match record.status.as_str() {
+                    "quarantined" => existing.set_quarantined(true),
+                    "active" => {
+                        if !existing.is_quarantined() {
+                            existing.set_quarantined(false);
+                        }
+                    }
+                    _ => {}
+                }
+                return Arc::clone(existing);
+            }
+
+            Arc::new(ProxyEntry::new(
+                record.proxy_url.clone(),
+                record.status == "quarantined",
+            ))
+        })
+        .collect()
+}
+
+fn persist_quarantine_blocking(inventory_pool: PgPool, proxy_url: String, reason: String) {
+    let store = ProxyInventoryStore::new(inventory_pool);
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        tokio::task::block_in_place(|| {
+            if let Err(error) =
+                handle.block_on(async move { store.mark_quarantined(&proxy_url, &reason).await })
+            {
+                warn!(err = %error, "Failed to persist proxy quarantine to postgres");
+            }
+        });
+        return;
+    }
+
+    std::thread::spawn(move || {
+        let runtime = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                warn!(err = %error, "Failed to build runtime for proxy quarantine persistence");
+                return;
+            }
+        };
+        if let Err(error) =
+            runtime.block_on(async move { store.mark_quarantined(&proxy_url, &reason).await })
+        {
+            warn!(err = %error, "Failed to persist proxy quarantine to postgres");
+        }
+    });
+}
+
 fn normalize_proxy_token(token: &str) -> Option<String> {
     if token.contains("://") {
         return Some(token.to_string());
     }
 
-    // Parse raw provider format: host:port:user:pass
     let mut parts = token.rsplitn(4, ':');
     let pass = parts.next()?;
     let user = parts.next()?;
@@ -304,8 +481,9 @@ fn normalize_proxy_token(token: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs;
+
+    use super::*;
 
     #[test]
     fn test_proxy_pool_round_robin() {
@@ -371,10 +549,14 @@ mod tests {
         ));
         let _ = fs::remove_file(&path);
 
-        let pool = ProxyPool::new_with_quarantine(
-            vec!["http://proxy1:8080".to_string()],
+        let pool = ProxyPool::new_with_runtime(
+            vec![ProxyInventoryRecord {
+                proxy_url: "http://proxy1:8080".to_string(),
+                status: "active".to_string(),
+            }],
             Some(path.clone()),
-            HashSet::new(),
+            None,
+            None,
         );
         pool.quarantine("http://proxy1:8080", "unit-test");
 
@@ -383,6 +565,40 @@ mod tests {
         assert!(content.contains("unit-test"));
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_reused_entry_keeps_local_quarantine_until_explicit_reenable() {
+        let initial = build_entries(
+            vec![ProxyInventoryRecord {
+                proxy_url: "http://proxy1:8080".to_string(),
+                status: "quarantined".to_string(),
+            }],
+            None,
+        );
+        assert!(initial[0].is_quarantined());
+
+        let previous = HashMap::from([("http://proxy1:8080".to_string(), initial[0].clone())]);
+        let refreshed = build_entries(
+            vec![ProxyInventoryRecord {
+                proxy_url: "http://proxy1:8080".to_string(),
+                status: "active".to_string(),
+            }],
+            Some(&previous),
+        );
+        assert!(refreshed[0].is_quarantined());
+    }
+
+    #[test]
+    fn test_disabled_inventory_record_is_removed_from_runtime() {
+        let entries = build_entries(
+            vec![ProxyInventoryRecord {
+                proxy_url: "http://proxy1:8080".to_string(),
+                status: "disabled".to_string(),
+            }],
+            None,
+        );
+        assert!(entries.is_empty());
     }
 
     #[test]

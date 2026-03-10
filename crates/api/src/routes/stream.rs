@@ -721,5 +721,4 @@ mod tests {
         .unwrap();
         assert_eq!(extract_mime_type(&url).as_deref(), Some("video/mp4"));
     }
-
 }

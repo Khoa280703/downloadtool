@@ -1,0 +1,93 @@
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
+
+use anyhow::Context;
+use sqlx::PgPool;
+use tracing::{info, warn};
+
+use crate::proxy_health_store::ProxyHealthStore;
+use crate::proxy_inventory_store::ProxyInventoryStore;
+use crate::proxy_pool::{parse_proxy_tokens, ProxyPool};
+use crate::proxy_quarantine::{load_quarantined_proxies, proxy_quarantine_file_from_env};
+
+const PROXY_SYNC_INTERVAL_SECS: u64 = 15;
+
+static GLOBAL_PROXY_POOL: OnceLock<Arc<ProxyPool>> = OnceLock::new();
+
+pub async fn init_global_proxy_pool(db_pool: PgPool, redis_url: &str) -> anyhow::Result<()> {
+    if GLOBAL_PROXY_POOL.get().is_some() {
+        return Ok(());
+    }
+
+    let inventory_store = ProxyInventoryStore::new(db_pool.clone());
+    let proxy_count_before_seed = inventory_store.count_all().await.unwrap_or_default();
+    let env_urls = std::env::var("PROXY_LIST")
+        .ok()
+        .map(|raw| parse_proxy_tokens(&raw))
+        .unwrap_or_default();
+
+    if !env_urls.is_empty() {
+        let changed = inventory_store.sync_env_inventory(&env_urls).await?;
+        if changed > 0 {
+            info!(changed, "Synchronized proxy inventory from PROXY_LIST");
+        }
+    }
+
+    let quarantine_file = proxy_quarantine_file_from_env();
+    if proxy_count_before_seed == 0 {
+        let file_quarantined = quarantine_file
+            .as_ref()
+            .map(|path| load_quarantined_proxies(path))
+            .unwrap_or_default();
+        if !file_quarantined.is_empty() {
+            let migrated = inventory_store
+                .mark_urls_quarantined(
+                    &file_quarantined.into_iter().collect::<Vec<_>>(),
+                    "migrated-file-quarantine",
+                )
+                .await?;
+            if migrated > 0 {
+                info!(
+                    migrated,
+                    "Migrated proxy quarantine file into postgres inventory"
+                );
+            }
+        }
+    }
+
+    let records = inventory_store.list_runtime_records().await?;
+    let redis_store = ProxyHealthStore::new(redis_url)
+        .context("failed to initialize shared redis proxy health store")?;
+    let pool = Arc::new(ProxyPool::new_with_runtime(
+        records,
+        quarantine_file,
+        Some(db_pool),
+        Some(redis_store),
+    ));
+
+    pool.refresh_from_runtime().await?;
+
+    if GLOBAL_PROXY_POOL.set(Arc::clone(&pool)).is_ok() {
+        spawn_background_sync(pool);
+    }
+
+    Ok(())
+}
+
+pub fn global_proxy_pool() -> Option<Arc<ProxyPool>> {
+    GLOBAL_PROXY_POOL.get().cloned()
+}
+
+fn spawn_background_sync(pool: Arc<ProxyPool>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(PROXY_SYNC_INTERVAL_SECS));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        loop {
+            interval.tick().await;
+            if let Err(error) = pool.refresh_from_runtime().await {
+                warn!(err = %error, "Failed to sync proxy runtime state");
+            }
+        }
+    });
+}

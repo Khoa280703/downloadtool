@@ -27,6 +27,12 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 
+# Runtime state
+redis = { workspace = true }
+sqlx = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
 # Streaming
 bytes = "1"
 futures = "0.3"

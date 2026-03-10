@@ -73,7 +73,11 @@ impl JobRepository {
         })
     }
 
-    async fn find_reusable_job(&self, owner: &JobOwner, request_hash: &str) -> anyhow::Result<Option<JobRecord>> {
+    async fn find_reusable_job(
+        &self,
+        owner: &JobOwner,
+        request_hash: &str,
+    ) -> anyhow::Result<Option<JobRecord>> {
         let row = match (&owner.user_id, &owner.session_id) {
             (Some(user_id), _) => {
                 sqlx::query(

@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use job_system::JobRepository;
+use proxy::init_global_proxy_pool;
 use queue::redis_streams::RedisStreamsQueue;
 use queue::{JobQueueConsumer, JobQueuePublisher};
 use sqlx::postgres::PgPoolOptions;
@@ -36,6 +37,7 @@ async fn main() -> Result<()> {
         .connect(&config.database_url)
         .await?;
     sqlx::migrate!("../api/migrations").run(&db_pool).await?;
+    init_global_proxy_pool(db_pool.clone(), &config.redis_url).await?;
 
     let repo = JobRepository::new(db_pool);
     let queue = Arc::new(RedisStreamsQueue::new(

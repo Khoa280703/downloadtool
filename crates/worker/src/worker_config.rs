@@ -92,7 +92,12 @@ impl WorkerConfig {
         }
 
         let mut ps_filter = Command::new("docker");
-        ps_filter.args(["ps", "-q", "--filter", &format!("name={fallback_container_name}")]);
+        ps_filter.args([
+            "ps",
+            "-q",
+            "--filter",
+            &format!("name={fallback_container_name}"),
+        ]);
         if let Some(container_id) = Self::command_stdout_trimmed(&mut ps_filter)
             .and_then(|stdout| stdout.lines().next().map(str::trim).map(str::to_string))
             .filter(|id| !id.is_empty())
@@ -172,11 +177,9 @@ impl WorkerConfig {
                 .unwrap_or(3),
             artifact_backend: env::var("MUX_ARTIFACT_BACKEND")
                 .unwrap_or_else(|_| "localfs".to_string()),
-            artifact_dir: PathBuf::from(
-                Self::env_or_default("MUX_JOB_OUTPUT_DIR", || {
-                    "/tmp/downloadtool-worker-artifacts".to_string()
-                }),
-            ),
+            artifact_dir: PathBuf::from(Self::env_or_default("MUX_JOB_OUTPUT_DIR", || {
+                "/tmp/downloadtool-worker-artifacts".to_string()
+            })),
             artifact_ttl_secs: env::var("MUX_ARTIFACT_TTL_SECS")
                 .ok()
                 .and_then(|v| v.parse().ok())

@@ -64,7 +64,7 @@ RUN useradd -m -u 1000 -s /bin/bash appuser
 
 COPY --from=builder /app/target/release/mux-worker /usr/local/bin/
 
-RUN mkdir -p /app/extractors /app/mux-artifacts && chown -R appuser:appuser /app
+RUN mkdir -p /app/extractors /app/mux-artifacts /app/proxy-state && chown -R appuser:appuser /app
 
 USER appuser
 

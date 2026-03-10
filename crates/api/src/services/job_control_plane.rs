@@ -75,7 +75,8 @@ impl JobControlPlaneService {
             .await?;
 
         if created.job.status == JobStatus::Queued {
-            self.publish_job(&created.job.id, &created.job.dedupe_key).await?;
+            self.publish_job(&created.job.id, &created.job.dedupe_key)
+                .await?;
         }
 
         Ok(JobCreationResult {

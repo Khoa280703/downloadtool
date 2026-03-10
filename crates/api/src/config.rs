@@ -136,7 +136,12 @@ impl Config {
 
         // Fallback for environments where container names are prefixed by project id.
         let mut ps_filter = Command::new("docker");
-        ps_filter.args(["ps", "-q", "--filter", &format!("name={fallback_container_name}")]);
+        ps_filter.args([
+            "ps",
+            "-q",
+            "--filter",
+            &format!("name={fallback_container_name}"),
+        ]);
 
         if let Some(container_id) = Self::command_stdout_trimmed(&mut ps_filter)
             .and_then(|stdout| stdout.lines().next().map(str::trim).map(str::to_string))
@@ -227,8 +232,10 @@ impl Config {
                 )
             })
             .unwrap_or(false);
-        let redis_url =
-            Self::resolve_local_redis_url(&Self::env_or_default("REDIS_URL", "redis://127.0.0.1:6379"));
+        let redis_url = Self::resolve_local_redis_url(&Self::env_or_default(
+            "REDIS_URL",
+            "redis://127.0.0.1:6379",
+        ));
         let mux_queue_stream = Self::env_or_default("MUX_QUEUE_STREAM", "mux_jobs");
         let mux_job_max_attempts = env::var("MUX_JOB_MAX_ATTEMPTS")
             .ok()

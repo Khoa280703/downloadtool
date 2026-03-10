@@ -27,7 +27,7 @@ static YTDLP_SEMAPHORE: OnceLock<Arc<Semaphore>> = OnceLock::new();
 static EXTRACT_CACHE: OnceLock<Cache<String, Arc<VideoInfo>>> = OnceLock::new();
 static EXTRACT_CACHE_HITS: AtomicU64 = AtomicU64::new(0);
 static EXTRACT_CACHE_MISSES: AtomicU64 = AtomicU64::new(0);
-static YTDLP_PROXY_POOL: OnceLock<Option<ProxyPool>> = OnceLock::new();
+static YTDLP_PROXY_POOL: OnceLock<Option<Arc<ProxyPool>>> = OnceLock::new();
 static STREAM_PROXY_CACHE: OnceLock<Cache<String, Arc<String>>> = OnceLock::new();
 
 fn extract_cache_ttl_secs() -> u64 {
@@ -68,8 +68,10 @@ fn resolve_ytdlp_binary() -> String {
         .unwrap_or_else(|| "yt-dlp".to_string())
 }
 
-fn get_proxy_pool() -> Option<&'static ProxyPool> {
-    YTDLP_PROXY_POOL.get_or_init(ProxyPool::from_env).as_ref()
+fn get_proxy_pool() -> Option<&'static Arc<ProxyPool>> {
+    YTDLP_PROXY_POOL
+        .get_or_init(ProxyPool::global_or_env)
+        .as_ref()
 }
 
 fn fixed_proxy_from_env() -> Option<String> {
@@ -94,7 +96,7 @@ fn select_proxy() -> Option<SelectedProxy> {
     }
 
     get_proxy_pool()
-        .and_then(ProxyPool::next_owned)
+        .and_then(|pool| pool.next_owned())
         .map(|url| SelectedProxy {
             url,
             from_pool: true,
@@ -120,10 +122,19 @@ fn should_quarantine_proxy(stderr: &str) -> bool {
 
 /// Resolve pinned proxy URL for a previously extracted stream URL.
 pub async fn resolve_stream_proxy(url: &str) -> Option<String> {
-    get_stream_proxy_cache()
+    let proxy = get_stream_proxy_cache()
         .get(url)
         .await
-        .map(|proxy| (*proxy).clone())
+        .map(|proxy| (*proxy).clone())?;
+
+    if let Some(pool) = get_proxy_pool() {
+        if !pool.is_proxy_usable(&proxy) {
+            get_stream_proxy_cache().invalidate(url).await;
+            return None;
+        }
+    }
+
+    Some(proxy)
 }
 
 async fn remember_stream_proxy(formats: &[VideoFormat], proxy_url: &str) {
