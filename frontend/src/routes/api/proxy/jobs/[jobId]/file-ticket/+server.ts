@@ -24,17 +24,9 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies }) =
 		});
 	}
 
-	const payload = (await upstream.json()) as { download_url?: string };
-	const downloadUrl = payload.download_url ?? null;
-	if (!downloadUrl) {
-		return json({ download_url: `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file` });
-	}
-
-	if (downloadUrl.startsWith('/api/jobs/')) {
-		return json({
-			download_url: `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file`
-		});
-	}
-
-	return json({ download_url: downloadUrl });
+	// Always force browser downloads through same-origin proxy.
+	// Direct presigned R2 URLs cause some browsers to navigate instead of downloading.
+	return json({
+		download_url: `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file`
+	});
 };
