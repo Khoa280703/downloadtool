@@ -94,6 +94,15 @@
 		</div>
 
 		<div class="mt-6 flex flex-wrap gap-3">
+			{#if data.isAdmin}
+				<a
+					href="/admin"
+					class="account-outline-btn rounded-full border border-plum/20 px-5 py-3 text-sm font-bold uppercase tracking-wide text-plum transition hover:border-primary/40 hover:text-primary"
+				>
+					Admin dashboard
+				</a>
+			{/if}
+
 			{#if !isPremium}
 				<a
 					href="/api/checkout"

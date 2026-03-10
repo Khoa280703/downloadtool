@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 import { getSubscriptionForUser } from '$lib/server/auth-utils';
+import { isAdminEmail } from '$lib/server/admin-access';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user || !locals.session) {
@@ -13,6 +14,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {
 		user: locals.user,
 		subscription,
-		checkoutStatus: url.searchParams.get('checkout')
+		checkoutStatus: url.searchParams.get('checkout'),
+		isAdmin: isAdminEmail(locals.user.email)
 	};
 };
