@@ -11,7 +11,7 @@
 </script>
 
 <div>
-	<p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">{eyebrow}</p>
-	<h2 class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">{title}</h2>
-	<p class="mt-2 text-sm text-slate-600">{description}</p>
+	<p class="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">{eyebrow}</p>
+	<h2 class="mt-1 text-lg font-bold tracking-[-0.02em] text-slate-950">{title}</h2>
+	<p class="mt-1 text-[13px] leading-5 text-slate-600">{description}</p>
 </div>

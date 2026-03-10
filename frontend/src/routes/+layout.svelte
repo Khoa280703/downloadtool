@@ -74,6 +74,10 @@
 		});
 	}
 
+	function isAdminPath(pathname: string): boolean {
+		return pathname === '/admin' || pathname.startsWith('/admin/');
+	}
+
 	function isKnownLocale(value: string): value is (typeof locales)[number] {
 		return (locales as readonly string[]).includes(value);
 	}
@@ -257,8 +261,9 @@ async function handleAuthSuccess(target: string): Promise<void> {
 	class="app page-root bg-bg-page min-h-screen flex flex-col overflow-x-hidden text-plum selection:bg-primary/20"
 	class:theme-dark={isDarkMode}
 	class:theme-light={!isDarkMode}
+	class:admin-route={isAdminPath($page.url.pathname)}
 >
-	{#if !isLocalizedHomePath($page.url.pathname)}
+	{#if !isLocalizedHomePath($page.url.pathname) && !isAdminPath($page.url.pathname)}
 		<SiteHeader
 			authUser={authUser}
 			onOpenAuthModal={openAuthModal}
@@ -268,13 +273,19 @@ async function handleAuthSuccess(target: string): Promise<void> {
 		/>
 	{/if}
 
-	<main class={isLocalizedHomePath($page.url.pathname) ? 'main-home' : 'main'}>
+	<main
+		class={isLocalizedHomePath($page.url.pathname)
+			? 'main-home'
+			: isAdminPath($page.url.pathname)
+				? 'main-admin'
+				: 'main'}
+	>
 		{#key $page.url.pathname}
 			{@render children()}
 		{/key}
 	</main>
 
-	{#if !isLocalizedHomePath($page.url.pathname)}
+	{#if !isLocalizedHomePath($page.url.pathname) && !isAdminPath($page.url.pathname)}
 		<footer class="bg-white border-t border-pink-100 py-6 px-6">
 			<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
 				<div class="flex items-center gap-2 transition-all">
@@ -310,8 +321,9 @@ async function handleAuthSuccess(target: string): Promise<void> {
 	{/if}
 </div>
 
-<!-- Cookie Consent Banner -->
-<CookieConsent />
+{#if !isAdminPath($page.url.pathname)}
+	<CookieConsent />
+{/if}
 
 <div style="display:none">
 	{#each locales as locale}
@@ -342,6 +354,14 @@ async function handleAuthSuccess(target: string): Promise<void> {
 		padding: 0;
 	}
 
+	.main-admin {
+		flex: 1;
+		width: 100%;
+		max-width: none;
+		margin: 0;
+		padding: 0;
+	}
+
 	.page-root {
 		background-color: #fff5f9;
 		color: #2d1b36;
@@ -351,6 +371,12 @@ async function handleAuthSuccess(target: string): Promise<void> {
 	.page-root.theme-dark {
 		background-color: #12121a;
 		color: #e0d0f5;
+	}
+
+	.page-root.admin-route,
+	.page-root.theme-dark.admin-route {
+		background: #f3f4f6;
+		color: #0f172a;
 	}
 
 	:global(.glass-header) {

@@ -11,6 +11,9 @@
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
 	const model = $derived(buildAdminDashboardViewModel(data.overview));
+	const activeSection = $derived(
+		adminSectionItems.find((section) => $page.url.pathname === section.href) ?? adminSectionItems[0]
+	);
 
 	function formatGateMode(mode: string): string {
 		return mode.replace(/[_-]/g, ' ');
@@ -21,91 +24,114 @@
 	}
 </script>
 
-<section class="admin-page min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] px-4 py-6 md:px-6 md:py-8">
-	<div class="mx-auto grid max-w-[1700px] gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-		<aside class="admin-sidebar rounded-[2rem] border border-slate-200/80 bg-white/95 p-5 shadow-[0_24px_80px_-44px_rgba(15,23,42,0.45)] xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)] xl:overflow-hidden">
-			<div class="flex h-full flex-col">
-				<div>
-					<div class="inline-flex rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-slate-600">
-						Admin shell
-					</div>
-					<h1 class="mt-4 text-3xl font-black tracking-[-0.04em] text-slate-950">Control plane</h1>
-					<p class="mt-3 text-sm leading-6 text-slate-600">
-						Khu quản trị riêng cho mux jobs, proxy fleet và artifact pipeline.
-					</p>
-				</div>
+<section class="admin-page min-h-screen bg-slate-100 text-slate-900">
+	<div class="xl:grid xl:min-h-screen xl:grid-cols-[248px_minmax(0,1fr)]">
+		<aside class="hidden border-r border-slate-800 bg-slate-950 text-slate-100 xl:flex xl:flex-col">
+			<div class="border-b border-slate-800 px-5 py-5">
+				<p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Downloadtool</p>
+				<h1 class="mt-2 text-xl font-black tracking-[-0.03em] text-white">Admin Console</h1>
+				<p class="mt-2 text-[13px] leading-5 text-slate-400">
+					Điều phối jobs, proxy fleet và artifact storage.
+				</p>
+			</div>
 
-				<div class="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-					<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Signed in</p>
-					<p class="mt-2 text-sm font-semibold text-slate-900">{data.user.email}</p>
-					<div class="mt-3 flex flex-wrap gap-2">
-						<span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-							{formatGateMode(data.gateMode)}
-						</span>
-						<span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-							{data.overview.activeProxies} proxies active
-						</span>
-					</div>
-				</div>
-
-				<nav class="mt-6 hidden xl:block">
-					<div class="space-y-5">
-						{#each ['Monitor', 'Operations'] as group}
-							<div>
-								<p class="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
-									{group}
-								</p>
-								<div class="space-y-2">
-									{#each adminSectionItems.filter((section) => section.group === group) as section}
-										<a
-											href={section.href}
-											class={`flex items-start gap-3 rounded-[1.35rem] border px-4 py-3 text-left transition ${
-												isActive(section.href)
-													? 'border-slate-900 bg-slate-900 text-white shadow-[0_16px_36px_-24px_rgba(15,23,42,0.8)]'
-													: 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-											}`}
-										>
-											<span class="material-symbols-outlined mt-0.5 text-xl">{section.icon}</span>
-											<span class="min-w-0 flex-1">
-												<span class="flex items-center justify-between gap-2">
-													<span class="block text-sm font-bold">{section.label}</span>
-													{#if getAdminSectionBadge(section.id, data.overview)}
-														<span
-															class={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-																isActive(section.href)
-																	? 'bg-white/15 text-white'
-																	: 'bg-slate-100 text-slate-700'
-															}`}
-														>
-															{getAdminSectionBadge(section.id, data.overview)}
-														</span>
-													{/if}
-												</span>
+			<nav class="flex-1 px-3 py-4">
+				{#each ['Monitor', 'Operations'] as group}
+					<div class="mb-6">
+						<p class="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+							{group}
+						</p>
+						<div class="space-y-1">
+							{#each adminSectionItems.filter((section) => section.group === group) as section}
+								<a
+									href={section.href}
+									class={`flex items-start gap-3 rounded-lg border px-3 py-3 transition ${
+										isActive(section.href)
+											? 'border-slate-700 bg-slate-900 text-white'
+											: 'border-transparent text-slate-300 hover:border-slate-800 hover:bg-slate-900/70 hover:text-white'
+									}`}
+								>
+									<span class="material-symbols-outlined mt-0.5 text-[18px]">{section.icon}</span>
+									<span class="min-w-0 flex-1">
+										<span class="flex items-center justify-between gap-2">
+											<span class="text-sm font-semibold">{section.label}</span>
+											{#if getAdminSectionBadge(section.id, data.overview)}
 												<span
-													class={`mt-1 block text-xs leading-5 ${
-														isActive(section.href) ? 'text-slate-300' : 'text-slate-500'
+													class={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+														isActive(section.href)
+															? 'bg-white/10 text-white'
+															: 'bg-slate-800 text-slate-200'
 													}`}
 												>
-													{section.description}
+													{getAdminSectionBadge(section.id, data.overview)}
 												</span>
-											</span>
-										</a>
-									{/each}
-								</div>
-							</div>
-						{/each}
+											{/if}
+										</span>
+										<span class={`mt-1 block text-xs leading-5 ${isActive(section.href) ? 'text-slate-400' : 'text-slate-500'}`}>
+											{section.description}
+										</span>
+									</span>
+								</a>
+							{/each}
+						</div>
 					</div>
-				</nav>
+				{/each}
+			</nav>
 
-				<div class="mt-6 xl:hidden">
-					<div class="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+			<div class="border-t border-slate-800 px-4 py-4">
+				<div class="grid gap-2">
+					{#each model.headerStats as stat}
+						<AdminMiniMetric
+							label={stat.label}
+							value={stat.value}
+							caption={stat.caption}
+							inverted={true}
+						/>
+					{/each}
+				</div>
+				<div class="mt-4 rounded-lg border border-slate-800 bg-slate-900 px-3 py-3">
+					<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Operator</p>
+					<p class="mt-2 text-sm font-semibold text-white">{data.user.email}</p>
+					<p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+						Mode: {formatGateMode(data.gateMode)}
+					</p>
+				</div>
+				<a
+					href="/account"
+					class="mt-3 inline-flex w-full items-center justify-center rounded-md border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+				>
+					Back to account
+				</a>
+			</div>
+		</aside>
+
+		<div class="min-w-0">
+			<header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+				<div class="px-4 py-4 md:px-6">
+					<div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+						<div>
+							<p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Control plane</p>
+							<h2 class="mt-1 text-2xl font-black tracking-[-0.03em] text-slate-950">
+								{activeSection.label}
+							</h2>
+							<p class="mt-1 text-[13px] leading-5 text-slate-600">{activeSection.description}</p>
+						</div>
+
+						<div class="grid gap-2 sm:grid-cols-3 xl:min-w-[420px]">
+							{#each model.headerStats as stat}
+								<AdminMiniMetric label={stat.label} value={stat.value} caption={stat.caption} />
+							{/each}
+						</div>
+					</div>
+
+					<div class="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1 xl:hidden">
 						{#each adminSectionItems as section}
 							<a
 								href={section.href}
-								class={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
+								class={`inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition ${
 									isActive(section.href)
 										? 'border-slate-900 bg-slate-900 text-white'
-										: 'border-slate-200 bg-white text-slate-700'
+										: 'border-slate-300 bg-white text-slate-700'
 								}`}
 							>
 								<span class="material-symbols-outlined text-base">{section.icon}</span>
@@ -114,68 +140,24 @@
 						{/each}
 					</div>
 				</div>
+			</header>
 
-				<div class="mt-6 grid gap-3 sm:grid-cols-3 xl:mt-auto xl:grid-cols-1">
-					{#each model.headerStats as stat}
-						<AdminMiniMetric label={stat.label} value={stat.value} caption={stat.caption} />
-					{/each}
-				</div>
-
-				<div class="mt-6 flex flex-wrap gap-3">
-					<a
-						href="/account"
-						class="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:text-slate-950"
-					>
-						Back to account
-					</a>
-				</div>
+			<div class="px-4 py-4 md:px-6 md:py-6">
+				{@render children()}
 			</div>
-		</aside>
-
-		<div class="space-y-6">
-			{@render children()}
 		</div>
 	</div>
 </section>
 
 <style>
-	:global(.app.theme-dark) .admin-page {
-		background: linear-gradient(180deg, rgba(2, 6, 23, 0.96) 0%, rgba(15, 23, 42, 0.98) 100%);
-	}
-
-	:global(.app.theme-dark) .admin-sidebar,
-	:global(.app.theme-dark) .admin-panel,
-	:global(.app.theme-dark) .admin-kpi-box,
-	:global(.app.theme-dark) .admin-stat-card {
-		border-color: rgba(148, 163, 184, 0.14) !important;
-		background: rgba(15, 23, 42, 0.74) !important;
-	}
-
-	:global(.app.theme-dark) .admin-page .text-slate-950,
-	:global(.app.theme-dark) .admin-page .text-slate-900,
-	:global(.app.theme-dark) .admin-page .text-slate-800 {
-		color: rgba(248, 250, 252, 0.98) !important;
-	}
-
-	:global(.app.theme-dark) .admin-page .text-slate-700,
-	:global(.app.theme-dark) .admin-page .text-slate-600,
-	:global(.app.theme-dark) .admin-page .text-slate-500 {
-		color: rgba(203, 213, 225, 0.78) !important;
-	}
-
-	:global(.app.theme-dark .admin-page .bg-slate-50),
-	:global(.app.theme-dark .admin-page .bg-white) {
-		background: rgba(15, 23, 42, 0.74) !important;
-	}
-
-	:global(.app.theme-dark .admin-page .admin-field),
-	:global(.app.theme-dark .admin-page .admin-data-table thead) {
-		background: rgba(15, 23, 42, 0.82) !important;
-		color: rgba(248, 250, 252, 0.98) !important;
-	}
-
-	:global(.app.theme-dark .admin-page .admin-data-table tbody tr:hover) {
-		background: rgba(51, 65, 85, 0.42) !important;
+	:global(.admin-page) {
+		font-family:
+			ui-sans-serif,
+			system-ui,
+			-apple-system,
+			BlinkMacSystemFont,
+			'Segoe UI',
+			sans-serif;
 	}
 
 	:global(.no-scrollbar) {

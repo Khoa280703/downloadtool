@@ -57,13 +57,11 @@
 	});
 </script>
 
-<article
-	class={`admin-stat-card rounded-[1.75rem] border p-5 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.45)] ${toneClass.surface}`}
->
-	<div class={`h-1.5 w-12 rounded-full ${toneClass.accent}`}></div>
-	<p class={`mt-4 text-[11px] font-bold uppercase tracking-[0.22em] ${toneClass.label}`}>{label}</p>
-	<p class={`mt-3 text-3xl font-black tracking-[-0.03em] ${toneClass.value}`}>{value}</p>
+<article class={`admin-stat-card rounded-xl border p-4 ${toneClass.surface}`}>
+	<div class={`h-0.5 w-8 ${toneClass.accent}`}></div>
+	<p class={`mt-3 text-[10px] font-bold uppercase tracking-[0.2em] ${toneClass.label}`}>{label}</p>
+	<p class={`mt-2 text-[1.9rem] font-black tracking-[-0.03em] ${toneClass.value}`}>{value}</p>
 	{#if caption}
-		<p class={`mt-2 text-sm ${toneClass.caption}`}>{caption}</p>
+		<p class={`mt-1 text-[12px] leading-5 ${toneClass.caption}`}>{caption}</p>
 	{/if}
 </article>
