@@ -2,28 +2,68 @@
 	let {
 		label,
 		value,
-		tone = 'plum'
+		caption = '',
+		tone = 'neutral'
 	}: {
 		label: string;
 		value: string | number;
-		tone?: 'plum' | 'pink' | 'emerald' | 'amber';
+		caption?: string;
+		tone?: 'neutral' | 'sky' | 'emerald' | 'amber' | 'rose';
 	} = $props();
 
 	const toneClass = $derived.by(() => {
 		switch (tone) {
-			case 'pink':
-				return 'from-pink-500/15 to-pink-100 text-pink-700';
+			case 'sky':
+				return {
+					accent: 'bg-sky-500',
+					value: 'text-slate-950',
+					label: 'text-slate-500',
+					caption: 'text-slate-500',
+					surface: 'border-slate-200 bg-white/95'
+				};
 			case 'emerald':
-				return 'from-emerald-500/15 to-emerald-100 text-emerald-700';
+				return {
+					accent: 'bg-emerald-500',
+					value: 'text-slate-950',
+					label: 'text-slate-500',
+					caption: 'text-slate-500',
+					surface: 'border-slate-200 bg-white/95'
+				};
 			case 'amber':
-				return 'from-amber-500/15 to-amber-100 text-amber-700';
+				return {
+					accent: 'bg-amber-500',
+					value: 'text-slate-950',
+					label: 'text-slate-500',
+					caption: 'text-slate-500',
+					surface: 'border-slate-200 bg-white/95'
+				};
+			case 'rose':
+				return {
+					accent: 'bg-rose-500',
+					value: 'text-slate-950',
+					label: 'text-slate-500',
+					caption: 'text-slate-500',
+					surface: 'border-slate-200 bg-white/95'
+				};
 			default:
-				return 'from-plum/15 to-plum/5 text-plum';
+				return {
+					accent: 'bg-slate-900',
+					value: 'text-slate-950',
+					label: 'text-slate-500',
+					caption: 'text-slate-500',
+					surface: 'border-slate-200 bg-white/95'
+				};
 		}
 	});
 </script>
 
-<article class={`rounded-3xl border border-white/70 bg-gradient-to-br p-5 shadow-card ${toneClass}`}>
-	<p class="text-xs font-bold uppercase tracking-[0.2em] text-current/70">{label}</p>
-	<p class="mt-3 text-3xl font-black tracking-tight text-current">{value}</p>
+<article
+	class={`admin-stat-card rounded-[1.75rem] border p-5 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.45)] ${toneClass.surface}`}
+>
+	<div class={`h-1.5 w-12 rounded-full ${toneClass.accent}`}></div>
+	<p class={`mt-4 text-[11px] font-bold uppercase tracking-[0.22em] ${toneClass.label}`}>{label}</p>
+	<p class={`mt-3 text-3xl font-black tracking-[-0.03em] ${toneClass.value}`}>{value}</p>
+	{#if caption}
+		<p class={`mt-2 text-sm ${toneClass.caption}`}>{caption}</p>
+	{/if}
 </article>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { AdminJobRow } from '$lib/admin/types';
+	import AdminStatusBadge from '$components/admin/AdminStatusBadge.svelte';
 
 	let { jobs }: { jobs: AdminJobRow[] } = $props();
 
@@ -12,41 +13,46 @@
 </script>
 
 <div class="overflow-x-auto">
-	<table class="min-w-full text-sm">
-		<thead class="text-left text-xs uppercase tracking-[0.18em] text-plum/55">
+	<table class="admin-data-table min-w-full text-sm text-slate-700">
+		<thead class="sticky top-0 z-10 bg-slate-50/90 text-left text-[11px] uppercase tracking-[0.18em] text-slate-500 backdrop-blur">
 			<tr>
-				<th class="pb-3">Job</th>
-				<th class="pb-3">Status</th>
-				<th class="pb-3">Owner</th>
-				<th class="pb-3">Attempts</th>
-				<th class="pb-3">Artifact</th>
-				<th class="pb-3">Updated</th>
+				<th class="px-4 py-3 font-bold">Job</th>
+				<th class="px-4 py-3 font-bold">Status</th>
+				<th class="px-4 py-3 font-bold">Owner</th>
+				<th class="px-4 py-3 font-bold">Attempts</th>
+				<th class="px-4 py-3 font-bold">Artifact</th>
+				<th class="px-4 py-3 font-bold">Updated</th>
 			</tr>
 		</thead>
-		<tbody class="divide-y divide-pink-100/80">
+		<tbody class="divide-y divide-slate-200/80">
 			{#each jobs as job}
-				<tr class="align-top">
-					<td class="py-3 pr-4">
-						<p class="max-w-[24rem] truncate font-semibold text-plum">{job.title ?? job.id}</p>
-						<p class="mt-1 font-mono text-xs text-plum/55">{job.id}</p>
+				<tr class="align-top transition hover:bg-slate-50/80">
+					<td class="px-4 py-4 pr-2">
+						<p class="max-w-[24rem] truncate text-sm font-semibold text-slate-900">{job.title ?? job.id}</p>
+						<p class="mt-1 font-mono text-[11px] text-slate-500">{job.id}</p>
 						{#if job.lastError}
-							<p class="mt-2 max-w-[28rem] text-xs text-red-700">{job.lastError}</p>
+							<p class="mt-2 max-w-[28rem] text-xs text-rose-700">{job.lastError}</p>
 						{/if}
 					</td>
-					<td class="py-3 pr-4">
-						<span class="inline-flex rounded-full bg-pink-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-pink-700">
-							{job.status}
-						</span>
+					<td class="px-4 py-4 pr-2">
+						<AdminStatusBadge value={job.status} kind="job" />
 					</td>
-					<td class="py-3 pr-4 font-mono text-xs text-plum/65">{job.ownerLabel}</td>
-					<td class="py-3 pr-4 text-plum/70">{job.attemptLabel}</td>
-					<td class="py-3 pr-4">
-						<p class="text-plum/75">{job.backend ?? '—'}</p>
-						<p class="text-xs text-plum/55">{formatBytes(job.fileSizeBytes)}</p>
+					<td class="px-4 py-4 pr-2 font-mono text-xs text-slate-600">{job.ownerLabel}</td>
+					<td class="px-4 py-4 pr-2 text-slate-600">{job.attemptLabel}</td>
+					<td class="px-4 py-4 pr-2">
+						<p class="text-sm text-slate-700">{job.backend ?? '—'}</p>
+						<p class="text-xs text-slate-500">{formatBytes(job.fileSizeBytes)}</p>
 					</td>
-					<td class="py-3 text-plum/70">{new Date(job.updatedAt).toLocaleString()}</td>
+					<td class="px-4 py-4 text-slate-600">{new Date(job.updatedAt).toLocaleString()}</td>
 				</tr>
 			{/each}
+			{#if jobs.length === 0}
+				<tr>
+					<td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">
+						Chưa có job nào trong phạm vi hiển thị.
+					</td>
+				</tr>
+			{/if}
 		</tbody>
 	</table>
 </div>
