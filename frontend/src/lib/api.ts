@@ -431,8 +431,7 @@ export async function waitForMuxedDownloadJobReady(
 	const startedAt = Date.now();
 	const timeoutMs = options?.timeoutMs ?? MUX_JOB_MAX_WAIT_MS;
 	const pollIntervalMs = options?.pollIntervalMs ?? MUX_JOB_POLL_INTERVAL_MS;
-	const statusUrl = `/api/proxy/jobs/${encodeURIComponent(jobId)}`;
-	const fileTicketUrl = `/api/proxy/jobs/${encodeURIComponent(jobId)}/file-ticket`;
+	const jobPath = `/api/proxy/jobs/${encodeURIComponent(jobId)}`;
 
 	while (true) {
 		if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
@@ -440,14 +439,15 @@ export async function waitForMuxedDownloadJobReady(
 			throw new Error(`Mux job timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
 		}
 
-		const response = await fetch(statusUrl, { signal });
+		const cacheBuster = Date.now().toString();
+		const response = await fetch(`${jobPath}?t=${cacheBuster}`, { signal });
 		if (!response.ok) {
 			throw await parseApiError(response, `Failed to query mux job status (${response.status})`);
 		}
 
 		const status = (await response.json()) as MuxJobStatusApiResponse;
 		if (status.status === 'ready') {
-			const ticketResponse = await fetch(fileTicketUrl, { signal });
+			const ticketResponse = await fetch(`${jobPath}/file-ticket?t=${cacheBuster}`, { signal });
 			if (!ticketResponse.ok) {
 				throw await parseApiError(
 					ticketResponse,
@@ -455,7 +455,7 @@ export async function waitForMuxedDownloadJobReady(
 				);
 			}
 			const ticket = (await ticketResponse.json()) as FileTicketApiResponse;
-			return toAbsoluteDownloadUrl(ticket.download_url);
+			return toAbsoluteDownloadUrl(appendCacheBuster(ticket.download_url, cacheBuster));
 		}
 		if (status.status === 'failed') {
 			throw new Error(status.error || 'Mux job failed');
@@ -466,6 +466,11 @@ export async function waitForMuxedDownloadJobReady(
 
 		await sleep(pollIntervalMs, signal);
 	}
+}
+
+function appendCacheBuster(url: string, value: string): string {
+	const separator = url.includes('?') ? '&' : '?';
+	return `${url}${separator}t=${encodeURIComponent(value)}`;
 }
 
 export async function releaseMuxedDownloadJob(
