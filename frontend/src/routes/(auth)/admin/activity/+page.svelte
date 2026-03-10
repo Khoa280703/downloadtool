@@ -1,38 +1,40 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import AdminActivityTable from '$components/admin/AdminActivityTable.svelte';
+	import AdminMiniMetric from '$components/admin/AdminMiniMetric.svelte';
 	import AdminSectionHeader from '$components/admin/AdminSectionHeader.svelte';
-	import AdminStatCard from '$components/admin/AdminStatCard.svelte';
+	import { buildAdminDashboardViewModel } from '$lib/admin/dashboard-view-model';
 
 	let { data }: { data: PageData } = $props();
+
+	const model = $derived(buildAdminDashboardViewModel(data.overview));
 </script>
 
 <svelte:head>
 	<title>Admin Activity</title>
 </svelte:head>
 
-<section class="admin-panel rounded-xl border border-slate-200 bg-white">
-	<div class="border-b border-slate-200 px-5 py-5 md:px-6">
+<header class="admin-panel border border-slate-200 bg-white px-5 py-5 md:px-6">
+	<div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
 		<AdminSectionHeader
 			eyebrow="Activity"
-			title="Operational event stream"
-			description="Timeline hợp nhất từ jobs và proxy health để debug nhanh các biến động mới nhất."
+			title="Recent activity"
+			description="Timeline event từ jobs và proxy health để debug nhanh và thấy nhịp hoạt động hệ thống."
 		/>
+		<div class="grid gap-2 sm:grid-cols-3 xl:min-w-[420px]">
+			{#each model.snapshotStats as stat}
+				<AdminMiniMetric label={stat.label} value={stat.value} />
+			{/each}
+		</div>
 	</div>
+</header>
 
-	<div class="grid gap-4 px-5 py-5 md:grid-cols-3 md:px-6">
-		<AdminStatCard label="Signals / 24h" value={data.overview.eventsLast24h} caption="Tổng event trong 24 giờ gần nhất" tone="neutral" />
-		<AdminStatCard label="Queue backlog" value={data.overview.queuedJobs + data.overview.leasedJobs} caption="Khối lượng job đang chờ hoặc đã lease" tone={data.overview.queuedJobs + data.overview.leasedJobs > 0 ? 'amber' : 'neutral'} />
-		<AdminStatCard label="Proxy risk" value={data.overview.quarantinedProxies + data.overview.disabledProxies} caption="Proxy không nằm trong usable pool" tone={data.overview.quarantinedProxies + data.overview.disabledProxies > 0 ? 'rose' : 'neutral'} />
-	</div>
-</section>
-
-<section class="admin-panel mt-6 rounded-xl border border-slate-200 bg-white">
+<section class="admin-panel border border-slate-200 bg-white">
 	<div class="border-b border-slate-200 px-5 py-4 md:px-6">
 		<AdminSectionHeader
-			eyebrow="Timeline"
+			eyebrow="System activity"
 			title="Latest events"
-			description="Danh sách sự kiện mới nhất để truy ngược lỗi, quarantine và các thay đổi trạng thái."
+			description="Union của job events và proxy events theo thứ tự thời gian mới nhất."
 		/>
 	</div>
 	<AdminActivityTable activity={data.activity} />

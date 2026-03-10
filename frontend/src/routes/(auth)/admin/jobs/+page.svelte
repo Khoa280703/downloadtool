@@ -10,7 +10,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const model = $derived(buildAdminDashboardViewModel(data.overview));
-	const jobChartItems = $derived([
+	const queueChart = $derived([
 		{ label: 'Queued', value: data.overview.queuedJobs, tone: 'amber' as const },
 		{ label: 'Leased', value: data.overview.leasedJobs, tone: 'blue' as const },
 		{ label: 'Processing', value: data.overview.processingJobs, tone: 'blue' as const },
@@ -24,45 +24,61 @@
 	<title>Admin Jobs</title>
 </svelte:head>
 
-<section class="admin-panel rounded-xl border border-slate-200 bg-white">
-	<div class="border-b border-slate-200 px-5 py-5 md:px-6">
-		<div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-			<AdminSectionHeader
-				eyebrow="Jobs"
-				title="Mux queue operations"
-				description="Theo dõi trạng thái queue, retry pressure và nhịp hoàn thành của worker plane."
-			/>
-			<div class="grid gap-2 sm:grid-cols-3">
-				{#each model.queueStats as stat}
-					<AdminMiniMetric label={stat.label} value={stat.value} />
-				{/each}
-			</div>
-		</div>
-	</div>
-
-	<div class="grid gap-4 px-5 py-5 md:grid-cols-2 xl:grid-cols-4 md:px-6">
-		<AdminStatCard label="Queue backlog" value={model.queueBacklog} caption="Queued + leased" tone={model.queueBacklog > 0 ? 'amber' : 'neutral'} />
-		<AdminStatCard label="Active load" value={model.activeJobs} caption="Processing + leased" tone={model.activeJobs > 0 ? 'sky' : 'neutral'} />
-		<AdminStatCard label="Ready jobs" value={data.overview.readyJobs} caption="Đã hoàn tất trong queue" tone="emerald" />
-		<AdminStatCard label="Failure surface" value={data.overview.failedJobs + data.overview.expiredJobs} caption="Failed + expired" tone={data.overview.failedJobs + data.overview.expiredJobs > 0 ? 'rose' : 'neutral'} />
-	</div>
-</section>
-
-<div class="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-	<AdminBarChart
-		title="Job state distribution"
-		description="Phân bố hiện tại của toàn bộ pipeline jobs."
-		items={jobChartItems}
+<header class="admin-panel border border-slate-200 bg-white px-5 py-5 md:px-6">
+	<AdminSectionHeader
+		eyebrow="Jobs"
+		title="Mux queue"
+		description="Chi tiết queue, lease, retry count và artifact backend của các job gần nhất."
 	/>
+</header>
 
-	<section class="admin-panel rounded-xl border border-slate-200 bg-white">
-		<div class="border-b border-slate-200 px-5 py-4 md:px-6">
-			<AdminSectionHeader
-				eyebrow="Queue detail"
-				title="Recent mux jobs"
-				description="20 job gần nhất với trạng thái, owner, attempt count và backend artifact."
+<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+	<section class="admin-panel border border-slate-200 bg-white p-5">
+		<AdminSectionHeader
+			eyebrow="Queue profile"
+			title="Current distribution"
+			description="Phân bố hiện tại của queue để nhận diện backlog và failure pressure."
+		/>
+		<div class="mt-5">
+			<AdminBarChart title="Mux job states" description="Snapshot thời điểm hiện tại." items={queueChart} />
+		</div>
+	</section>
+
+	<section class="admin-panel border border-slate-200 bg-white p-5">
+		<AdminSectionHeader
+			eyebrow="Queue metrics"
+			title="Operational counters"
+			description="Các counters quan trọng cho operator theo dõi throughput và retry."
+		/>
+		<div class="mt-5 grid gap-3">
+			{#each model.queueStats as stat}
+				<AdminMiniMetric label={stat.label} value={stat.value} />
+			{/each}
+		</div>
+		<div class="mt-4 grid gap-3">
+			<AdminStatCard
+				label="Artifacts ready"
+				value={data.overview.readyArtifacts}
+				caption="Số artifact có thể cấp file ticket"
+				tone="emerald"
+			/>
+			<AdminStatCard
+				label="Artifacts building"
+				value={data.overview.buildingArtifacts}
+				caption="Đang mux và upload"
+				tone="sky"
 			/>
 		</div>
-		<AdminJobsTable jobs={data.jobs} />
 	</section>
 </div>
+
+<section class="admin-panel border border-slate-200 bg-white">
+	<div class="border-b border-slate-200 px-5 py-4 md:px-6">
+		<AdminSectionHeader
+			eyebrow="Queue detail"
+			title="Recent mux jobs"
+			description="20 job gần nhất với trạng thái, số lần thử và artifact backend tương ứng."
+		/>
+	</div>
+	<AdminJobsTable jobs={data.jobs} />
+</section>
