@@ -9,8 +9,31 @@ import {
 
 export const GET: RequestHandler = async ({ params, request, fetch, cookies }) => {
 	const downloadSessionId = ensureDownloadSessionId(cookies);
-	const upstream = await fetch(buildRustApiUrl(`/api/jobs/${encodeURIComponent(params.jobId)}/file`), {
-		headers: await buildRustApiHeaders(request, false, downloadSessionId),
+	const rustHeaders = await buildRustApiHeaders(request, false, downloadSessionId);
+	const ticketUpstream = await fetch(
+		buildRustApiUrl(`/api/jobs/${encodeURIComponent(params.jobId)}/file-ticket`),
+		{
+			headers: rustHeaders,
+			signal: request.signal
+		}
+	);
+
+	if (!ticketUpstream.ok) {
+		return new Response(ticketUpstream.body, {
+			status: ticketUpstream.status,
+			headers: copyRustResponseHeaders(ticketUpstream)
+		});
+	}
+
+	const ticketPayload = (await ticketUpstream.json()) as { download_url?: string };
+	const rustFallbackPath = `/api/jobs/${encodeURIComponent(params.jobId)}/file`;
+	const ticketUrl = ticketPayload.download_url?.trim();
+	const upstreamUrl =
+		ticketUrl && /^https?:\/\//i.test(ticketUrl)
+			? ticketUrl
+			: buildRustApiUrl(ticketUrl && ticketUrl.startsWith('/api/jobs/') ? ticketUrl : rustFallbackPath);
+	const upstream = await fetch(upstreamUrl, {
+		headers: /^https?:\/\//i.test(upstreamUrl) ? undefined : rustHeaders,
 		signal: request.signal
 	});
 
