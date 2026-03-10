@@ -1,50 +1,65 @@
 <script lang="ts">
-	type BadgeKind = 'job' | 'proxy' | 'scope' | 'tone';
+	import type { AdminActivityRow, AdminJobStatus, ProxyStatus } from '$lib/admin/types';
+
 	type Tone = 'neutral' | 'sky' | 'emerald' | 'amber' | 'rose';
+	type BadgeProps =
+		| { kind: 'job'; value: AdminJobStatus; tone?: never }
+		| { kind: 'proxy'; value: ProxyStatus; tone?: never }
+		| { kind: 'scope'; value: AdminActivityRow['scope']; tone?: never }
+		| { kind?: 'tone'; value: string; tone?: Tone };
 
 	let {
 		value,
 		kind = 'tone',
 		tone = 'neutral'
-	}: {
-		value: string;
-		kind?: BadgeKind;
-		tone?: Tone;
-	} = $props();
+	}: BadgeProps = $props();
+
+	function resolveJobTone(status: AdminJobStatus): Tone {
+		switch (status) {
+			case 'queued':
+				return 'amber';
+			case 'leased':
+			case 'processing':
+				return 'sky';
+			case 'ready':
+				return 'emerald';
+			case 'failed':
+			case 'expired':
+				return 'rose';
+		}
+	}
+
+	function resolveProxyTone(status: ProxyStatus): Tone {
+		switch (status) {
+			case 'active':
+				return 'emerald';
+			case 'quarantined':
+				return 'rose';
+			case 'disabled':
+				return 'amber';
+		}
+	}
+
+	function resolveScopeTone(scope: AdminActivityRow['scope']): Tone {
+		switch (scope) {
+			case 'job':
+				return 'sky';
+			case 'proxy':
+				return 'amber';
+		}
+	}
 
 	function resolveTone(): Tone {
 		if (kind === 'job') {
-			switch (value) {
-				case 'ready':
-					return 'emerald';
-				case 'failed':
-				case 'expired':
-					return 'rose';
-				case 'processing':
-				case 'leased':
-					return 'sky';
-				case 'queued':
-					return 'amber';
-				default:
-					return 'neutral';
-			}
+			return resolveJobTone(value as AdminJobStatus);
 		}
 
 		if (kind === 'proxy') {
-			switch (value) {
-				case 'active':
-					return 'emerald';
-				case 'quarantined':
-					return 'rose';
-				case 'disabled':
-					return 'amber';
-				default:
-					return 'neutral';
-			}
+			return resolveProxyTone(value as ProxyStatus);
 		}
 
 		if (kind === 'scope') {
-			return value === 'proxy' ? 'amber' : 'sky';
+			return resolveScopeTone(value as AdminActivityRow['scope']);
 		}
 
 		return tone;

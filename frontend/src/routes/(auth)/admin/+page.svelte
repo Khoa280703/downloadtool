@@ -2,7 +2,9 @@
 	import type { ActionData, PageData } from './$types';
 	import AdminActivityTable from '$components/admin/AdminActivityTable.svelte';
 	import AdminJobsTable from '$components/admin/AdminJobsTable.svelte';
+	import AdminMiniMetric from '$components/admin/AdminMiniMetric.svelte';
 	import AdminProxyTable from '$components/admin/AdminProxyTable.svelte';
+	import AdminSectionHeader from '$components/admin/AdminSectionHeader.svelte';
 	import AdminStatCard from '$components/admin/AdminStatCard.svelte';
 
 	type StatTone = 'neutral' | 'sky' | 'emerald' | 'amber' | 'rose';
@@ -60,6 +62,33 @@
 			tone: 'neutral'
 		}
 	]);
+	const headerStats = $derived([
+		{ label: 'Queued', value: overview.queuedJobs, caption: 'Chờ worker nhận lease' },
+		{ label: 'Processing', value: overview.processingJobs, caption: 'Đang mux và upload' },
+		{ label: 'Ready', value: overview.readyJobs, caption: 'Đã có ticket để tải' }
+	]);
+	const queueStats = $derived([
+		{ label: 'Leased', value: overview.leasedJobs },
+		{ label: 'Failed', value: overview.failedJobs },
+		{ label: 'Expired', value: overview.expiredJobs }
+	]);
+	const snapshotStats = $derived([
+		{
+			label: 'Queue pressure',
+			value: queueBacklog > 0 ? `${queueBacklog} job cần hoàn thành` : 'Ổn định',
+			caption: `${overview.processingJobs} processing, ${overview.leasedJobs} leased.`
+		},
+		{
+			label: 'Proxy coverage',
+			value: `${overview.activeProxies} active / ${totalProxies}`,
+			caption: `${overview.quarantinedProxies} quarantined, ${overview.disabledProxies} disabled.`
+		},
+		{
+			label: 'Artifact cache',
+			value: `${overview.readyArtifacts} ready / ${totalArtifacts}`,
+			caption: `${overview.buildingArtifacts} artifact đang build.`
+		}
+	]);
 
 	function formatGateMode(mode: string): string {
 		return mode.replace(/[_-]/g, ' ');
@@ -105,28 +134,10 @@
 					</div>
 				</div>
 
-					<div class="grid gap-3 sm:grid-cols-3 xl:w-[28rem]">
-						<div class="admin-kpi-box rounded-[1.5rem] border border-slate-200 bg-white/90 p-4">
-						<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Queued</p>
-						<p class="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-950">
-							{overview.queuedJobs}
-						</p>
-						<p class="mt-1 text-sm text-slate-500">Chờ worker nhận lease</p>
-					</div>
-						<div class="admin-kpi-box rounded-[1.5rem] border border-slate-200 bg-white/90 p-4">
-						<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Processing</p>
-						<p class="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-950">
-							{overview.processingJobs}
-						</p>
-						<p class="mt-1 text-sm text-slate-500">Đang mux và upload</p>
-					</div>
-						<div class="admin-kpi-box rounded-[1.5rem] border border-slate-200 bg-white/90 p-4">
-						<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Ready</p>
-						<p class="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-950">
-							{overview.readyJobs}
-						</p>
-						<p class="mt-1 text-sm text-slate-500">Đã có ticket để tải</p>
-					</div>
+				<div class="grid gap-3 sm:grid-cols-3 xl:w-[28rem]">
+					{#each headerStats as stat}
+						<AdminMiniMetric label={stat.label} value={stat.value} caption={stat.caption} />
+					{/each}
 				</div>
 			</div>
 
@@ -168,36 +179,15 @@
 				<div class="space-y-6">
 					<section class="admin-panel rounded-[1.75rem] border border-slate-200 bg-white">
 						<div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 md:px-6">
-							<div>
-								<p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
-									Queue detail
-								</p>
-								<h2 class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">
-									Recent mux jobs
-								</h2>
-								<p class="mt-2 text-sm text-slate-600">
-									20 job gần nhất với trạng thái, số lần thử và artifact backend.
-								</p>
-							</div>
+							<AdminSectionHeader
+								eyebrow="Queue detail"
+								title="Recent mux jobs"
+								description="20 job gần nhất với trạng thái, số lần thử và artifact backend."
+							/>
 							<div class="grid gap-3 sm:grid-cols-3">
-								<div class="admin-kpi-box rounded-2xl bg-slate-50 px-4 py-3">
-									<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Leased</p>
-									<p class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">
-										{overview.leasedJobs}
-									</p>
-								</div>
-								<div class="admin-kpi-box rounded-2xl bg-slate-50 px-4 py-3">
-									<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Failed</p>
-									<p class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">
-										{overview.failedJobs}
-									</p>
-								</div>
-								<div class="admin-kpi-box rounded-2xl bg-slate-50 px-4 py-3">
-									<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Expired</p>
-									<p class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">
-										{overview.expiredJobs}
-									</p>
-								</div>
+								{#each queueStats as stat}
+									<AdminMiniMetric label={stat.label} value={stat.value} />
+								{/each}
 							</div>
 						</div>
 						<div class="px-0 py-0">
@@ -207,30 +197,22 @@
 
 					<section class="admin-panel rounded-[1.75rem] border border-slate-200 bg-white">
 						<div class="border-b border-slate-200 px-5 py-5 md:px-6">
-							<p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
-								Proxy fleet
-							</p>
-							<h2 class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">
-								Proxy inventory
-							</h2>
-							<p class="mt-2 text-sm text-slate-600">
-								Cập nhật trạng thái proxy trực tiếp từ dashboard, theo dõi quarantine và event gần nhất.
-							</p>
+							<AdminSectionHeader
+								eyebrow="Proxy fleet"
+								title="Proxy inventory"
+								description="Cập nhật trạng thái proxy trực tiếp từ dashboard, theo dõi quarantine và event gần nhất."
+							/>
 						</div>
 						<AdminProxyTable proxies={data.dashboard.proxies} />
 					</section>
 
 					<section class="admin-panel rounded-[1.75rem] border border-slate-200 bg-white">
 						<div class="border-b border-slate-200 px-5 py-5 md:px-6">
-							<p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
-								System activity
-							</p>
-							<h2 class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">
-								Recent activity
-							</h2>
-							<p class="mt-2 text-sm text-slate-600">
-								Hợp nhất event từ job pipeline và proxy health để soi timeline sự cố.
-							</p>
+							<AdminSectionHeader
+								eyebrow="System activity"
+								title="Recent activity"
+								description="Hợp nhất event từ job pipeline và proxy health để soi timeline sự cố."
+							/>
 						</div>
 						<AdminActivityTable activity={data.dashboard.activity} />
 					</section>
@@ -238,52 +220,29 @@
 
 				<aside class="space-y-6">
 					<section class="admin-panel rounded-[1.75rem] border border-slate-200 bg-slate-950 p-5 text-white">
-						<p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">System posture</p>
-						<h2 class="mt-2 text-2xl font-black tracking-[-0.03em] text-white">Operational snapshot</h2>
+						<AdminSectionHeader
+							eyebrow="System posture"
+							title="Operational snapshot"
+							description="Tóm tắt nhanh các vùng có thể gây áp lực lên pipeline ở thời điểm hiện tại."
+						/>
 						<div class="mt-5 grid gap-3">
-							<div class="admin-kpi-box rounded-2xl border border-white/10 bg-white/5 p-4">
-								<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-									Queue pressure
-								</p>
-								<p class="mt-2 text-lg font-bold text-white">
-									{queueBacklog > 0 ? `${queueBacklog} job cần hoàn thành` : 'Ổn định'}
-								</p>
-								<p class="mt-1 text-sm text-slate-300">
-									{overview.processingJobs} processing, {overview.leasedJobs} leased.
-								</p>
-							</div>
-							<div class="admin-kpi-box rounded-2xl border border-white/10 bg-white/5 p-4">
-								<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-									Proxy coverage
-								</p>
-								<p class="mt-2 text-lg font-bold text-white">
-									{overview.activeProxies} active / {totalProxies}
-								</p>
-								<p class="mt-1 text-sm text-slate-300">
-									{overview.quarantinedProxies} quarantined, {overview.disabledProxies} disabled.
-								</p>
-							</div>
-							<div class="admin-kpi-box rounded-2xl border border-white/10 bg-white/5 p-4">
-								<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-									Artifact cache
-								</p>
-								<p class="mt-2 text-lg font-bold text-white">
-									{overview.readyArtifacts} ready / {totalArtifacts}
-								</p>
-								<p class="mt-1 text-sm text-slate-300">
-									{overview.buildingArtifacts} artifact đang build.
-								</p>
-							</div>
+							{#each snapshotStats as stat}
+								<AdminMiniMetric
+									label={stat.label}
+									value={stat.value}
+									caption={stat.caption}
+									inverted={true}
+								/>
+							{/each}
 						</div>
 					</section>
 
 					<section class="admin-panel rounded-[1.75rem] border border-slate-200 bg-white p-5">
-						<p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Proxy controls</p>
-						<h2 class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">Add proxy</h2>
-						<p class="mt-2 text-sm leading-6 text-slate-600">
-							Nhận full URL hoặc định dạng raw <code>host:port:user:pass</code>. Credentials chỉ
-							được hiển thị dưới dạng masked khi render lại.
-						</p>
+						<AdminSectionHeader
+							eyebrow="Proxy controls"
+							title="Add proxy"
+							description="Nhận full URL hoặc định dạng raw host:port:user:pass. Credentials chỉ được hiển thị dưới dạng masked khi render lại."
+						/>
 						<form method="POST" action="?/createProxy" class="mt-5 grid gap-3">
 							<input
 								type="text"
@@ -313,8 +272,11 @@
 					</section>
 
 					<section class="admin-panel rounded-[1.75rem] border border-slate-200 bg-white p-5">
-						<p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Support metrics</p>
-						<h2 class="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">Capacity</h2>
+						<AdminSectionHeader
+							eyebrow="Support metrics"
+							title="Capacity"
+							description="Sức chứa hiện tại của fleet và artifact pipeline."
+						/>
 						<div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
 							<AdminStatCard
 								label="Active proxies"

@@ -1,4 +1,5 @@
 export type ProxyStatus = 'active' | 'disabled' | 'quarantined';
+export type AdminJobStatus = 'queued' | 'leased' | 'processing' | 'ready' | 'failed' | 'expired';
 
 export type AdminOverview = {
 	queuedJobs: number;
@@ -18,7 +19,7 @@ export type AdminOverview = {
 export type AdminJobRow = {
 	id: string;
 	title: string | null;
-	status: string;
+	status: AdminJobStatus;
 	ownerLabel: string;
 	attemptLabel: string;
 	fileSizeBytes: number | null;
