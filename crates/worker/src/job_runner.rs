@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::Instant;
 
 use anyhow::Result;
 use job_system::{JobRepository, JobStatus};
@@ -74,6 +75,14 @@ pub async fn run_claimed_job(
         let artifact = repo
             .ensure_building_artifact(&job.dedupe_key, "video/mp4")
             .await?;
+        info!(
+            job_id = job.id,
+            artifact_id = artifact.id,
+            dedupe_key = job.dedupe_key,
+            artifact_backend = config.artifact_backend,
+            artifact_dir = %config.artifact_dir.display(),
+            "Worker starting mux artifact build"
+        );
         repo.mark_processing(
             &job.id,
             &config.worker_id,
@@ -87,12 +96,24 @@ pub async fn run_claimed_job(
             config.lease_secs,
         );
 
+        let upload_started_at = Instant::now();
         let upload_result =
             upload_muxed_artifact(&job.id, &job.request, storage.clone(), &job.dedupe_key).await;
 
         let _ = heartbeat_stop.send(());
         let _ = heartbeat_task.await;
         let stored = upload_result?;
+        info!(
+            job_id = job.id,
+            artifact_id = artifact.id,
+            backend = stored.backend,
+            size_bytes = stored.size_bytes,
+            local_path = stored.local_path.as_deref().unwrap_or(""),
+            bucket = stored.storage_bucket.as_deref().unwrap_or(""),
+            object_key = stored.object_key.as_deref().unwrap_or(""),
+            elapsed_ms = upload_started_at.elapsed().as_millis() as u64,
+            "Worker stored muxed artifact"
+        );
 
         repo.mark_artifact_ready(
             &job.id,

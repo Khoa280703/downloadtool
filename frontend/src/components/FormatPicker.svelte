@@ -354,6 +354,7 @@
 	function iconFor(stream: Stream): string {
 		if (stream.isAudioOnly) return 'headphones';
 		const quality = qualityScore(stream.quality);
+		if (quality >= 4320) return '8k';
 		if (quality >= 2160) return '4k';
 		if (quality >= 1440) return '2k';
 		if (quality >= 1080) return 'full_hd';

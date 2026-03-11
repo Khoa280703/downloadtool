@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::{anyhow, Context, Result};
 use futures::TryStreamExt;
@@ -19,6 +20,21 @@ pub async fn upload_muxed_artifact(
     let mut video_url = request.video_url.clone();
     let mut audio_url = request.audio_url.clone();
     let refresh_options = build_refresh_options(request);
+    let started_at = Instant::now();
+
+    info!(
+        job_id,
+        artifact_key,
+        source_url = request.source_url.as_deref().unwrap_or(""),
+        video_format_id = request.video_format_id.as_deref().unwrap_or(""),
+        audio_format_id = request.audio_format_id.as_deref().unwrap_or(""),
+        refresh_attempts = refresh_options
+            .video
+            .as_ref()
+            .map(|value| value.max_refresh_attempts)
+            .unwrap_or(0),
+        "Starting mux upload pipeline"
+    );
 
     for attempt in 0..=refresh_options
         .video
@@ -26,6 +42,7 @@ pub async fn upload_muxed_artifact(
         .map(|value| value.max_refresh_attempts)
         .unwrap_or(0)
     {
+        let fetch_started_at = Instant::now();
         let (video_stream, audio_stream) = StreamFetcher::fetch_both_with_refresh(
             &video_url,
             &audio_url,
@@ -34,22 +51,54 @@ pub async fn upload_muxed_artifact(
         )
         .await
         .with_context(|| format!("failed to fetch streams for job {job_id}"))?;
+        info!(
+            job_id,
+            artifact_key,
+            attempt,
+            elapsed_ms = fetch_started_at.elapsed().as_millis() as u64,
+            total_elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "Fetched source streams for mux pipeline"
+        );
 
         let muxed = remux_streams(video_stream, audio_stream);
         let upload_stream: UploadStream = Box::pin(muxed.map_err(anyhow::Error::new));
+        let store_started_at = Instant::now();
+        info!(
+            job_id,
+            artifact_key,
+            attempt,
+            "Storing muxed artifact to storage backend"
+        );
 
         match storage
             .store_stream(artifact_key, "video/mp4", upload_stream)
             .await
         {
-            Ok(stored) => return Ok(stored),
+            Ok(stored) => {
+                info!(
+                    job_id,
+                    artifact_key,
+                    attempt,
+                    backend = stored.backend,
+                    size_bytes = stored.size_bytes,
+                    elapsed_ms = store_started_at.elapsed().as_millis() as u64,
+                    total_elapsed_ms = started_at.elapsed().as_millis() as u64,
+                    "Stored muxed artifact successfully"
+                );
+                return Ok(stored);
+            }
             Err(error) if is_auth_like_error(&error) && request.source_url.is_some() => {
                 if let Some((next_video, next_audio)) =
                     refresh_both_urls(request, &video_url, &audio_url).await
                 {
                     warn!(
                         job_id,
-                        attempt, "Refreshing mux URLs after auth-like storage pipeline error"
+                        artifact_key,
+                        attempt,
+                        err = %error,
+                        err_chain = %format!("{error:#}"),
+                        elapsed_ms = store_started_at.elapsed().as_millis() as u64,
+                        "Refreshing mux URLs after auth-like storage pipeline error"
                     );
                     video_url = next_video;
                     audio_url = next_audio;
@@ -57,7 +106,19 @@ pub async fn upload_muxed_artifact(
                 }
                 return Err(error).context("mux upload auth refresh failed");
             }
-            Err(error) => return Err(error).context("failed to store muxed artifact"),
+            Err(error) => {
+                warn!(
+                    job_id,
+                    artifact_key,
+                    attempt,
+                    err = %error,
+                    err_chain = %format!("{error:#}"),
+                    elapsed_ms = store_started_at.elapsed().as_millis() as u64,
+                    total_elapsed_ms = started_at.elapsed().as_millis() as u64,
+                    "Failed to store muxed artifact in storage backend"
+                );
+                return Err(error).context("failed to store muxed artifact");
+            }
         }
     }
 

@@ -1,8 +1,11 @@
+use std::time::Instant;
+
 use anyhow::{anyhow, Context, Result};
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
 use futures::StreamExt;
+use tracing::{info, warn};
 
 use crate::UploadStream;
 
@@ -17,10 +20,20 @@ pub(crate) async fn upload_stream_parts(
     let mut completed_parts = Vec::new();
     let mut next_part_number = 1i32;
     let mut buffer = MultipartUploadBuffer::new(part_size_bytes);
+    let started_at = Instant::now();
+
+    info!(
+        bucket,
+        artifact_key,
+        upload_id,
+        part_size_bytes,
+        "Starting multipart upload stream ingestion"
+    );
 
     while let Some(chunk) = stream.next().await {
         buffer.push(&chunk?)?;
         while let Some(part) = buffer.take_ready_part() {
+            let part_len = part.len();
             completed_parts.push(
                 upload_part(
                     client,
@@ -32,12 +45,24 @@ pub(crate) async fn upload_stream_parts(
                 )
                 .await?,
             );
+            info!(
+                bucket,
+                artifact_key,
+                upload_id,
+                part_number = next_part_number,
+                part_size_bytes = part_len,
+                uploaded_parts = completed_parts.len(),
+                buffered_total_bytes = buffer.total_bytes,
+                elapsed_ms = started_at.elapsed().as_millis() as u64,
+                "Uploaded multipart part"
+            );
             next_part_number += 1;
         }
     }
 
     let (final_part, total_bytes) = buffer.finish()?;
     if let Some(part) = final_part {
+        let part_len = part.len();
         completed_parts.push(
             upload_part(
                 client,
@@ -49,7 +74,28 @@ pub(crate) async fn upload_stream_parts(
             )
             .await?,
         );
+        info!(
+            bucket,
+            artifact_key,
+            upload_id,
+            part_number = next_part_number,
+            part_size_bytes = part_len,
+            uploaded_parts = completed_parts.len(),
+            total_bytes,
+            elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "Uploaded final multipart part"
+        );
     }
+
+    info!(
+        bucket,
+        artifact_key,
+        upload_id,
+        total_bytes,
+        total_parts = completed_parts.len(),
+        elapsed_ms = started_at.elapsed().as_millis() as u64,
+        "Finished multipart upload stream ingestion"
+    );
 
     Ok((completed_parts, total_bytes))
 }
@@ -61,6 +107,8 @@ pub(crate) async fn complete_upload(
     upload_id: &str,
     completed_parts: Vec<CompletedPart>,
 ) -> Result<()> {
+    let started_at = Instant::now();
+    let parts_len = completed_parts.len();
     client
         .complete_multipart_upload()
         .bucket(bucket)
@@ -75,6 +123,15 @@ pub(crate) async fn complete_upload(
         .await
         .with_context(|| format!("failed to complete multipart upload for {artifact_key}"))?;
 
+    info!(
+        bucket,
+        artifact_key,
+        upload_id,
+        parts = parts_len,
+        elapsed_ms = started_at.elapsed().as_millis() as u64,
+        "Completed multipart upload"
+    );
+
     Ok(())
 }
 
@@ -84,6 +141,7 @@ pub(crate) async fn abort_upload(
     artifact_key: &str,
     upload_id: &str,
 ) -> Result<()> {
+    let started_at = Instant::now();
     client
         .abort_multipart_upload()
         .bucket(bucket)
@@ -92,6 +150,14 @@ pub(crate) async fn abort_upload(
         .send()
         .await
         .with_context(|| format!("failed to abort multipart upload for {artifact_key}"))?;
+
+    warn!(
+        bucket,
+        artifact_key,
+        upload_id,
+        elapsed_ms = started_at.elapsed().as_millis() as u64,
+        "Aborted multipart upload"
+    );
 
     Ok(())
 }
@@ -104,6 +170,7 @@ async fn upload_part(
     part_number: i32,
     bytes: &[u8],
 ) -> Result<CompletedPart> {
+    let started_at = Instant::now();
     let response = client
         .upload_part()
         .bucket(bucket)
@@ -114,6 +181,16 @@ async fn upload_part(
         .send()
         .await
         .with_context(|| format!("failed to upload part {part_number} for {artifact_key}"))?;
+
+    info!(
+        bucket,
+        artifact_key,
+        upload_id,
+        part_number,
+        part_size_bytes = bytes.len(),
+        elapsed_ms = started_at.elapsed().as_millis() as u64,
+        "upload_part request finished"
+    );
 
     Ok(CompletedPart::builder()
         .part_number(part_number)
