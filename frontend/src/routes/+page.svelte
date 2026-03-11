@@ -1,16 +1,41 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { onMount } from 'svelte';
-	import BatchInput from '$components/BatchInput.svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import BatchProgress from '$components/BatchProgress.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
-	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
+	import { extract, extractYouTubeVideoId, isValidVideoUrl, subscribeBatch } from '$lib/api';
 	import mikeAvatar from '$lib/assets/testimonials/mike.webp';
 	import * as m from '$lib/paraglide/messages';
+	import {
+		PLAYLIST_DOWNLOAD_MODE_OPTIONS,
+		PLAYLIST_QUALITY_OPTIONS,
+		type PlaylistDownloadMode,
+		type PlaylistQuality,
+		getStoredPlaylistDownloadMode,
+		getStoredPlaylistQuality
+	} from '$lib/playlist-download-stream-selection';
+	import {
+		type QueueEntry,
+		enqueueDownload,
+		pickSaveDirectory,
+		resetWorkerState,
+		setPreferredDownloadMode,
+		setPreferredQuality
+	} from '$lib/playlist-download-worker';
 	import sarahAvatar from '$lib/assets/testimonials/sarah.webp';
+	import {
+		addBatchItem,
+		batchProgress,
+		batchQueue,
+		completeBatch,
+		resetBatch,
+		setBatchProgress,
+		setEventSource,
+		startBatch
+	} from '$stores/batch';
 	import type { ExtractResult, Stream } from '$lib/types';
 	import user1Avatar from '$lib/assets/testimonials/user-1.webp';
 	import user2Avatar from '$lib/assets/testimonials/user-2.webp';
@@ -33,6 +58,14 @@
 	);
 	let authModalOpen = $state(false);
 	let AuthModalComponent = $state<AuthModalComponentType | null>(null);
+	let playlistModeEnabled = $state(false);
+	let playlistPhase = $state<'idle' | 'fetching' | 'ready' | 'downloading'>('idle');
+	let fsaaSupported = $state(false);
+	let dirPicked = $state(false);
+	let selectedDownloadMode = $state<PlaylistDownloadMode>(getStoredPlaylistDownloadMode());
+	let selectedQuality = $state<PlaylistQuality>(getStoredPlaylistQuality());
+	let stagedEntries = $state<QueueEntry[]>([]);
+	let playlistCompletionNotified = $state(false);
 	/** undefined = loading skeleton, null = unauthenticated, object = authenticated */
 	let authUser = $state<AuthUser | null | undefined>(undefined);
 	let redirectTo = $state('/');
@@ -83,6 +116,21 @@
 		}))
 	];
 
+	const showPlaylistPanel = $derived.by(
+		() => playlistPhase !== 'idle' || $batchQueue.length > 0
+	);
+	const playlistBusy = $derived.by(
+		() => playlistPhase === 'fetching' || playlistPhase === 'downloading'
+	);
+	const playlistReadyCount = $derived.by(() => $batchQueue.length);
+	const playlistSelectedCount = $derived.by(
+		() => $batchQueue.filter((item) => item.selected !== false).length
+	);
+	const playlistDiscoveryPercent = $derived.by(() => {
+		if ($batchProgress.total <= 0) return 0;
+		return Math.min(100, Math.round(($batchProgress.received / $batchProgress.total) * 100));
+	});
+
 	function normalizeRedirectTo(value: string | null): string {
 		if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
 		return value;
@@ -117,6 +165,8 @@
 
 	onMount(() => {
 		syncThemeFromStorage();
+		const picker = (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker;
+		fsaaSupported = typeof picker === 'function';
 
 		void (async () => {
 			await refreshAuthUser();
@@ -154,9 +204,232 @@
 		};
 	});
 
+	onDestroy(() => {
+		resetWorkerState();
+		resetBatch();
+	});
+
+	$effect(() => {
+		if (playlistPhase !== 'downloading' || playlistCompletionNotified) return;
+		if ($batchQueue.length === 0) return;
+
+		const selectedItems = $batchQueue.filter((item) => item.selected !== false);
+		const settled = selectedItems.every(
+			(item) => item.status === 'completed' || item.status === 'error'
+		);
+		if (!settled) return;
+
+		playlistCompletionNotified = true;
+		playlistPhase = 'ready';
+		completeBatch();
+	});
+
 	function handleFormatSelect(videoStream: Stream, audioStream: Stream | null): void {
 		currentDownload.update((state) => ({ ...state, selectedStream: videoStream }));
 		selectedAudioStream = audioStream;
+	}
+
+	function isPlaylistUrl(input: string): boolean {
+		if (!input.includes('youtube.com') && !input.includes('youtu.be')) return false;
+		if (/[?&]list=/.test(input)) return true;
+		if (/youtube\.com\/playlist/.test(input)) return true;
+		return false;
+	}
+
+	function setPlaylistMode(enabled: boolean): void {
+		if (playlistBusy || isExtracting) return;
+		if (playlistModeEnabled === enabled) return;
+
+		playlistModeEnabled = enabled;
+		extractError = '';
+		if (enabled) {
+			extractResult = null;
+			selectedAudioStream = null;
+			currentDownload.update((state) => ({ ...state, selectedStream: null, error: null }));
+			return;
+		}
+
+		resetPlaylistComposer();
+	}
+
+	function persistPlaylistQuality(quality: PlaylistQuality): void {
+		if (!browser) return;
+		try {
+			window.localStorage.setItem('fetchtube.playlist-quality.v1', quality);
+		} catch {
+			// Ignore localStorage failures.
+		}
+	}
+
+	function persistPlaylistDownloadMode(mode: PlaylistDownloadMode): void {
+		if (!browser) return;
+		try {
+			window.localStorage.setItem('fetchtube.playlist-download-mode.v1', mode);
+		} catch {
+			// Ignore localStorage failures.
+		}
+	}
+
+	function pushStagedEntry(entry: QueueEntry): void {
+		if (stagedEntries.some((item) => item.videoId === entry.videoId)) return;
+		stagedEntries = [...stagedEntries, entry];
+	}
+
+	function resetPlaylistComposer(options: { preserveQueue?: boolean } = {}): void {
+		resetWorkerState();
+		if (!options.preserveQueue) {
+			resetBatch();
+			stagedEntries = [];
+		}
+		playlistPhase = 'idle';
+		playlistCompletionNotified = false;
+	}
+
+	async function handleFetchPlaylist(): Promise<void> {
+		if (playlistBusy) return;
+
+		const url = inputUrl.trim();
+		if (!url) {
+			extractError = m.home_playlist_error_paste_url();
+			return;
+		}
+		if (!isValidVideoUrl(url)) {
+			extractError = m.home_playlist_error_invalid_url();
+			return;
+		}
+		if (!isPlaylistUrl(url)) {
+			extractError = m.home_playlist_error_use_playlist_url();
+			return;
+		}
+
+		extractError = '';
+		extractResult = null;
+		selectedAudioStream = null;
+		currentDownload.update((state) => ({ ...state, selectedStream: null, error: null }));
+		playlistCompletionNotified = false;
+		stagedEntries = [];
+		resetWorkerState();
+		resetBatch();
+		startBatch();
+		playlistPhase = 'fetching';
+
+		const es = subscribeBatch(
+			url,
+			(data) => {
+				if (data.type === 'link') {
+					if (!data.videoId || !data.title) return;
+
+					const entry: QueueEntry = {
+						videoId: data.videoId,
+						title: data.title,
+						thumbnail: data.thumbnail
+					};
+
+					pushStagedEntry(entry);
+					addBatchItem({
+						videoId: entry.videoId,
+						title: entry.title,
+						thumbnail: entry.thumbnail,
+						status: 'pending'
+					});
+
+					if (data.index != null && data.total != null) {
+						setBatchProgress(data.index, data.total);
+					}
+					return;
+				}
+
+				if (data.type === 'progress') {
+					if (data.current != null && data.total != null) {
+						setBatchProgress(data.current, data.total);
+					}
+					return;
+				}
+
+				if (data.type === 'done') {
+					es.close();
+					completeBatch();
+					playlistPhase = stagedEntries.length > 0 ? 'ready' : 'idle';
+					if (stagedEntries.length === 0) {
+						extractError = m.home_playlist_error_no_videos();
+					}
+					return;
+				}
+
+				if (data.type === 'error') {
+					extractError = data.message || m.home_playlist_error_process_failed();
+					es.close();
+					completeBatch();
+					playlistPhase = stagedEntries.length > 0 ? 'ready' : 'idle';
+				}
+			},
+			() => {
+				extractError = m.home_playlist_error_sse_failed();
+				completeBatch();
+				playlistPhase = stagedEntries.length > 0 ? 'ready' : 'idle';
+			}
+		);
+
+		setEventSource(es);
+		queueMicrotask(() => {
+			document
+				.getElementById('playlist-panel')
+				?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		});
+	}
+
+	function handleStartPlaylistDownload(): void {
+		if (playlistPhase === 'downloading') return;
+
+		if (stagedEntries.length === 0) {
+			extractError = m.home_playlist_error_empty();
+			return;
+		}
+
+		const selectedVideoIds = new Set(
+			$batchQueue.filter((item) => item.selected !== false).map((item) => item.videoId)
+		);
+		const selectedEntries = stagedEntries.filter((entry) => selectedVideoIds.has(entry.videoId));
+		if (selectedEntries.length === 0) {
+			extractError = m.home_playlist_error_select_one();
+			return;
+		}
+
+		extractError = '';
+		playlistCompletionNotified = false;
+		resetWorkerState();
+		setPreferredDownloadMode(selectedDownloadMode);
+		setPreferredQuality(selectedQuality);
+		persistPlaylistDownloadMode(selectedDownloadMode);
+		persistPlaylistQuality(selectedQuality);
+		startBatch();
+		playlistPhase = 'downloading';
+
+		for (const entry of selectedEntries) {
+			enqueueDownload(entry);
+		}
+	}
+
+	async function handlePickPlaylistDirectory(): Promise<void> {
+		dirPicked = await pickSaveDirectory();
+		if (!dirPicked) {
+			extractError = m.home_playlist_error_folder_picker();
+		}
+	}
+
+	function handleCancelPlaylist(): void {
+		playlistModeEnabled = false;
+		resetPlaylistComposer();
+		extractError = '';
+	}
+
+	async function handlePrimarySubmit(event?: SubmitEvent): Promise<void> {
+		event?.preventDefault();
+		if (playlistModeEnabled) {
+			await handleFetchPlaylist();
+			return;
+		}
+		await handleFetch();
 	}
 
 	async function handleFetch(event?: SubmitEvent): Promise<void> {
@@ -504,29 +777,171 @@
 			contain-intrinsic-size: 640px;
 		}
 
-		.playlist-section-stable {
-			min-height: 620px;
+		.playlist-mode-switch {
+			margin: 0 auto 1rem;
+			display: inline-flex;
+			align-items: center;
+			gap: 0.25rem;
+			border: 1px solid rgba(255, 77, 140, 0.18);
+			border-radius: 999px;
+			background: rgba(255, 255, 255, 0.96);
+			padding: 0.3rem;
+			box-shadow: 0 16px 28px -22px rgba(45, 27, 54, 0.65);
 		}
 
-		.playlist-grid {
-			align-items: stretch;
+		.playlist-mode-option {
+			display: inline-flex;
+			min-width: 8rem;
+			align-items: center;
+			justify-content: center;
+			gap: 0.4rem;
+			border: 0;
+			border-radius: 999px;
+			background: transparent;
+			padding: 0.58rem 1rem;
+			font-size: 0.78rem;
+			font-weight: 800;
+			color: #7c2d12;
+			transition:
+				transform 160ms ease,
+				background-color 160ms ease,
+				color 160ms ease,
+				opacity 160ms ease;
 		}
 
-		.playlist-slot {
-			min-height: 260px;
+		.playlist-mode-option:hover:not(:disabled) {
+			transform: translateY(-1px);
 		}
 
-		.playlist-slot-input {
-			min-height: 300px;
+		.playlist-mode-option:disabled {
+			cursor: not-allowed;
+			opacity: 0.6;
 		}
 
-		.playlist-slot-progress {
-			min-height: 260px;
+		.playlist-mode-option-active {
+			background: linear-gradient(135deg, #ff4d8c, #ffb938);
+			color: #fff;
+			box-shadow: 0 12px 24px -18px rgba(255, 77, 140, 0.9);
 		}
 
-		@media (max-width: 1024px) {
-			.playlist-section-stable {
-				min-height: 560px;
+		.playlist-inline-panel {
+			align-items: start;
+		}
+
+		.playlist-inline-controls {
+			min-height: 100%;
+		}
+
+		.playlist-panel-close {
+			border: 1px solid #fbcfe8;
+			border-radius: 999px;
+			background: #fff;
+			padding: 0.55rem 0.9rem;
+			font-size: 0.74rem;
+			font-weight: 800;
+			color: #be185d;
+		}
+
+		.playlist-panel-close:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		.playlist-field {
+			display: flex;
+			flex-direction: column;
+			gap: 0.45rem;
+		}
+
+		.playlist-field span {
+			font-size: 0.72rem;
+			font-weight: 800;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+			color: rgba(45, 27, 54, 0.66);
+		}
+
+		.playlist-field select {
+			height: 2.8rem;
+			border: 1px solid #fbcfe8;
+			border-radius: 1rem;
+			background: #fff;
+			padding: 0 0.9rem;
+			font-size: 0.92rem;
+			font-weight: 700;
+			color: #2d1b36;
+		}
+
+		.playlist-field select:disabled {
+			opacity: 0.55;
+			cursor: not-allowed;
+		}
+
+		.playlist-primary-btn,
+		.playlist-ghost-btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 999px;
+			padding: 0.8rem 1.15rem;
+			font-size: 0.82rem;
+			font-weight: 800;
+			letter-spacing: 0.01em;
+		}
+
+		.playlist-primary-btn {
+			border: 0;
+			background: linear-gradient(135deg, #ff4d8c, #ffb938);
+			color: #fff;
+			box-shadow: 0 18px 30px -22px rgba(255, 77, 140, 0.8);
+		}
+
+		.playlist-ghost-btn {
+			border: 1px solid #fbcfe8;
+			background: #fff;
+			color: #9d174d;
+		}
+
+		.page-root.theme-dark .playlist-mode-switch {
+			background: rgba(28, 29, 40, 0.94);
+			border-color: rgba(255, 77, 140, 0.3);
+		}
+
+		.page-root.theme-dark .playlist-mode-option {
+			color: #fbcfe8;
+		}
+
+		.page-root.theme-dark .playlist-mode-option-active {
+			background: linear-gradient(135deg, #ff4d8c, #ffb938);
+			color: #fff;
+		}
+
+		.page-root.theme-dark .playlist-inline-controls {
+			background: rgba(22, 22, 32, 0.92) !important;
+			border-color: rgba(255, 77, 140, 0.22) !important;
+		}
+
+		.page-root.theme-dark .playlist-panel-close,
+		.page-root.theme-dark .playlist-ghost-btn,
+		.page-root.theme-dark .playlist-field select {
+			background: rgba(255, 255, 255, 0.04);
+			border-color: rgba(255, 77, 140, 0.22);
+			color: #fbcfe8;
+		}
+
+		.page-root.theme-dark .playlist-field span {
+			color: rgba(224, 208, 245, 0.72);
+		}
+
+		@media (max-width: 768px) {
+			.playlist-mode-switch {
+				width: 100%;
+				max-width: 22rem;
+			}
+
+			.playlist-mode-option {
+				flex: 1;
+				min-width: 0;
 			}
 		}
 	</style>
@@ -559,22 +974,67 @@
 					{m.home_hero_subtitle()}
 				</p>
 
-				<form class="relative w-full max-w-[700px] mx-auto group mb-12" onsubmit={handleFetch}>
-					<div class="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
-					<div class="relative flex items-center bg-white rounded-full shadow-float p-2 h-[64px] transition-all duration-300 group-focus-within:ring-4 group-focus-within:ring-primary/20">
+				<div
+					class="playlist-mode-switch"
+					role="tablist"
+					aria-label={m.home_download_mode_aria()}
+				>
+					<button
+						type="button"
+						class={`playlist-mode-option ${!playlistModeEnabled ? 'playlist-mode-option-active' : ''}`}
+						onclick={() => setPlaylistMode(false)}
+						aria-pressed={!playlistModeEnabled}
+						disabled={playlistBusy || isExtracting}
+					>
+						<span class="material-symbols-outlined text-[16px]">smart_display</span>
+						<span>{m.home_playlist_mode_single()}</span>
+					</button>
+					<button
+						type="button"
+						class={`playlist-mode-option ${playlistModeEnabled ? 'playlist-mode-option-active' : ''}`}
+						onclick={() => setPlaylistMode(true)}
+						aria-pressed={playlistModeEnabled}
+						disabled={playlistBusy || isExtracting}
+					>
+						<span class="material-symbols-outlined text-[16px]">playlist_play</span>
+						<span>{m.home_playlist_mode_playlist()}</span>
+					</button>
+				</div>
+
+				<form class="relative mx-auto mb-9 w-full max-w-[700px] group lg:mb-5" onsubmit={handlePrimarySubmit}>
+					<div class="absolute -inset-1 rounded-full bg-gradient-to-r from-primary to-secondary blur opacity-25 transition duration-500 group-hover:opacity-50"></div>
+					<div class="relative flex h-[64px] items-center rounded-full bg-white p-2 shadow-float transition-all duration-300 group-focus-within:ring-4 group-focus-within:ring-primary/20">
 						<div class="pl-6 text-plum/30">
 							<span class="material-symbols-outlined text-2xl">link</span>
 						</div>
-						<input id="video-url-input" class="w-full h-full bg-transparent border-none focus:ring-0 text-lg md:text-xl font-semibold placeholder:text-muted/50 text-plum px-4" placeholder={m.home_input_placeholder()} type="text" bind:value={inputUrl} disabled={isExtracting}/>
-						<button class="absolute right-1.5 top-1.5 bottom-1.5 bg-gradient-primary hover:brightness-110 text-white font-bold rounded-full px-6 md:px-10 text-base md:text-lg shadow-candy transition-all hover:scale-105 active:scale-95 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100" type="submit" disabled={isExtracting}>
-							<span>{isExtracting ? m.home_button_fetching() : m.home_button_fetch()}</span>
-							<span class="material-symbols-outlined font-bold text-lg">{isExtracting ? 'progress_activity' : 'bolt'}</span>
+						<input
+							id="video-url-input"
+							class="h-full w-full border-none bg-transparent px-4 text-lg font-semibold text-plum placeholder:text-muted/50 focus:ring-0 md:text-xl"
+							placeholder={playlistModeEnabled ? m.home_playlist_input_placeholder() : m.home_input_placeholder()}
+							type="text"
+							bind:value={inputUrl}
+							disabled={isExtracting || playlistBusy}
+						/>
+						<button
+							class="absolute right-1.5 top-1.5 bottom-1.5 flex items-center gap-1.5 rounded-full bg-gradient-primary px-4 text-sm font-bold text-white shadow-candy transition-all hover:scale-105 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 md:gap-2 md:px-10 md:text-lg"
+							type="submit"
+							disabled={isExtracting || playlistBusy}
+						>
+							<span>
+								{isExtracting || playlistBusy
+									? m.home_button_fetching()
+									: m.home_button_fetch()}
+							</span>
+							<span class="material-symbols-outlined text-base font-bold md:text-lg">
+								{isExtracting || playlistBusy ? 'progress_activity' : 'bolt'}
+							</span>
 						</button>
 					</div>
 
 					{#if extractError}
 						<p class="mt-3 text-sm font-bold text-red-500">{extractError}</p>
 					{/if}
+
 					{#if isExtracting}
 						<p class="mt-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-bold text-primary shadow-sm">
 							<span class="material-symbols-outlined animate-spin text-base">progress_activity</span>
@@ -582,26 +1042,123 @@
 						</p>
 					{/if}
 
-					<div class="mt-6 flex flex-wrap justify-center gap-3 opacity-80 hover:opacity-100 transition-opacity">
-						<div class="flex items-center gap-2 bg-white/60 px-3 py-1.5 rounded-xl border border-white/50">
-							<span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>
-							<span class="font-bold text-xs text-plum/70">{m.home_chip_ad_free()}</span>
+					<div class="mt-6 flex flex-wrap justify-center gap-3 opacity-80 transition-opacity hover:opacity-100">
+						<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
+							<span class="material-symbols-outlined text-lg text-green-500">check_circle</span>
+							<span class="text-xs font-bold text-plum/70">{m.home_chip_ad_free()}</span>
 						</div>
-						<div class="flex items-center gap-2 bg-white/60 px-3 py-1.5 rounded-xl border border-white/50">
-							<span class="material-symbols-outlined text-blue-500 text-lg">verified_user</span>
-							<span class="font-bold text-xs text-plum/70">{m.home_chip_safe_secure()}</span>
+						<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
+							<span class="material-symbols-outlined text-lg text-blue-500">verified_user</span>
+							<span class="text-xs font-bold text-plum/70">{m.home_chip_safe_secure()}</span>
 						</div>
-						<div class="flex items-center gap-2 bg-white/60 px-3 py-1.5 rounded-xl border border-white/50">
-							<span class="material-symbols-outlined text-purple-500 text-lg">rocket_launch</span>
-							<span class="font-bold text-xs text-plum/70">{m.home_chip_super_fast()}</span>
+						<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
+							<span class="material-symbols-outlined text-lg text-purple-500">rocket_launch</span>
+							<span class="text-xs font-bold text-plum/70">{m.home_chip_super_fast()}</span>
 						</div>
 					</div>
 				</form>
+
+				{#if showPlaylistPanel}
+					<div
+						class="playlist-inline-panel mx-auto mt-4 grid w-full max-w-5xl gap-4 lg:grid-cols-[0.95fr,1.05fr]"
+						id="playlist-panel"
+					>
+						<div class="playlist-inline-controls rounded-[1.75rem] border border-pink-100 bg-white/90 p-5 text-left shadow-card backdrop-blur-md">
+							<div class="flex items-start justify-between gap-3">
+								<div>
+										<p class="text-[11px] font-bold uppercase tracking-[0.16em] text-primary">{m.home_playlist_panel_label()}</p>
+										<h3 class="mt-1 text-xl font-bold text-plum">
+											{playlistPhase === 'fetching'
+												? m.home_playlist_stage_fetching_title()
+												: playlistPhase === 'ready'
+													? m.home_playlist_stage_ready_title({ count: String(playlistReadyCount) })
+													: playlistPhase === 'downloading'
+														? m.home_playlist_stage_downloading_title()
+														: m.home_playlist_stage_enabled_title()}
+										</h3>
+										<p class="mt-1 text-sm font-semibold text-plum/70">
+											{playlistPhase === 'idle'
+												? m.home_playlist_stage_idle_desc()
+												: playlistPhase === 'fetching'
+													? m.home_playlist_stage_fetching_desc({
+															received: String($batchProgress.received),
+															total: $batchProgress.total ? String($batchProgress.total) : '...'
+														})
+													: playlistPhase === 'ready'
+														? m.home_playlist_stage_ready_desc({
+																selected: String(playlistSelectedCount),
+																total: String(playlistReadyCount)
+															})
+														: m.home_playlist_stage_downloading_desc()}
+										</p>
+									</div>
+								<button
+									type="button"
+									class="playlist-panel-close"
+									onclick={handleCancelPlaylist}
+									disabled={playlistPhase === 'fetching'}
+								>
+										{m.home_playlist_reset()}
+									</button>
+								</div>
+
+							{#if playlistPhase === 'fetching'}
+								<div class="mt-4">
+									<div class="h-2 overflow-hidden rounded-full bg-pink-100">
+										<div
+											class="h-full rounded-full bg-gradient-primary transition-all duration-300"
+											style:width={`${playlistDiscoveryPercent}%`}
+										></div>
+									</div>
+									<div class="mt-3 flex items-center justify-between text-xs font-bold text-plum/65">
+										<span>{m.home_playlist_discovery_reading()}</span>
+										<span>{playlistDiscoveryPercent}%</span>
+									</div>
+								</div>
+							{:else if playlistPhase === 'ready' || playlistPhase === 'downloading'}
+								<div class="mt-4 grid gap-4 md:grid-cols-2">
+									<label class="playlist-field">
+										<span>{m.home_playlist_download_type()}</span>
+										<select bind:value={selectedDownloadMode} disabled={playlistPhase === 'downloading'}>
+											{#each PLAYLIST_DOWNLOAD_MODE_OPTIONS as option}
+												<option value={option.value}>{option.label}</option>
+											{/each}
+										</select>
+									</label>
+
+									<label class="playlist-field">
+										<span>{m.home_playlist_preferred_quality()}</span>
+										<select bind:value={selectedQuality} disabled={selectedDownloadMode !== 'video' || playlistPhase === 'downloading'}>
+											{#each PLAYLIST_QUALITY_OPTIONS as option}
+												<option value={option.value}>{option.label}</option>
+											{/each}
+										</select>
+									</label>
+								</div>
+
+								<div class="mt-4 flex flex-wrap gap-3">
+									{#if fsaaSupported}
+										<button type="button" class="playlist-ghost-btn" onclick={() => void handlePickPlaylistDirectory()}>
+											{dirPicked ? m.home_playlist_save_folder_selected() : m.home_playlist_choose_save_folder()}
+										</button>
+									{/if}
+									{#if playlistPhase === 'ready'}
+										<button type="button" class="playlist-primary-btn" onclick={handleStartPlaylistDownload}>
+											{m.home_playlist_start_download()}
+										</button>
+									{/if}
+								</div>
+							{/if}
+						</div>
+
+						<BatchProgress />
+					</div>
+				{/if}
 			</div>
 		</section>
 
 		{#if isExtracting}
-			<section class="py-8 px-6 lg:px-20" id="download-options">
+			<section class="py-6 lg:py-4 px-6 lg:px-20 lg:-mt-4" id="download-options">
 				<div class="max-w-7xl mx-auto">
 					<div class="bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row animate-pulse">
 						<div class="w-full lg:w-[42%] p-6 md:p-8 flex flex-col gap-5 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
@@ -647,99 +1204,66 @@
 					</div>
 				</div>
 			</section>
-			{:else if extractResult}
-				<section class="py-8 px-6 lg:px-20" id="download-options">
-					<div class="max-w-7xl mx-auto">
-						<div class="download-result-card bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row">
-							<div class="download-result-meta w-full lg:w-[42%] p-6 md:p-8 flex flex-col gap-5 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
-								<div class="relative w-full aspect-video rounded-3xl overflow-hidden shadow-lg border-4 border-white bg-slate-100">
-									{#if extractResult.thumbnail}
-										<img class="absolute inset-0 w-full h-full object-cover" src={extractResult.thumbnail} alt={extractResult.title}/>
+		{:else if extractResult}
+			<section class="py-5 lg:py-3 px-6 lg:px-20 lg:-mt-5" id="download-options">
+				<div class="max-w-7xl mx-auto">
+					<div class="download-result-card bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row">
+						<div class="download-result-meta w-full lg:w-[42%] p-6 md:p-7 flex flex-col gap-4 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
+							<div class="relative w-full aspect-video rounded-3xl overflow-hidden shadow-lg border-4 border-white bg-slate-100">
+								{#if extractResult.thumbnail}
+									<img class="absolute inset-0 w-full h-full object-cover" src={extractResult.thumbnail} alt={extractResult.title}/>
 								{:else}
 									<div class="absolute inset-0 grid place-items-center text-slate-400">
 										<span class="material-symbols-outlined text-6xl">movie</span>
 									</div>
 								{/if}
-									<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-									<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/20">{m.home_video_available()}</div>
+								<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+								<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/20">{m.home_video_available()}</div>
+							</div>
+							<h3 class="download-result-title text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{extractResult.title}</h3>
+							<div class="flex flex-wrap items-center gap-3">
+								<div class="download-result-chip-duration flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-600 text-sm font-bold">
+									<span class="material-symbols-outlined text-[18px]">schedule</span>
+									{formatDuration(extractResult.duration)}
 								</div>
-								<h3 class="download-result-title text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{extractResult.title}</h3>
-								<div class="flex flex-wrap items-center gap-3">
-									<div class="download-result-chip-duration flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-600 text-sm font-bold">
-										<span class="material-symbols-outlined text-[18px]">schedule</span>
-										{formatDuration(extractResult.duration)}
-									</div>
-									{#if extractResult.viewCount}
-										<div class="download-result-chip-view flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full text-pink-600 text-sm font-bold">
-											<span class="material-symbols-outlined text-[18px]">visibility</span>
-											{formatViews(extractResult.viewCount)}
-										</div>
-									{/if}
-									{#if extractResult.channel}
-										<div class="download-result-chip-channel flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-slate-600 text-sm font-bold">
-											<span class="material-symbols-outlined text-[18px]">person</span>
-											{extractResult.channel}
-										</div>
-									{/if}
-								</div>
-								{#if extractResult.description}
-									<div class="download-result-description p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-600 leading-relaxed">
-										<span class="font-bold text-slate-800">{m.home_description_label()}</span>
-										{shortDescription(extractResult.description)}
+								{#if extractResult.viewCount}
+									<div class="download-result-chip-view flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full text-pink-600 text-sm font-bold">
+										<span class="material-symbols-outlined text-[18px]">visibility</span>
+										{formatViews(extractResult.viewCount)}
 									</div>
 								{/if}
-								<p class="download-result-hint text-slate-500 font-semibold">{m.home_choose_format_hint()}</p>
+								{#if extractResult.channel}
+									<div class="download-result-chip-channel flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-slate-600 text-sm font-bold">
+										<span class="material-symbols-outlined text-[18px]">person</span>
+										{extractResult.channel}
+									</div>
+								{/if}
 							</div>
-							<div class="download-result-actions flex-1 flex flex-col bg-white">
-								<div class="p-6 md:p-8">
-									<FormatPicker streams={extractResult.streams} onSelect={handleFormatSelect}/>
+							{#if extractResult.description}
+								<div class="download-result-description p-4 bg-slate-50 rounded-2xl border border-slate-100 text-sm text-slate-600 leading-relaxed">
+									<span class="font-bold text-slate-800">{m.home_description_label()}</span>
+									{shortDescription(extractResult.description)}
 								</div>
-								<div class="download-result-download p-6 md:p-8 border-t border-indigo-50 bg-indigo-50/20">
-									<DownloadBtn
-										stream={$currentDownload.selectedStream}
-										audioStream={selectedAudioStream}
-										sourceUrl={extractResult.originalUrl}
-										title={extractResult.title}
-									/>
-								</div>
+							{/if}
+							<p class="download-result-hint text-slate-500 font-semibold">{m.home_choose_format_hint()}</p>
+						</div>
+						<div class="download-result-actions flex-1 flex flex-col bg-white">
+							<div class="p-5 md:p-6 pb-4 md:pb-5">
+								<FormatPicker streams={extractResult.streams} onSelect={handleFormatSelect}/>
 							</div>
+							<div class="download-result-download p-5 pt-4 md:p-6 md:pt-5 border-t border-indigo-50 bg-indigo-50/20">
+								<DownloadBtn
+									stream={$currentDownload.selectedStream}
+									audioStream={selectedAudioStream}
+									sourceUrl={extractResult.originalUrl}
+									title={extractResult.title}
+								/>
+							</div>
+						</div>
 					</div>
 				</div>
 			</section>
 		{/if}
-
-		<section class="playlist-section-stable py-10 px-6 lg:px-20 relative">
-			<div class="max-w-5xl mx-auto relative">
-				<div class="absolute -top-10 left-[8%] h-36 w-36 rounded-full bg-primary/20 blur-3xl"></div>
-				<div class="absolute -bottom-10 right-[10%] h-40 w-40 rounded-full bg-secondary/25 blur-3xl"></div>
-
-				<div class="relative rounded-[2.25rem] border border-white/70 bg-white/65 backdrop-blur-xl shadow-float p-6 md:p-8 overflow-hidden">
-					<div class="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(255,77,140,0.14),transparent_40%),radial-gradient(circle_at_85%_80%,rgba(255,185,56,0.16),transparent_42%)]"></div>
-					<div class="relative">
-						<div class="text-center mx-auto max-w-3xl">
-							<span class="inline-flex items-center rounded-full bg-white/80 px-4 py-1 text-xs font-bold uppercase tracking-wider text-primary shadow-sm">
-								{m.home_playlist_badge()}
-							</span>
-							<h2 class="mt-3 text-2xl md:text-4xl font-bold text-plum leading-tight">
-								{m.home_playlist_title()}
-							</h2>
-							<p class="mt-2 text-sm md:text-base text-plum/70 font-semibold">
-								{m.home_playlist_subtitle()}
-							</p>
-						</div>
-
-						<div class="playlist-grid mt-6 grid grid-cols-1 lg:grid-cols-[1.05fr,0.95fr] gap-4">
-							<div class="playlist-slot playlist-slot-input">
-								<BatchInput />
-							</div>
-							<div class="playlist-slot playlist-slot-progress">
-								<BatchProgress />
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
 
 		<section class="defer-render-how-it-works py-8 px-6 lg:px-20 relative z-20" id="how-it-works">
 			<div class="max-w-6xl mx-auto">
@@ -843,8 +1367,8 @@
 							<h3 class="text-lg font-bold mb-1">{m.home_tool_script_title()}</h3>
 							<p class="text-white/80 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_script_desc()}</p>
 							<div class="w-full bg-black/45 rounded-lg p-3 font-mono text-[11px] text-white/95 mb-2 border border-white/10 shadow-inner">
-								<p class="opacity-85">// install.js</p>
-								<p class="truncate">const q = '4k';</p>
+								<p class="opacity-85">{m.home_tool_script_snippet_comment()}</p>
+								<p class="truncate">{m.home_tool_script_snippet_quality()}</p>
 							</div>
 						</div>
 						<div class="mt-auto z-10 relative w-full">
@@ -870,18 +1394,18 @@
 						<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">{m.home_testimonials_title()}</h2>
 						<p class="text-base text-plum/75 font-semibold max-w-md mx-auto md:mx-0">{m.home_testimonials_subtitle()}</p>
 						<div class="hidden md:flex mt-6 -space-x-3">
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 1"><img alt="User 1" class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user1Avatar}/></div>
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 2"><img alt="User 2" class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user2Avatar}/></div>
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title="User 3"><img alt="User 3" class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user3Avatar}/></div>
+								<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '1' })}><img alt={m.home_testimonial_user_avatar({ index: '1' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user1Avatar}/></div>
+								<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '2' })}><img alt={m.home_testimonial_user_avatar({ index: '2' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user2Avatar}/></div>
+								<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '3' })}><img alt={m.home_testimonial_user_avatar({ index: '3' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user3Avatar}/></div>
 							<div class="w-10 h-10 rounded-full border-2 border-white bg-plum text-white text-xs font-bold flex items-center justify-center">+9k</div>
 						</div>
 					</div>
 					<div class="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300">
 							<div class="flex items-center gap-3 mb-3">
-								<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt="Sarah" class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={sarahAvatar}/></div>
-								<div>
-									<p class="font-bold text-plum text-sm">Sarah J.</p>
+									<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt={m.home_testimonial_sarah_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={sarahAvatar}/></div>
+									<div>
+										<p class="font-bold text-plum text-sm">{m.home_testimonial_sarah_name()}</p>
 									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
 								</div>
 							</div>
@@ -889,9 +1413,9 @@
 						</div>
 						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300 sm:translate-y-4">
 							<div class="flex items-center gap-3 mb-3">
-								<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt="Mike" class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={mikeAvatar}/></div>
-								<div>
-									<p class="font-bold text-plum text-sm">Chef Mike</p>
+									<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt={m.home_testimonial_mike_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={mikeAvatar}/></div>
+									<div>
+										<p class="font-bold text-plum text-sm">{m.home_testimonial_mike_name()}</p>
 									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
 								</div>
 							</div>

@@ -3,7 +3,8 @@
 		buildStreamUrl,
 		createMuxedDownloadJob,
 		releaseMuxedDownloadJob,
-		waitForMuxedDownloadJobReady
+		waitForMuxedDownloadJobReady,
+		type MuxJobStatusUpdate
 	} from '$lib/api';
 	import { currentDownload, setDownloading, downloadProgress } from '$stores/download';
 	import { trackDownloadStarted } from '$lib/analytics';
@@ -80,6 +81,60 @@
 		downloadProgress.set(0);
 	}
 
+	function buildFilename(extension: string): string {
+		const safeTitle = title.replace(/[^a-z0-9]/gi, '_');
+		const normalizedExt = extension.trim().replace(/^\.+/, '') || 'mp4';
+		return `${safeTitle}.${normalizedExt}`;
+	}
+
+	function formatMuxStatus(update: MuxJobStatusUpdate): { label: string; value: number } {
+		const elapsedSeconds = Math.floor(update.elapsedMs / 1000);
+
+		if (update.status === 'queued') {
+			return {
+				label:
+					elapsedSeconds >= 8
+						? m.download_btn_mux_status_queued_waiting()
+						: m.download_btn_mux_status_queued(),
+				value: 14
+			};
+		}
+
+		if (update.status === 'leased') {
+			return {
+				label:
+					elapsedSeconds >= 10
+						? m.download_btn_mux_status_leased_waiting()
+						: m.download_btn_mux_status_leased(),
+				value: 28
+			};
+		}
+
+		if (update.status === 'processing') {
+			const phase = Math.floor(elapsedSeconds / 6) % 4;
+			if (phase === 0) {
+				return { label: m.download_btn_mux_status_processing_fetching(), value: 46 };
+			}
+			if (phase === 1) {
+				return { label: m.download_btn_mux_status_processing_muxing(), value: 58 };
+			}
+			if (phase === 2) {
+				return { label: m.download_btn_mux_status_processing_finalizing(), value: 68 };
+			}
+			return { label: m.download_btn_mux_status_processing_running(), value: 76 };
+		}
+
+		if (update.status === 'ready') {
+			return { label: m.download_btn_mux_status_ready(), value: 88 };
+		}
+
+		if (update.status === 'failed') {
+			return { label: m.download_btn_mux_status_failed(), value: 0 };
+		}
+
+		return { label: m.download_btn_mux_status_expired(), value: 0 };
+	}
+
 	/** Trigger browser download */
 	async function handleDownload(): Promise<void> {
 		if (!stream) return;
@@ -98,19 +153,20 @@
 		const useMux = muxAudioStream !== null;
 		isLoading = true;
 		setDownloading(true);
-		resetProgressState();
-		setProgressState(
-			useMux ? 'Queueing mux job...' : 'Preparing browser download...',
-			{ value: useMux ? 8 : 20, indeterminate: true }
-		);
+			resetProgressState();
+			setProgressState(
+				useMux ? m.download_btn_progress_queueing_mux() : m.download_btn_progress_preparing_browser(),
+				{ value: useMux ? 8 : 20, indeterminate: true }
+			);
 
 		try {
-			const filename = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
 			const controller = new AbortController();
 			let downloadUrl: string;
 			let muxJobId: string | null = null;
+			let filename: string;
 
 			if (useMux) {
+				filename = buildFilename('mp4');
 				const created = await createMuxedDownloadJob(
 					stream.url,
 					muxAudioStream.url,
@@ -123,40 +179,50 @@
 					controller.signal
 				);
 				muxJobId = created.jobId;
-				console.info('[downloadtool] mux job created', {
-					jobId: created.jobId,
-					statusUrl: created.statusUrl,
-					fileUrl: created.fileUrl
-				});
-				setProgressState('Muxing video on server...', {
-					value: 18,
-					indeterminate: true
-				});
+					console.info('[downloadtool] mux job created', {
+						jobId: created.jobId,
+						statusUrl: created.statusUrl,
+						fileUrl: created.fileUrl
+					});
+					setProgressState(m.download_btn_progress_muxing(), {
+						value: 18,
+						indeterminate: true
+					});
 				downloadUrl = await waitForMuxedDownloadJobReady(
 					created.jobId,
-					undefined,
+					{
+						onStatus: (update) => {
+							const nextState = formatMuxStatus(update);
+							setProgressState(nextState.label, {
+								value: nextState.value,
+								indeterminate: update.status !== 'ready'
+							});
+						}
+					},
 					controller.signal
 				);
-				console.info('[downloadtool] mux job ready', {
-					jobId: created.jobId,
-					downloadUrl
-				});
-				setProgressState('Starting browser download...', {
-					value: 92,
-					indeterminate: true
-				});
+					console.info('[downloadtool] mux job ready', {
+						jobId: created.jobId,
+						downloadUrl
+					});
+					setProgressState(m.download_btn_progress_starting_browser(), {
+						value: 92,
+						indeterminate: true
+					});
 			} else {
+				filename = buildFilename(stream.format || 'mp4');
 				downloadUrl = buildStreamUrl(stream.url, title, stream.format, {
 					sourceUrl: sourceUrl ?? undefined,
-					formatId: stream.formatId
+					formatId: stream.formatId,
+					patchInitMetadata: !stream.hasAudio && (stream.format || 'mp4').toLowerCase() === 'mp4'
 				});
-				console.info('[downloadtool] direct stream download prepared', {
-					downloadUrl
-				});
-				setProgressState('Starting browser download...', {
-					value: 92,
-					indeterminate: true
-				});
+					console.info('[downloadtool] direct stream download prepared', {
+						downloadUrl
+					});
+					setProgressState(m.download_btn_progress_starting_browser(), {
+						value: 92,
+						indeterminate: true
+					});
 			}
 
 			const secureDownloadUrl = enforceHttps(downloadUrl);
@@ -187,17 +253,17 @@
 				}
 			}
 
-			setProgressState('Browser download started', { value: 100 });
-			currentDownload.update((state) => ({ ...state, error: null }));
+				setProgressState(m.download_btn_progress_started(), { value: 100 });
+				currentDownload.update((state) => ({ ...state, error: null }));
 
 			isLoading = false;
 			setDownloading(false);
 			resetProgressState();
-		} catch (err) {
-			console.error('Download failed:', err);
-			currentDownload.update((state) => ({ ...state, error: 'Download failed. Please retry.' }));
-			isLoading = false;
-			setDownloading(false);
+			} catch (err) {
+				console.error('Download failed:', err);
+				currentDownload.update((state) => ({ ...state, error: m.download_btn_error_failed() }));
+				isLoading = false;
+				setDownloading(false);
 			resetProgressState();
 		}
 	}
@@ -231,8 +297,8 @@
 					style:width={progressIndeterminate ? undefined : `${$downloadProgress}%`}
 				></div>
 			</div>
-			<div class="progress-meta">
-				<span class="progress-text">{progressLabel || 'Preparing download...'}</span>
+				<div class="progress-meta">
+					<span class="progress-text">{progressLabel || m.download_btn_preparing()}</span>
 				{#if !progressIndeterminate}
 					<span class="progress-percent">{$downloadProgress}%</span>
 				{/if}

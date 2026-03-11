@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import * as m from '$lib/paraglide/messages';
 	import { consent, hasDecided } from '$stores/consent';
 	import { trackConsent } from '$lib/analytics';
 
@@ -63,40 +64,43 @@
 </script>
 
 {#if browser && isClientReady && !$hasDecided}
-	<div class="cookie-shell" class:theme-dark={isDarkMode} role="region" aria-label="Cookie consent">
+	<div class="cookie-shell" class:theme-dark={isDarkMode} role="region" aria-label={m.cookie_banner_region_aria()}>
 		<div class="cookie-banner">
 			<div class="cookie-main">
-				<span class="cookie-badge">Privacy</span>
-				<h2 class="cookie-title">We value your privacy</h2>
+				<span class="cookie-badge">{m.cookie_banner_badge()}</span>
+				<h2 class="cookie-title">{m.cookie_banner_title()}</h2>
 				<p class="cookie-description">
-					We use cookies to improve your browsing experience and analyze traffic.
-					By clicking "Accept All", you consent to our use of cookies.
-					<a href="/privacy" aria-label="Read our privacy policy">Read Privacy Policy</a>
+					{m.cookie_banner_description()}{' '}
+					{m.cookie_banner_description_consent()}{' '}
+					<a href="/privacy" aria-label={m.cookie_banner_privacy_aria()}>{m.cookie_banner_privacy_link()}</a>
 				</p>
 			</div>
 
 			<div class="cookie-actions">
-				<button class="btn-accept" onclick={handleAccept}>Accept All</button>
-				<button class="btn-reject" onclick={handleReject}>Reject Non-Essential</button>
+				<button class="btn-accept" onclick={handleAccept}>{m.cookie_banner_accept_all()}</button>
+				<button class="btn-reject" onclick={handleReject}>{m.cookie_banner_reject_non_essential()}</button>
 				<button
 					class="btn-details"
 					onclick={() => (showDetails = !showDetails)}
 					aria-expanded={showDetails}
 				>
-					{showDetails ? 'Hide Details' : 'Show Details'}
+					{showDetails ? m.cookie_banner_hide_details() : m.cookie_banner_show_details()}
 				</button>
 			</div>
 
 			{#if showDetails}
 				<div class="cookie-details">
 					<div class="detail-item">
-						<strong>Essential:</strong> Required for core site functionality. Always enabled.
+						<strong>{m.cookie_banner_detail_essential_label()}</strong>
+						{m.cookie_banner_detail_essential_body()}
 					</div>
 					<div class="detail-item">
-						<strong>Analytics:</strong> Helps us measure performance and improve the product.
+						<strong>{m.cookie_banner_detail_analytics_label()}</strong>
+						{m.cookie_banner_detail_analytics_body()}
 					</div>
 					<div class="detail-item">
-						<strong>Preferences:</strong> Stores interface choices for a smoother experience.
+						<strong>{m.cookie_banner_detail_preferences_label()}</strong>
+						{m.cookie_banner_detail_preferences_body()}
 					</div>
 				</div>
 			{/if}

@@ -7,6 +7,38 @@ import { sveltekitCookies } from 'better-auth/svelte-kit';
 
 import { getDatabasePool, getUserTier } from './auth-utils';
 
+function normalizeOptionalUrl(value: string | undefined): string | undefined {
+	const trimmed = value?.trim();
+	return trimmed ? trimmed.replace(/\/+$/, '') : undefined;
+}
+
+function isLoopbackBaseUrl(value: string): boolean {
+	try {
+		const hostname = new URL(value).hostname;
+		return (
+			hostname === 'localhost' ||
+			hostname === '127.0.0.1' ||
+			hostname === '0.0.0.0' ||
+			hostname === '::1'
+		);
+	} catch {
+		return false;
+	}
+}
+
+function resolveAuthBaseUrl(): string | undefined {
+	const configuredBaseUrl =
+		normalizeOptionalUrl(env.BETTER_AUTH_URL) ?? normalizeOptionalUrl(env.ORIGIN);
+
+	// In local dev we often access the app via localhost, LAN IP, or Tailscale IP interchangeably.
+	// Let Better Auth derive the origin from the current request instead of pinning callbacks to loopback.
+	if (!configuredBaseUrl || isLoopbackBaseUrl(configuredBaseUrl)) {
+		return undefined;
+	}
+
+	return configuredBaseUrl;
+}
+
 function resolveAuthSecret(): string {
 	const value = env.BETTER_AUTH_SECRET?.trim();
 
@@ -37,7 +69,7 @@ const socialProviders =
 		: undefined;
 
 export const auth = betterAuth({
-	baseURL: env.ORIGIN ?? env.BETTER_AUTH_URL ?? 'http://localhost:5168',
+	baseURL: resolveAuthBaseUrl(),
 	database: getDatabasePool(),
 	secret: resolveAuthSecret(),
 	trustedOrigins,

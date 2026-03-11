@@ -1,15 +1,83 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 	import {
 		createMuxedDownloadJob,
-		waitForMuxedDownloadJobReady
+		waitForMuxedDownloadJobReady,
+		type MuxJobStatusUpdate
 	} from '$lib/api';
 
-	let stage = $state('Đang chuẩn bị mux job...');
-	let detail = $state('Giữ tab này mở cho đến khi tải bắt đầu.');
+	let stage = $state<string>(m.mux_job_stage_preparing());
+	let detail = $state<string>(m.mux_job_detail_keep_tab_open());
 	let fatalError = $state<string | null>(null);
 	let bootstrapped = false;
+
+	function describeMuxStatus(update: MuxJobStatusUpdate): { stage: string; detail: string } {
+		const elapsedSeconds = Math.floor(update.elapsedMs / 1000);
+
+		if (update.status === 'queued') {
+			return {
+				stage: m.mux_job_stage_queued(),
+				detail:
+					elapsedSeconds >= 8
+						? m.mux_job_detail_queued_waiting({ jobId: update.jobId })
+						: m.mux_job_detail_queued_received({ jobId: update.jobId })
+			};
+		}
+
+		if (update.status === 'leased') {
+			return {
+				stage: m.mux_job_stage_leased(),
+				detail: m.mux_job_detail_leased({ jobId: update.jobId })
+			};
+		}
+
+		if (update.status === 'processing') {
+			const phase = Math.floor(elapsedSeconds / 6) % 4;
+			if (phase === 0) {
+				return {
+					stage: m.mux_job_stage_processing_fetching_streams(),
+					detail: m.mux_job_detail_processing_fetching_streams({ jobId: update.jobId })
+				};
+			}
+			if (phase === 1) {
+				return {
+					stage: m.mux_job_stage_processing_muxing(),
+					detail: m.mux_job_detail_processing_muxing({ jobId: update.jobId })
+				};
+			}
+			if (phase === 2) {
+				return {
+					stage: m.mux_job_stage_processing_finalizing(),
+					detail: m.mux_job_detail_processing_finalizing({ jobId: update.jobId })
+				};
+			}
+			return {
+				stage: m.mux_job_stage_processing_still_running(),
+				detail: m.mux_job_detail_processing_still_running({ jobId: update.jobId })
+			};
+		}
+
+		if (update.status === 'ready') {
+			return {
+				stage: m.mux_job_stage_ready(),
+				detail: m.mux_job_detail_ready({ jobId: update.jobId })
+			};
+		}
+
+		if (update.status === 'failed') {
+			return {
+				stage: m.mux_job_stage_failed(),
+				detail: m.mux_job_detail_failed({ jobId: update.jobId })
+			};
+		}
+
+		return {
+			stage: m.mux_job_stage_expired(),
+			detail: m.mux_job_detail_expired({ jobId: update.jobId })
+		};
+	}
 
 	function readQuery(): {
 		videoUrl: string | null;
@@ -41,15 +109,15 @@
 
 		const payload = readQuery();
 		if (!payload.videoUrl || !payload.audioUrl) {
-			stage = 'Thiếu tham số tải';
-			detail = 'Link launcher không hợp lệ hoặc đã bị cắt mất query.';
-			fatalError = 'Missing required video/audio stream URLs';
+			stage = m.mux_job_stage_missing_params();
+			detail = m.mux_job_detail_missing_params();
+			fatalError = m.mux_job_error_missing_required_urls();
 			return;
 		}
 
 		try {
-			stage = 'Đang tạo job...';
-			detail = 'Frontend sẽ chuyển yêu cầu sang worker pipeline.';
+			stage = m.mux_job_stage_creating();
+			detail = m.mux_job_detail_creating();
 			console.info('[downloadtool] launcher bootstrap start', payload);
 			const created = await createMuxedDownloadJob(
 				payload.videoUrl,
@@ -63,16 +131,22 @@
 			);
 			console.info('[downloadtool] launcher mux job created', created);
 
-			stage = 'Đang đợi worker hoàn tất...';
-			detail = `Job ${created.jobId} đang mux và upload artifact.`;
-			const downloadUrl = await waitForMuxedDownloadJobReady(created.jobId);
+			stage = m.mux_job_stage_waiting_worker();
+			detail = m.mux_job_detail_waiting_worker({ jobId: created.jobId });
+			const downloadUrl = await waitForMuxedDownloadJobReady(created.jobId, {
+				onStatus: (update) => {
+					const next = describeMuxStatus(update);
+					stage = next.stage;
+					detail = next.detail;
+				}
+			});
 			console.info('[downloadtool] launcher mux job ready', {
 				jobId: created.jobId,
 				downloadUrl
 			});
 
-			stage = 'Đang bắt đầu tải...';
-			detail = 'Nếu trình duyệt không tự tải, hãy kiểm tra popup chặn tải xuống.';
+			stage = m.mux_job_stage_starting_download();
+			detail = m.mux_job_detail_starting_download();
 			console.info('[downloadtool] launcher redirecting to download url', downloadUrl);
 			window.location.replace(downloadUrl);
 		} catch (error) {
@@ -85,8 +159,8 @@
 				return;
 			}
 
-			stage = 'Không thể bắt đầu tải';
-			detail = error instanceof Error ? error.message : 'Unexpected error';
+			stage = m.mux_job_stage_cannot_start_download();
+			detail = error instanceof Error ? error.message : m.mux_job_error_unexpected();
 			fatalError = detail;
 		}
 	}
@@ -97,12 +171,12 @@
 </script>
 
 <svelte:head>
-	<title>Mux Job Launcher</title>
+	<title>{m.mux_job_page_title()}</title>
 </svelte:head>
 
 <div class="launcher-shell">
 	<div class="launcher-card">
-		<p class="eyebrow">Mux Jobs</p>
+		<p class="eyebrow">{m.mux_job_page_eyebrow()}</p>
 		<h1>{stage}</h1>
 		<p>{detail}</p>
 		{#if fatalError}

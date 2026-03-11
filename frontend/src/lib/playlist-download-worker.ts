@@ -21,6 +21,7 @@ import {
 	pickSaveDirectory,
 	saveDownload
 } from './playlist-download-file-saver';
+import * as m from '$lib/paraglide/messages';
 
 export type QueueEntry = {
 	videoId: string;
@@ -179,7 +180,8 @@ async function fillPrefetchBuffer(): Promise<void> {
 					break;
 				}
 
-				const message = error instanceof Error ? error.message : 'Failed to prepare download';
+				const message =
+					error instanceof Error ? error.message : m.playlist_worker_error_prepare_failed();
 				updateBatchItemByVideoId(entry.videoId, 'error', message);
 			}
 		}
@@ -240,7 +242,8 @@ async function startDownload(ready: ReadyEntry): Promise<void> {
 		if (isAbortError(error)) {
 			updateBatchItemByVideoId(entry.videoId, 'pending');
 		} else {
-			const message = error instanceof Error ? error.message : 'Download failed';
+			const message =
+				error instanceof Error ? error.message : m.playlist_worker_error_download_failed();
 			updateBatchItemByVideoId(entry.videoId, 'error', message);
 		}
 	} finally {
@@ -299,11 +302,12 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 	}
 
 	const stream = video ?? audio;
-	if (!stream) throw new Error('No downloadable stream found');
+	if (!stream) throw new Error(m.playlist_worker_error_no_streams());
 
 	const downloadUrl = buildStreamUrl(stream.url, entry.title, stream.format || 'mp4', {
 		sourceUrl: result.originalUrl,
-		formatId: stream.formatId
+		formatId: stream.formatId,
+		patchInitMetadata: !stream.hasAudio && (stream.format || 'mp4').toLowerCase() === 'mp4'
 	});
 
 	return {

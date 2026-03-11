@@ -1,3 +1,5 @@
+import * as m from '$lib/paraglide/messages';
+
 type SaveDirectoryHandle = {
 	getFileHandle: (
 		name: string,
@@ -82,11 +84,11 @@ export async function saveDownload(
 	}
 
 	if (requireFsaa) {
-		throw new Error('No save directory selected');
+		throw new Error(m.file_saver_error_no_directory_selected());
 	}
 
 	if (!allowAnchorFallback) {
-		throw new Error('Anchor fallback is disabled');
+		throw new Error(m.file_saver_error_anchor_fallback_disabled());
 	}
 
 	console.info('[downloadtool] saveDownload using anchor fallback', {
@@ -111,7 +113,7 @@ async function saveWithDirectory(
 		if (typeof writable.close === 'function') {
 			await writable.close();
 		}
-		throw new Error('Readable stream is not available');
+		throw new Error(m.file_saver_error_stream_unavailable());
 	}
 
 	try {
@@ -147,7 +149,9 @@ async function fetchWithRetry(url: string, signal: AbortSignal): Promise<Respons
 			}
 
 			if (!isRetryableStatus(status) || attempt >= MAX_RETRY_ATTEMPTS) {
-				const error = new Error(`Download failed with status ${status}`) as DownloadErrorWithStatus;
+				const error = new Error(
+					m.file_saver_error_download_failed_with_status({ status: String(status) })
+				) as DownloadErrorWithStatus;
 				error.status = status;
 				error.retryAfterMs = retryAfterMs;
 				throw error;
@@ -169,7 +173,7 @@ async function fetchWithRetry(url: string, signal: AbortSignal): Promise<Respons
 	}
 
 	if (lastError instanceof Error) throw lastError;
-	throw new Error('Download failed after retries');
+	throw new Error(m.file_saver_error_download_failed_after_retries());
 }
 
 function isRetryableStatus(status: number): boolean {

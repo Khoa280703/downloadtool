@@ -84,12 +84,12 @@ self.addEventListener('backgroundfetchsuccess', (event: Event) => {
         client.postMessage({ type: 'bg-fetch-complete', url, title: bgFetch.id });
       }
 
-      await bgFetch.updateUI({ title: `Download complete: ${bgFetch.id}` });
+      await bgFetch.updateUI({ title: bgFetch.id });
     })(),
   );
 });
 
 self.addEventListener('backgroundfetchfail', (event: Event) => {
   const bgFetch = (event as BackgroundFetchUpdateUIEvent).registration;
-  bgFetch.updateUI({ title: `Download failed: ${bgFetch.id}` });
+  bgFetch.updateUI({ title: bgFetch.id });
 });

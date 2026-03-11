@@ -8,7 +8,10 @@ use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
+use muxer::atom_framer::AtomFramer;
+use muxer::init_segment_normalizer::normalize_fragmented_mp4_moov;
 use serde::Deserialize;
+use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use tokio::sync::mpsc;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -46,6 +49,8 @@ pub struct StreamParams {
     pub title: Option<String>,
     /// File format extension
     pub format: Option<String>,
+    /// Patch MP4 init metadata for fragmented video-only streams to avoid double duration on QT/AVFoundation.
+    pub patch_init_metadata: Option<bool>,
 }
 
 /// API error type.
@@ -131,6 +136,69 @@ where
             yield item;
         }
     }
+}
+
+fn should_patch_fragmented_mp4_init(params: &StreamParams) -> bool {
+    params.patch_init_metadata.unwrap_or(false)
+        && params
+            .format
+            .as_deref()
+            .map(|format| format.eq_ignore_ascii_case("mp4"))
+            .unwrap_or(false)
+}
+
+fn with_optional_init_patch<S, E>(
+    stream: S,
+    patch_init_metadata: bool,
+) -> Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>
+where
+    S: Stream<Item = Result<Bytes, E>> + Send + 'static,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    if !patch_init_metadata {
+        return Box::pin(stream.map(|item| item.map_err(std::io::Error::other)));
+    }
+
+    Box::pin(async_stream::stream! {
+        let mut framer = AtomFramer::new(Box::pin(stream));
+        let mut init_boxes: Vec<Bytes> = Vec::new();
+
+        loop {
+            match framer.read_box().await {
+                Some(Ok((box_type, data))) => {
+                    if &box_type == b"moov" {
+                        match normalize_fragmented_mp4_moov(&data) {
+                            Ok(patched) => {
+                                debug!("Patched fragmented MP4 init metadata for direct stream");
+                                init_boxes.push(Bytes::from(patched));
+                            }
+                            Err(err) => {
+                                debug!("Failed to patch fragmented MP4 init metadata: {}", err);
+                                init_boxes.push(data);
+                            }
+                        }
+                        break;
+                    }
+
+                    init_boxes.push(data);
+                }
+                Some(Err(err)) => {
+                    yield Err(std::io::Error::other(err.to_string()));
+                    return;
+                }
+                None => break,
+            }
+        }
+
+        for atom in init_boxes {
+            yield Ok(atom);
+        }
+
+        let mut remainder = framer.into_remaining_stream();
+        while let Some(item) = remainder.next().await {
+            yield item.map_err(|err| std::io::Error::other(err.to_string()));
+        }
+    })
 }
 
 fn proxy_error_status(error: &ProxyError) -> Option<StatusCode> {
@@ -254,10 +322,11 @@ pub async fn stream_handler(
 
     let platform = detect_platform(&params.url);
     let browser_range = extract_range_from_headers(&headers);
+    let patch_init_metadata = should_patch_fragmented_mp4_init(&params);
 
     // Mode 1: browser Range header present (seek / resume) → single range request
     if let Some(range) = browser_range {
-        return proxy_single_request(&params, Some(range), platform, permit).await;
+        return proxy_single_request(&params, Some(range), platform, permit, false).await;
     }
 
     // Mode 2: YouTube CDN with clen → chunked download (throttle bypass)
@@ -267,11 +336,19 @@ pub async fn stream_handler(
             total_size,
             YOUTUBE_CHUNK_SIZE / 1_000_000
         );
-        return proxy_chunked(&params, &parsed_url, total_size, platform, permit).await;
+        return proxy_chunked(
+            &params,
+            &parsed_url,
+            total_size,
+            platform,
+            permit,
+            patch_init_metadata,
+        )
+        .await;
     }
 
     // Mode 3: fallback single request
-    proxy_single_request(&params, None, platform, permit).await
+    proxy_single_request(&params, None, platform, permit, patch_init_metadata).await
 }
 
 /// Proxy a single (possibly ranged) request — used for seek/resume or non-CDN URLs.
@@ -280,6 +357,7 @@ async fn proxy_single_request(
     range: Option<Range>,
     platform: Platform,
     permit: Option<OwnedSemaphorePermit>,
+    patch_init_metadata: bool,
 ) -> Result<Response, ApiError> {
     let mut target_url = params.url.clone();
     let max_refresh_attempts = stream_url_refresh_max_attempts();
@@ -300,6 +378,7 @@ async fn proxy_single_request(
                 add_cors_headers(&mut response_headers);
                 add_no_store_header(&mut response_headers);
 
+                let byte_stream = with_optional_init_patch(byte_stream, patch_init_metadata);
                 let guarded_stream = stream_with_permit_guard(byte_stream, permit);
                 let body = Body::from_stream(guarded_stream);
                 let mut rb = Response::builder();
@@ -361,6 +440,7 @@ async fn proxy_chunked(
     total_size: u64,
     platform: Platform,
     permit: Option<OwnedSemaphorePermit>,
+    patch_init_metadata: bool,
 ) -> Result<Response, ApiError> {
     let content_type =
         extract_mime_type(parsed_url).unwrap_or_else(|| "application/octet-stream".to_string());
@@ -392,6 +472,7 @@ async fn proxy_chunked(
         params.format_id.clone(),
         params.format.clone(),
     );
+    let stream = with_optional_init_patch(stream, patch_init_metadata);
     let guarded_stream = stream_with_permit_guard(stream, permit);
     let body = Body::from_stream(guarded_stream);
 

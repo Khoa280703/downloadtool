@@ -60,6 +60,7 @@ proxy = { path = "../proxy" }
 job-system = { path = "../job-system" }
 queue = { path = "../queue" }
 object-store = { path = "../object-store" }
+muxer = { path = "../muxer" }
 
 [[bin]]
 name = "api-server"

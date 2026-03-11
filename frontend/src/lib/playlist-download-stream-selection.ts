@@ -1,7 +1,8 @@
 import type { Stream } from '$lib/types';
+import * as m from '$lib/paraglide/messages';
 
 export const PLAYLIST_QUALITY_OPTIONS = [
-	{ value: 'best', label: 'Best available' },
+	{ value: 'best', label: m.home_playlist_quality_best() },
 	{ value: '2160', label: '2160p (4K)' },
 	{ value: '1440', label: '1440p (2K)' },
 	{ value: '1080', label: '1080p (Full HD)' },
@@ -11,8 +12,8 @@ export const PLAYLIST_QUALITY_OPTIONS = [
 ] as const;
 
 export const PLAYLIST_DOWNLOAD_MODE_OPTIONS = [
-	{ value: 'video', label: 'Video + audio' },
-	{ value: 'audio', label: 'Audio only' }
+	{ value: 'video', label: m.home_playlist_download_mode_video_audio() },
+	{ value: 'audio', label: m.home_playlist_download_mode_audio_only() }
 ] as const;
 
 export type PlaylistQuality = (typeof PLAYLIST_QUALITY_OPTIONS)[number]['value'];

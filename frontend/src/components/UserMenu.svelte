@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { signOutFromBrowser } from '$lib/auth-actions';
+	import * as m from '$lib/paraglide/messages';
 
 	type MenuUser = {
 		name?: string | null;
@@ -24,7 +25,7 @@
 			open = false;
 			window.location.assign('/');
 		} catch (error) {
-			signOutError = error instanceof Error ? error.message : 'Đăng xuất thất bại.';
+			signOutError = error instanceof Error ? error.message : m.user_menu_sign_out_failed();
 		} finally {
 			signingOut = false;
 		}
@@ -60,7 +61,7 @@
 				class="block rounded-xl px-3 py-2 text-sm font-semibold text-plum transition hover:bg-pink-50"
 				onclick={() => (open = false)}
 			>
-				Account
+				{m.user_menu_account()}
 			</a>
 				<button
 					type="button"
@@ -68,7 +69,7 @@
 					onclick={handleSignOut}
 					disabled={signingOut}
 				>
-					{signingOut ? 'Đang đăng xuất...' : 'Logout'}
+					{signingOut ? m.user_menu_signing_out() : m.user_menu_logout()}
 				</button>
 				{#if signOutError}
 					<p class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{signOutError}</p>

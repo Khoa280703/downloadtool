@@ -9,6 +9,7 @@ pub mod codec;
 pub mod fmp4_remuxer;
 pub mod fragment_aligner;
 pub mod fragment_stream;
+pub mod init_segment_normalizer;
 pub mod moov_merger;
 pub mod mux_router;
 pub mod stream_fetcher;

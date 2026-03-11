@@ -3,6 +3,7 @@
  * @module api
  */
 
+import * as m from '$lib/paraglide/messages';
 import type { ExtractResult, BatchMessage } from './types';
 import { apiClientLimitConfig, muxJobClientLimitConfig } from './runtime-limit-config';
 
@@ -38,6 +39,15 @@ type MuxJobStatusApiResponse = {
 	file_url?: string | null;
 };
 
+export type MuxJobLifecycleStatus = MuxJobStatusApiResponse['status'];
+
+export type MuxJobStatusUpdate = {
+	jobId: string;
+	status: MuxJobLifecycleStatus;
+	elapsedMs: number;
+	pollCount: number;
+};
+
 type FileTicketApiResponse = {
 	job_id: string;
 	download_url: string;
@@ -69,7 +79,7 @@ function mapExtractErrorMessage(status: number, rawMessage: string, inputUrl: st
 		(!hasSingleVideoId && isBatchLikeYoutubeUrl(urlLower)) ||
 		(!hasSingleVideoId && (text.includes('playlist') || text.includes('channel')))
 	) {
-		return 'Link này là playlist/channel. Hiện tool đang tải từng video; hãy mở 1 video cụ thể rồi thử lại.';
+		return m.api_extract_error_playlist_channel();
 	}
 
 	if (
@@ -82,7 +92,7 @@ function mapExtractErrorMessage(status: number, rawMessage: string, inputUrl: st
 		text.includes('members-only') ||
 		text.includes('restricted')
 	) {
-		return 'Video này đang bị giới hạn quyền truy cập (private/age/members). Hãy thử video public khác.';
+		return m.api_extract_error_restricted();
 	}
 
 	if (
@@ -91,7 +101,7 @@ function mapExtractErrorMessage(status: number, rawMessage: string, inputUrl: st
 		text.includes('geo') ||
 		text.includes('not available')
 	) {
-		return 'Video này có thể bị giới hạn khu vực hoặc tạm thời không khả dụng.';
+		return m.api_extract_error_region_blocked();
 	}
 
 	if (
@@ -103,7 +113,7 @@ function mapExtractErrorMessage(status: number, rawMessage: string, inputUrl: st
 		text.includes('gateway') ||
 		text.includes('connection')
 	) {
-		return 'Kết nối đến nguồn video đang chậm hoặc lỗi tạm thời. Vui lòng thử lại sau vài giây.';
+		return m.api_extract_error_temporary_network();
 	}
 
 	if (
@@ -112,15 +122,15 @@ function mapExtractErrorMessage(status: number, rawMessage: string, inputUrl: st
 		text.includes('invalid youtube url') ||
 		text.includes('could not extract video id')
 	) {
-		return 'Link chưa đúng định dạng YouTube video. Hãy dán link dạng /watch?v=... hoặc youtu.be/...';
+		return m.api_extract_error_invalid_youtube_url();
 	}
 
 	if (status >= 500) {
-		return 'Không thể phân tích video lúc này. Vui lòng thử lại sau.';
+		return m.api_extract_error_server_unavailable();
 	}
 
 	if (clean) return clean;
-	return 'Không thể phân tích link này. Vui lòng thử link YouTube khác.';
+	return m.api_extract_error_unknown();
 }
 
 function normalizeApiBase(base: string): string {
@@ -283,7 +293,7 @@ async function fetchExtractWithRetry(requestUrl: string, signal?: AbortSignal): 
 	}
 
 	if (lastError instanceof Error) throw lastError;
-	throw new Error('Extraction request failed after retries');
+	throw new Error(m.api_extract_request_failed_after_retries());
 }
 
 function normalizeExtractUrl(url: string): string {
@@ -330,7 +340,7 @@ export async function extract(url: string, signal?: AbortSignal): Promise<Extrac
 		return {
 			url: f.url,
 			formatId: f.format_id,
-			quality: f.quality || 'Unknown',
+			quality: f.quality || m.api_unknown_quality(),
 			format: f.ext || 'mp4',
 			hasAudio: !!f.has_audio,
 			isAudioOnly: !!f.is_audio_only,
@@ -341,7 +351,7 @@ export async function extract(url: string, signal?: AbortSignal): Promise<Extrac
 	});
 
 	return {
-		title: meta.title || 'Unknown',
+		title: meta.title || m.api_unknown_title(),
 		channel: meta.channel,
 		viewCount: meta.view_count,
 		description: meta.description,
@@ -367,6 +377,7 @@ export function buildStreamUrl(
 	options?: {
 		sourceUrl?: string;
 		formatId?: string;
+		patchInitMetadata?: boolean;
 	}
 ): string {
 	const params = new URLSearchParams({
@@ -376,6 +387,7 @@ export function buildStreamUrl(
 	});
 	if (options?.sourceUrl) params.set('source_url', options.sourceUrl);
 	if (options?.formatId) params.set('format_id', options.formatId);
+	if (options?.patchInitMetadata) params.set('patch_init_metadata', 'true');
 	return `${buildApiUrl('/api/stream')}?${params.toString()}`;
 }
 
@@ -407,7 +419,10 @@ export async function createMuxedDownloadJob(
 	});
 
 	if (!response.ok) {
-		throw await parseApiError(response, `Failed to create mux job (${response.status})`);
+		throw await parseApiError(
+			response,
+			m.api_mux_create_failed({ status: String(response.status) })
+		);
 	}
 
 	const data = (await response.json()) as CreateMuxJobApiResponse;
@@ -425,6 +440,7 @@ export async function waitForMuxedDownloadJobReady(
 	options?: {
 		timeoutMs?: number;
 		pollIntervalMs?: number;
+		onStatus?: (update: MuxJobStatusUpdate) => void;
 	},
 	signal?: AbortSignal
 ): Promise<string> {
@@ -432,36 +448,49 @@ export async function waitForMuxedDownloadJobReady(
 	const timeoutMs = options?.timeoutMs ?? MUX_JOB_MAX_WAIT_MS;
 	const pollIntervalMs = options?.pollIntervalMs ?? MUX_JOB_POLL_INTERVAL_MS;
 	const jobPath = `/api/proxy/jobs/${encodeURIComponent(jobId)}`;
+	let pollCount = 0;
 
 	while (true) {
 		if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
 		if (Date.now() - startedAt > timeoutMs) {
-			throw new Error(`Mux job timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
+			throw new Error(
+				m.api_mux_job_timed_out({ seconds: String(Math.ceil(timeoutMs / 1000)) })
+			);
 		}
 
 		const cacheBuster = Date.now().toString();
 		const response = await fetch(`${jobPath}?t=${cacheBuster}`, { signal });
 		if (!response.ok) {
-			throw await parseApiError(response, `Failed to query mux job status (${response.status})`);
+			throw await parseApiError(
+				response,
+				m.api_mux_query_status_failed({ status: String(response.status) })
+			);
 		}
 
 		const status = (await response.json()) as MuxJobStatusApiResponse;
+		pollCount += 1;
+		options?.onStatus?.({
+			jobId: status.job_id,
+			status: status.status,
+			elapsedMs: Date.now() - startedAt,
+			pollCount
+		});
 		if (status.status === 'ready') {
 			const ticketResponse = await fetch(`${jobPath}/file-ticket?t=${cacheBuster}`, { signal });
 			if (!ticketResponse.ok) {
 				throw await parseApiError(
 					ticketResponse,
-					`Failed to get mux file ticket (${ticketResponse.status})`
+					m.api_mux_file_ticket_failed({ status: String(ticketResponse.status) })
 				);
 			}
 			const ticket = (await ticketResponse.json()) as FileTicketApiResponse;
 			return toAbsoluteDownloadUrl(appendCacheBuster(ticket.download_url, cacheBuster));
 		}
 		if (status.status === 'failed') {
-			throw new Error(status.error || 'Mux job failed');
+			throw new Error(status.error || m.api_mux_job_failed());
 		}
 		if (status.status === 'expired') {
-			throw new Error(status.error || 'Mux job expired before download completed');
+			throw new Error(status.error || m.api_mux_job_expired());
 		}
 
 		await sleep(pollIntervalMs, signal);
@@ -483,7 +512,10 @@ export async function releaseMuxedDownloadJob(
 	});
 
 	if (!response.ok) {
-		throw await parseApiError(response, `Failed to release mux job (${response.status})`);
+		throw await parseApiError(
+			response,
+			m.api_mux_release_failed({ status: String(response.status) })
+		);
 	}
 
 	const payload = (await response.json()) as { released?: boolean };
@@ -624,7 +656,7 @@ export function isValidVideoUrl(url: string): boolean {
 		if (!(parsed.protocol === 'http:' || parsed.protocol === 'https:')) return false;
 		if (!isYouTubeHost(parsed.hostname)) return false;
 
-		// Accept real video URLs and playlist links (needed by BatchInput).
+		// Accept real video URLs and playlist links for homepage playlist mode.
 		if (extractYouTubeVideoId(url)) return true;
 		return parsed.searchParams.has('list');
 	} catch {

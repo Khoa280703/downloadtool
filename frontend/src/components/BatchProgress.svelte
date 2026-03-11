@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 	import {
 		batchQueue,
 		batchProgress,
@@ -51,10 +52,23 @@
 
 	function formatSummary(): string {
 		const waiting = workerStatus.pending + workerStatus.ready;
-		if (workerStatus.active > 0) return `${workerStatus.active} active • ${waiting} waiting`;
-		if (pendingCount > 0) return `${pendingCount} queued • click Start Playlist Download`;
-		if (waiting > 0) return `${waiting} waiting`;
-		return 'Finalizing playlist';
+		if (workerStatus.active > 0) {
+			return m.playlist_progress_summary_active_waiting({
+				active: String(workerStatus.active),
+				waiting: String(waiting)
+			});
+		}
+		if (pendingCount > 0) {
+			return m.playlist_progress_summary_queued({
+				pending: String(pendingCount)
+			});
+		}
+		if (waiting > 0) {
+			return m.playlist_progress_summary_waiting({
+				waiting: String(waiting)
+			});
+		}
+		return m.playlist_progress_summary_finalizing();
 	}
 
 	function toggleItemSelection(videoId: string, checked: boolean): void {
@@ -73,11 +87,11 @@
 	}
 
 	function getItemStatusLabel(item: { status: string; selected?: boolean }): string {
-		if (item.status === 'completed') return 'Success';
-		if (item.status === 'error') return 'Fail';
-		if (item.status === 'downloading') return 'In Progress';
-		if (item.selected === false) return 'Skipped';
-		return 'Pending';
+		if (item.status === 'completed') return m.playlist_progress_status_success();
+		if (item.status === 'error') return m.playlist_progress_status_fail();
+		if (item.status === 'downloading') return m.playlist_progress_status_in_progress();
+		if (item.selected === false) return m.playlist_progress_status_skipped();
+		return m.playlist_progress_status_pending();
 	}
 
 	function getItemStatusClass(item: { status: string; selected?: boolean }): string {
@@ -98,7 +112,7 @@
 
 <div class="batch-progress" class:is-idle={!$isBatchActive && $batchQueue.length === 0}>
 	<div class="header">
-		<h4>Playlist Progress</h4>
+		<h4>{m.playlist_progress_title()}</h4>
 		<span class="count">{progressDone} / {progressTotal}</span>
 	</div>
 
@@ -114,25 +128,31 @@
 		<div class="pool-indicator">
 			<div class="slots">
 				{#each Array(workerStatus.max) as _, i}
-					<span class="slot" class:active={i < workerStatus.active} title="Download slot {i + 1}"></span>
+					<span
+						class="slot"
+						class:active={i < workerStatus.active}
+						title={m.playlist_progress_download_slot({ index: String(i + 1) })}
+					></span>
 				{/each}
 			</div>
 			<span class="pool-text">{formatSummary()}</span>
 		</div>
 		{#if workerStatus.circuitOpen}
-			<div class="cooldown-note">Rate-limited, retry in {formatCooldown(workerStatus.cooldownMs)}</div>
+			<div class="cooldown-note">
+				{m.playlist_progress_rate_limited({ cooldown: formatCooldown(workerStatus.cooldownMs) })}
+			</div>
 		{/if}
 
 		<div class="summary-row">
-			<span class="summary-pill neutral">Selected: {selectedCount}</span>
-			<span class="summary-pill success">Done: {completedCount}</span>
-			<span class="summary-pill error">Errors: {errorCount}</span>
+			<span class="summary-pill neutral">{m.playlist_progress_selected({ count: String(selectedCount) })}</span>
+			<span class="summary-pill success">{m.playlist_progress_done({ count: String(completedCount) })}</span>
+			<span class="summary-pill error">{m.playlist_progress_errors({ count: String(errorCount) })}</span>
 		</div>
 
 		{#if canEditSelection}
 			<div class="selection-actions">
-				<button type="button" class="selection-btn" onclick={selectAllPending}>Select all</button>
-				<button type="button" class="selection-btn" onclick={clearAllPending}>Clear all</button>
+				<button type="button" class="selection-btn" onclick={selectAllPending}>{m.playlist_progress_select_all()}</button>
+				<button type="button" class="selection-btn" onclick={clearAllPending}>{m.playlist_progress_clear_all()}</button>
 			</div>
 		{/if}
 
@@ -146,9 +166,9 @@
 							class:is-selected={item.selected !== false}
 							disabled={!canEditSelection}
 							onclick={() => toggleItemSelection(item.videoId, item.selected === false)}
-							aria-label={item.selected === false ? 'Select video' : 'Deselect video'}
+							aria-label={item.selected === false ? m.playlist_progress_select_video() : m.playlist_progress_deselect_video()}
 							aria-pressed={item.selected !== false}
-							title={item.selected === false ? 'Select video' : 'Deselect video'}
+							title={item.selected === false ? m.playlist_progress_select_video() : m.playlist_progress_deselect_video()}
 						>
 							<span class="material-symbols-outlined toggle-icon">
 								{item.selected !== false ? 'check' : 'add'}
@@ -164,7 +184,7 @@
 		</div>
 	{:else}
 		<div class="idle-note">
-			Fetch Playlist Videos để xem tiến trình tải và trạng thái từng video.
+			{m.playlist_progress_idle_note()}
 		</div>
 	{/if}
 </div>

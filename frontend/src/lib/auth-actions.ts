@@ -1,3 +1,5 @@
+import * as m from '$lib/paraglide/messages';
+
 function normalizeSignOutError(status: number, payload: unknown): string {
 	if (payload && typeof payload === 'object' && 'message' in payload) {
 		const message = payload.message;
@@ -6,7 +8,7 @@ function normalizeSignOutError(status: number, payload: unknown): string {
 		}
 	}
 
-	return `Đăng xuất thất bại (HTTP ${status}).`;
+	return m.user_menu_sign_out_failed_status({ status: String(status) });
 }
 
 export async function signOutFromBrowser(): Promise<void> {

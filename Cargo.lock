@@ -80,6 +80,7 @@ dependencies = [
  "job-system",
  "json5",
  "jsonwebtoken",
+ "muxer",
  "object-store",
  "proxy",
  "queue",

@@ -1,1048 +1,961 @@
-2026-Mar-01 11:05:07.491946
+2026-Mar-10 02:21:36.092585
 Starting deployment of khoa280703/downloadtool:main-zoscg4oc04gkwkssg0kw8w8w to localhost.
-2026-Mar-01 11:05:07.656910
+2026-Mar-10 02:21:36.660579
 Preparing container with helper image: ghcr.io/coollabsio/coolify-helper:1.0.12
-2026-Mar-01 11:05:07.753946
-[CMD]: docker stop -t 30 wsgos4ws0cgwg8kg8s8kgg04
-2026-Mar-01 11:05:07.753946
-Error response from daemon: No such container: wsgos4ws0cgwg8kg8s8kgg04
-2026-Mar-01 11:05:07.885312
-[CMD]: docker run -d --network coolify --name wsgos4ws0cgwg8kg8s8kgg04  --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper:1.0.12
-2026-Mar-01 11:05:07.885312
-71598fade63efc8e1012b3b7f01b22ef3ca8f246c4fb73b76753f560bdb478a4
-2026-Mar-01 11:05:09.031596
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git ls-remote https://github.com/Khoa280703/downloadtool refs/heads/main'
-2026-Mar-01 11:05:09.031596
-02f799165d0773b805376bd1a9ca3429b83f1489	refs/heads/main
-2026-Mar-01 11:05:09.041688
+2026-Mar-10 02:21:36.953581
+[CMD]: docker stop -t 30 woc844so8wg0cks08cwcgowg
+2026-Mar-10 02:21:36.953581
+Error response from daemon: No such container: woc844so8wg0cks08cwcgowg
+2026-Mar-10 02:21:37.272024
+[CMD]: docker run -d --network coolify --name woc844so8wg0cks08cwcgowg  --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper:1.0.12
+2026-Mar-10 02:21:37.272024
+fb27c4cce931289db75103f782dd582b7a780613981b0cba9f3b97813927cb90
+2026-Mar-10 02:21:38.910160
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git ls-remote https://github.com/Khoa280703/downloadtool refs/heads/main'
+2026-Mar-10 02:21:38.910160
+6e96c70cad023efec322d476ffeb62cf7afd80e0	refs/heads/main
+2026-Mar-10 02:21:38.920378
 ----------------------------------------
-2026-Mar-01 11:05:09.045669
-Importing Khoa280703/downloadtool:main (commit sha 02f799165d0773b805376bd1a9ca3429b83f1489) to /artifacts/wsgos4ws0cgwg8kg8s8kgg04.
-2026-Mar-01 11:05:09.174953
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'git clone --depth=1 --recurse-submodules --shallow-submodules -b 'main' 'https://github.com/Khoa280703/downloadtool' '/artifacts/wsgos4ws0cgwg8kg8s8kgg04' && cd '/artifacts/wsgos4ws0cgwg8kg8s8kgg04' && if [ -f .gitmodules ]; then sed -i "s#git@\(.*\):#https://\1/#g" '/artifacts/wsgos4ws0cgwg8kg8s8kgg04'/.gitmodules || true && git submodule sync && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive --depth=1; fi && cd '/artifacts/wsgos4ws0cgwg8kg8s8kgg04' && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull'
-2026-Mar-01 11:05:09.174953
-Cloning into '/artifacts/wsgos4ws0cgwg8kg8s8kgg04'...
-2026-Mar-01 11:05:11.488961
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'cd /artifacts/wsgos4ws0cgwg8kg8s8kgg04 && git log -1 02f799165d0773b805376bd1a9ca3429b83f1489 --pretty=%B'
-2026-Mar-01 11:05:11.488961
-feat(frontend): finalize i18n rollout and auth ui cleanup
-2026-Mar-01 11:05:14.981270
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'test -f /artifacts/wsgos4ws0cgwg8kg8s8kgg04/docker/Dockerfile.api && echo 'exists' || echo 'not found''
-2026-Mar-01 11:05:14.981270
+2026-Mar-10 02:21:38.924402
+Importing Khoa280703/downloadtool:main (commit sha 6e96c70cad023efec322d476ffeb62cf7afd80e0) to /artifacts/woc844so8wg0cks08cwcgowg.
+2026-Mar-10 02:21:39.273138
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'git clone --depth=1 --recurse-submodules --shallow-submodules -b 'main' 'https://github.com/Khoa280703/downloadtool' '/artifacts/woc844so8wg0cks08cwcgowg' && cd '/artifacts/woc844so8wg0cks08cwcgowg' && if [ -f .gitmodules ]; then sed -i "s#git@\(.*\):#https://\1/#g" '/artifacts/woc844so8wg0cks08cwcgowg'/.gitmodules || true && git submodule sync && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive --depth=1; fi && cd '/artifacts/woc844so8wg0cks08cwcgowg' && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull'
+2026-Mar-10 02:21:39.273138
+Cloning into '/artifacts/woc844so8wg0cks08cwcgowg'...
+2026-Mar-10 02:21:42.002447
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'cd /artifacts/woc844so8wg0cks08cwcgowg && git log -1 6e96c70cad023efec322d476ffeb62cf7afd80e0 --pretty=%B'
+2026-Mar-10 02:21:42.002447
+fix: disable caching for mux job proxy routes
+2026-Mar-10 02:21:46.781281
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'test -f /artifacts/woc844so8wg0cks08cwcgowg/docker/Dockerfile.api && echo 'exists' || echo 'not found''
+2026-Mar-10 02:21:46.781281
 exists
-2026-Mar-01 11:05:15.137198
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'cat /artifacts/wsgos4ws0cgwg8kg8s8kgg04/docker/Dockerfile.api'
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'cat /artifacts/woc844so8wg0cks08cwcgowg/docker/Dockerfile.api'
+2026-Mar-10 02:21:47.128034
 # Dockerfile for API service deployment
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 # Builds the API server and related components without GPU support
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Stage 0: Build injector JS (embedded into api crate via include_str! at compile time)
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 FROM node:22-alpine AS js-builder
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 WORKDIR /app
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 RUN npm install -g pnpm
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Copy workspace manifests for pnpm resolution
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY packages/api-client/package.json ./packages/api-client/
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY apps/injector/package.json ./apps/injector/
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Copy injector source and shared packages
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY apps/injector/ ./apps/injector/
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY packages/ ./packages/
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Install deps and build injector (produces dist/bm.js and dist/youtube-downloader.user.js)
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN pnpm install --frozen-lockfile
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN pnpm --filter @downloadtool/injector build
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Build extractor TypeScript to IIFE format (required by crates/extractor/build.rs)
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY extractors/ ./extractors/
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN mkdir -p extractors/dist && \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 npx --yes esbuild extractors/types.ts --bundle --format=iife --global-name=types --platform=neutral --target=es2020 --outfile=extractors/dist/types.js && \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 npx --yes esbuild extractors/youtube.ts --bundle --format=iife --global-name=youtube --platform=neutral --target=es2020 --outfile=extractors/dist/youtube.js
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Stage 1: Rust builder
-2026-Mar-01 11:05:15.137198
-FROM rust:1.88-bookworm AS builder
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+FROM rust:1.91-bookworm AS builder
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 WORKDIR /app
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Install dependencies
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN apt-get update && apt-get install -y \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 pkg-config \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 libssl-dev \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 && rm -rf /var/lib/apt/lists/*
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Copy workspace configuration
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY Cargo.toml ./
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY Cargo.lock ./
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Copy all crates
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY crates/ ./crates/
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+COPY config/ ./config/
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Copy injector dist (required by include_str! in crates/api/src/routes/static_files.rs)
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Copy extractor source + pre-built IIFE dist (built by js-builder stage)
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY extractors/ ./extractors/
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY --from=js-builder /app/extractors/dist ./extractors/dist/
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Build the release binary
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN cargo build --release --bin api-server
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Stage 2: Runtime
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 FROM debian:bookworm-slim AS runtime
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 WORKDIR /app
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Install runtime dependencies
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN apt-get update && apt-get install -y \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 ca-certificates \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 curl \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 libssl3 \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 && rm -rf /var/lib/apt/lists/*
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Install latest yt-dlp binary (newer than Debian package).
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN set -eux; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 arch="$(dpkg --print-architecture)"; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 case "$arch" in \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 amd64) ytdlp_asset="yt-dlp_linux" ;; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 arm64) ytdlp_asset="yt-dlp_linux_aarch64" ;; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 esac; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 curl -fL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlp_asset}" -o /usr/local/bin/yt-dlp; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 chmod +x /usr/local/bin/yt-dlp; \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 /usr/local/bin/yt-dlp --version
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Create non-root user
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN useradd -m -u 1000 -s /bin/bash appuser
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Copy binary from builder
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 COPY --from=builder /app/target/release/api-server /usr/local/bin/
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Create directories
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Switch to non-root user
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 USER appuser
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Environment variables
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 ENV PORT=3068
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 ENV EXTRACTOR_DIR=/app/extractors
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 ENV YTDLP_PATH=/usr/local/bin/yt-dlp
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 ENV RUST_LOG=info
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Expose port
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 EXPOSE 3068
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Health check
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 CMD curl -f http://localhost:3068/health || exit 1
-2026-Mar-01 11:05:15.137198
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
+2026-Mar-10 02:21:47.128034
 # Run the server
-2026-Mar-01 11:05:15.137198
+2026-Mar-10 02:21:47.128034
 CMD ["api-server"]
-2026-Mar-01 11:05:15.291057
-Added 42 ARG declarations to Dockerfile for service api (multi-stage build, added to 3 stages).
-2026-Mar-01 11:05:15.438604
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'test -f /artifacts/wsgos4ws0cgwg8kg8s8kgg04/docker/Dockerfile.frontend && echo 'exists' || echo 'not found''
-2026-Mar-01 11:05:15.438604
+2026-Mar-10 02:21:47.488367
+Added 90 ARG declarations to Dockerfile for service api (multi-stage build, added to 3 stages).
+2026-Mar-10 02:21:47.837361
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'test -f /artifacts/woc844so8wg0cks08cwcgowg/docker/Dockerfile.worker && echo 'exists' || echo 'not found''
+2026-Mar-10 02:21:47.837361
 exists
-2026-Mar-01 11:05:15.584823
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'cat /artifacts/wsgos4ws0cgwg8kg8s8kgg04/docker/Dockerfile.frontend'
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:48.181952
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'cat /artifacts/woc844so8wg0cks08cwcgowg/docker/Dockerfile.worker'
+2026-Mar-10 02:21:48.181952
+# Dockerfile for mux worker deployment
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+# Stage 0: Build extractor TypeScript to IIFE format (required by crates/extractor/build.rs)
+2026-Mar-10 02:21:48.181952
+FROM node:22-alpine AS js-builder
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+WORKDIR /app
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN npm install -g pnpm
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+2026-Mar-10 02:21:48.181952
+COPY packages/api-client/package.json ./packages/api-client/
+2026-Mar-10 02:21:48.181952
+COPY apps/injector/package.json ./apps/injector/
+2026-Mar-10 02:21:48.181952
+COPY packages/ ./packages/
+2026-Mar-10 02:21:48.181952
+COPY apps/injector/ ./apps/injector/
+2026-Mar-10 02:21:48.181952
+COPY extractors/ ./extractors/
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN pnpm install --frozen-lockfile
+2026-Mar-10 02:21:48.181952
+RUN mkdir -p extractors/dist && \
+2026-Mar-10 02:21:48.181952
+npx --yes esbuild extractors/types.ts --bundle --format=iife --global-name=types --platform=neutral --target=es2020 --outfile=extractors/dist/types.js && \
+2026-Mar-10 02:21:48.181952
+npx --yes esbuild extractors/youtube.ts --bundle --format=iife --global-name=youtube --platform=neutral --target=es2020 --outfile=extractors/dist/youtube.js
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+# Stage 1: Rust builder
+2026-Mar-10 02:21:48.181952
+FROM rust:1.91-bookworm AS builder
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+WORKDIR /app
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN apt-get update && apt-get install -y \
+2026-Mar-10 02:21:48.181952
+pkg-config \
+2026-Mar-10 02:21:48.181952
+libssl-dev \
+2026-Mar-10 02:21:48.181952
+&& rm -rf /var/lib/apt/lists/*
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+COPY Cargo.toml ./
+2026-Mar-10 02:21:48.181952
+COPY Cargo.lock ./
+2026-Mar-10 02:21:48.181952
+COPY crates/ ./crates/
+2026-Mar-10 02:21:48.181952
+COPY config/ ./config/
+2026-Mar-10 02:21:48.181952
+COPY extractors/ ./extractors/
+2026-Mar-10 02:21:48.181952
+COPY --from=js-builder /app/extractors/dist ./extractors/dist/
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN cargo build --release --bin mux-worker
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+# Stage 2: Runtime
+2026-Mar-10 02:21:48.181952
+FROM debian:bookworm-slim AS runtime
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+WORKDIR /app
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN apt-get update && apt-get install -y \
+2026-Mar-10 02:21:48.181952
+ca-certificates \
+2026-Mar-10 02:21:48.181952
+curl \
+2026-Mar-10 02:21:48.181952
+libssl3 \
+2026-Mar-10 02:21:48.181952
+&& rm -rf /var/lib/apt/lists/*
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN set -eux; \
+2026-Mar-10 02:21:48.181952
+arch="$(dpkg --print-architecture)"; \
+2026-Mar-10 02:21:48.181952
+case "$arch" in \
+2026-Mar-10 02:21:48.181952
+amd64) ytdlp_asset="yt-dlp_linux" ;; \
+2026-Mar-10 02:21:48.181952
+arm64) ytdlp_asset="yt-dlp_linux_aarch64" ;; \
+2026-Mar-10 02:21:48.181952
+*) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+2026-Mar-10 02:21:48.181952
+esac; \
+2026-Mar-10 02:21:48.181952
+curl -fL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlp_asset}" -o /usr/local/bin/yt-dlp; \
+2026-Mar-10 02:21:48.181952
+chmod +x /usr/local/bin/yt-dlp; \
+2026-Mar-10 02:21:48.181952
+/usr/local/bin/yt-dlp --version
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN useradd -m -u 1000 -s /bin/bash appuser
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+COPY --from=builder /app/target/release/mux-worker /usr/local/bin/
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+RUN mkdir -p /app/extractors /app/mux-artifacts && chown -R appuser:appuser /app
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+USER appuser
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+ENV EXTRACTOR_DIR=/app/extractors
+2026-Mar-10 02:21:48.181952
+ENV YTDLP_PATH=/usr/local/bin/yt-dlp
+2026-Mar-10 02:21:48.181952
+ENV RUST_LOG=info
+2026-Mar-10 02:21:48.181952
+ENV MUX_JOB_OUTPUT_DIR=/app/mux-artifacts
+2026-Mar-10 02:21:48.181952
+2026-Mar-10 02:21:48.181952
+CMD ["mux-worker"]
+2026-Mar-10 02:21:48.540186
+Added 90 ARG declarations to Dockerfile for service worker (multi-stage build, added to 3 stages).
+2026-Mar-10 02:21:48.886724
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'test -f /artifacts/woc844so8wg0cks08cwcgowg/docker/Dockerfile.frontend && echo 'exists' || echo 'not found''
+2026-Mar-10 02:21:48.886724
+exists
+2026-Mar-10 02:21:49.229035
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'cat /artifacts/woc844so8wg0cks08cwcgowg/docker/Dockerfile.frontend'
+2026-Mar-10 02:21:49.229035
 # Dockerfile for frontend (SvelteKit Node server)
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 # Copy ALL source files BEFORE npm install so svelte-kit sync (prepare script)
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 # can find svelte.config.js and generate .svelte-kit/ correctly.
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 FROM node:22-alpine AS builder
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 WORKDIR /app
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 # Copy all frontend source files first (node_modules excluded via .dockerignore)
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 COPY frontend/ ./
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+COPY config/ /config/
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 # Install — prepare script runs svelte-kit sync with svelte.config.js available
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 RUN npm install
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 # Build-time public API URL (embedded into client bundle by Vite)
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 # Runtime env is too late for import.meta.env in browser bundle.
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 ARG VITE_API_URL
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 ENV VITE_API_URL=${VITE_API_URL}
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 RUN test -n "$VITE_API_URL" || (echo "VITE_API_URL build arg is required" && exit 1)
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
+# Generate Paraglide runtime/messages from frontend/messages/* before Vite build
+2026-Mar-10 02:21:49.229035
+RUN npm run paraglide:compile
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 RUN node build-docker.mjs
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 # Runtime
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 FROM node:22-alpine AS runtime
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 WORKDIR /app
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 COPY --from=builder /app/build ./build
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 COPY --from=builder /app/package.json ./
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 COPY --from=builder /app/package-lock.json ./
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 # Runtime needs server-side deps (better-auth, pg) used by hooks/routes
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 RUN npm ci --omit=dev
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 ENV PORT=5168
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 ENV HOST=0.0.0.0
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 EXPOSE 5168
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
 CMD wget -qO- http://127.0.0.1:5168 || exit 1
-2026-Mar-01 11:05:15.584823
-2026-Mar-01 11:05:15.584823
+2026-Mar-10 02:21:49.229035
+2026-Mar-10 02:21:49.229035
 CMD ["node", "build"]
-2026-Mar-01 11:05:15.743835
-Added 28 ARG declarations to Dockerfile for service frontend (multi-stage build, added to 2 stages).
-2026-Mar-01 11:05:15.747820
+2026-Mar-10 02:21:49.564395
+Added 60 ARG declarations to Dockerfile for service frontend (multi-stage build, added to 2 stages).
+2026-Mar-10 02:21:49.570303
 Pulling & building required images.
-2026-Mar-01 11:05:15.764697
+2026-Mar-10 02:21:49.612471
 Creating build-time .env file in /artifacts (outside Docker context).
-2026-Mar-01 11:05:15.907685
+2026-Mar-10 02:21:49.961887
 Adding build arguments to Docker Compose build command.
-2026-Mar-01 11:05:16.173091
-[CMD]: docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/build-time.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/wsgos4ws0cgwg8kg8s8kgg04 -f /artifacts/wsgos4ws0cgwg8kg8s8kgg04/docker/docker-compose.server.yml build --pull --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg SERVICE_URL_API --build-arg SERVICE_FQDN_FRONTEND --build-arg SERVICE_FQDN_API --build-arg ORIGIN --build-arg SERVICE_URL_FRONTEND --build-arg WHOP_WEBHOOK_SECRET --build-arg POSTGRES_PASSWORD --build-arg BETTER_AUTH_TRUSTED_ORIGINS --build-arg BETTER_AUTH_SECRET --build-arg GOOGLE_CLIENT_ID --build-arg GOOGLE_CLIENT_SECRET --build-arg WHOP_PLAN_ID --build-arg COOLIFY_BUILD_SECRETS_HASH=5211b99f02c8ef84c5b4387c0c0250f5d88df66df08eae10ee3d4d4bf2231816'
-2026-Mar-01 11:05:16.173091
+2026-Mar-10 02:21:50.421491
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/build-time.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/woc844so8wg0cks08cwcgowg -f /artifacts/woc844so8wg0cks08cwcgowg/docker/docker-compose.server.yml build --pull --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg SERVICE_URL_API --build-arg SERVICE_FQDN_FRONTEND --build-arg SERVICE_FQDN_API --build-arg ORIGIN --build-arg SERVICE_URL_FRONTEND --build-arg WHOP_WEBHOOK_SECRET --build-arg BETTER_AUTH_TRUSTED_ORIGINS --build-arg POSTGRES_PASSWORD --build-arg BETTER_AUTH_SECRET --build-arg SOCKS5_PROXY_URL --build-arg GOOGLE_CLIENT_ID --build-arg GOOGLE_CLIENT_SECRET --build-arg WHOP_PLAN_ID --build-arg VITE_API_URL --build-arg DOCKER_REDIS_URL --build-arg PROXY_LIST --build-arg MUX_QUEUE_STREAM --build-arg MUX_DIRECT_DOWNLOAD --build-arg MUX_ARTIFACT_BACKEND --build-arg S3_BUCKET_NAME --build-arg S3_ACCESS_KEY_ID --build-arg S3_SECRET_ACCESS_KEY --build-arg S3_REGION --build-arg S3_ENDPOINT --build-arg MUX_ARTIFACT_TTL_SECS --build-arg MUX_CLEANUP_INTERVAL_SECS --build-arg REDIS_URL --build-arg MUX_FILE_TICKET_TTL_SECS --build-arg COOLIFY_BUILD_SECRETS_HASH=3e99cefcd03abf1e712d5cec36a4cce835391695da6958216a57b079deecf05f'
+2026-Mar-10 02:21:50.421491
 #1 [internal] load local bake definitions
-2026-Mar-01 11:05:16.376190
-#1 reading from stdin 2.99kB done
-2026-Mar-01 11:05:16.376190
+2026-Mar-10 02:21:50.645374
+#1 reading from stdin 12.77kB done
+2026-Mar-10 02:21:50.645374
 #1 DONE 0.0s
-2026-Mar-01 11:05:16.376190
-2026-Mar-01 11:05:16.376190
-#2 [api internal] load build definition from Dockerfile.api
-2026-Mar-01 11:05:16.376190
-#2 transferring dockerfile: 4.27kB done
-2026-Mar-01 11:05:16.376190
+2026-Mar-10 02:21:50.645374
+2026-Mar-10 02:21:50.645374
+#2 [worker internal] load build definition from Dockerfile.worker
+2026-Mar-10 02:21:50.645374
+#2 transferring dockerfile: 4.23kB done
+2026-Mar-10 02:21:50.645374
 #2 DONE 0.0s
-2026-Mar-01 11:05:16.376190
-2026-Mar-01 11:05:16.376190
-#3 [frontend internal] load build definition from Dockerfile.frontend
-2026-Mar-01 11:05:16.376190
-#3 transferring dockerfile: 1.94kB done
-2026-Mar-01 11:05:16.376190
+2026-Mar-10 02:21:50.645374
+2026-Mar-10 02:21:50.645374
+#3 [api internal] load build definition from Dockerfile.api
+2026-Mar-10 02:21:50.645374
+#3 transferring dockerfile: 5.30kB done
+2026-Mar-10 02:21:50.645374
 #3 DONE 0.0s
-2026-Mar-01 11:05:16.376190
-2026-Mar-01 11:05:16.376190
-#4 [frontend internal] load metadata for docker.io/library/node:22-alpine
-2026-Mar-01 11:05:17.554692
-#4 ...
-2026-Mar-01 11:05:17.554692
-2026-Mar-01 11:05:17.554692
-#5 [api internal] load metadata for docker.io/library/rust:1.88-bookworm
-2026-Mar-01 11:05:17.554692
-#5 DONE 1.3s
-2026-Mar-01 11:05:17.666276
-#4 [api internal] load metadata for docker.io/library/node:22-alpine
-2026-Mar-01 11:05:17.666276
-#4 DONE 1.3s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#6 [api internal] load metadata for docker.io/library/debian:bookworm-slim
-2026-Mar-01 11:05:17.666276
-#6 DONE 1.3s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#7 [frontend internal] load .dockerignore
-2026-Mar-01 11:05:17.666276
-#7 transferring context: 341B done
-2026-Mar-01 11:05:17.666276
-#7 DONE 0.0s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#8 [frontend builder 1/6] FROM docker.io/library/node:22-alpine@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34
-2026-Mar-01 11:05:17.666276
-#8 resolve docker.io/library/node:22-alpine@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34 0.0s done
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:50.645374
+2026-Mar-10 02:21:50.645374
+#4 [frontend internal] load build definition from Dockerfile.frontend
+2026-Mar-10 02:21:50.645374
+#4 transferring dockerfile: 2.75kB done
+2026-Mar-10 02:21:50.645374
+#4 DONE 0.0s
+2026-Mar-10 02:21:50.645374
+2026-Mar-10 02:21:50.645374
+#5 [frontend internal] load metadata for docker.io/library/node:22-alpine
+2026-Mar-10 02:21:51.692062
+#5 DONE 1.1s
+2026-Mar-10 02:21:51.692062
+2026-Mar-10 02:21:51.692062
+#6 [api internal] load metadata for docker.io/library/rust:1.91-bookworm
+2026-Mar-10 02:21:51.692062
+#6 DONE 1.1s
+2026-Mar-10 02:21:51.692062
+2026-Mar-10 02:21:51.692062
+#7 [worker internal] load metadata for docker.io/library/debian:bookworm-slim
+2026-Mar-10 02:21:51.692062
+#7 DONE 1.1s
+2026-Mar-10 02:21:51.692062
+2026-Mar-10 02:21:51.692062
+#8 [worker internal] load .dockerignore
+2026-Mar-10 02:21:51.692062
+#8 transferring context: 341B done
+2026-Mar-10 02:21:51.692062
 #8 DONE 0.0s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.692062
+2026-Mar-10 02:21:51.692062
 #9 [api runtime 1/7] FROM docker.io/library/debian:bookworm-slim@sha256:74d56e3931e0d5a1dd51f8c8a2466d21de84a271cd3b5a733b803aa91abf4421
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.692062
 #9 resolve docker.io/library/debian:bookworm-slim@sha256:74d56e3931e0d5a1dd51f8c8a2466d21de84a271cd3b5a733b803aa91abf4421 0.0s done
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.692062
 #9 DONE 0.0s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#10 [api builder  1/10] FROM docker.io/library/rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0
-2026-Mar-01 11:05:17.666276
-#10 resolve docker.io/library/rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0 0.0s done
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.692062
+2026-Mar-10 02:21:51.692062
+#10 [worker builder 1/8] FROM docker.io/library/node:22-alpine@sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00
+2026-Mar-10 02:21:51.692062
+#10 resolve docker.io/library/node:22-alpine@sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00 0.0s done
+2026-Mar-10 02:21:51.692062
 #10 DONE 0.0s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#11 [api internal] load build context
-2026-Mar-01 11:05:17.666276
-#11 transferring context: 660.65kB 0.0s done
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.692062
+2026-Mar-10 02:21:51.692062
+#11 [api builder  1/10] FROM docker.io/library/rust:1.91-bookworm@sha256:c1e5f19e773b7878c3f7a805dd00a495e747acbdc76fb2337a4ebf0418896b33
+2026-Mar-10 02:21:51.692062
+#11 resolve docker.io/library/rust:1.91-bookworm@sha256:c1e5f19e773b7878c3f7a805dd00a495e747acbdc76fb2337a4ebf0418896b33 0.0s done
+2026-Mar-10 02:21:51.692062
 #11 DONE 0.0s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#12 [api js-builder  3/12] RUN npm install -g pnpm
-2026-Mar-01 11:05:17.666276
-#12 CACHED
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.692062
+2026-Mar-10 02:21:51.692062
+#12 [worker internal] load build context
+2026-Mar-10 02:21:51.692062
+#12 transferring context: 818.75kB 0.0s done
+2026-Mar-10 02:21:51.795897
+#12 transferring context: 818.75kB 0.0s done
+2026-Mar-10 02:21:51.795897
+#12 DONE 0.0s
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
 #13 [frontend internal] load build context
-2026-Mar-01 11:05:17.666276
-#13 transferring context: 1.33MB 0.0s done
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.795897
+#13 transferring context: 1.47MB 0.0s done
+2026-Mar-10 02:21:51.795897
 #13 DONE 0.0s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#14 [frontend builder 2/6] WORKDIR /app
-2026-Mar-01 11:05:17.666276
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#14 [frontend runtime 5/6] COPY --from=builder /app/package-lock.json ./
+2026-Mar-10 02:21:51.795897
 #14 CACHED
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#15 [frontend builder 3/6] COPY frontend/ ./
-2026-Mar-01 11:05:17.666276
-#15 DONE 0.0s
-2026-Mar-01 11:05:17.666276
-2026-Mar-01 11:05:17.666276
-#16 [api js-builder  4/12] COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-2026-Mar-01 11:05:17.826543
-#16 DONE 0.0s
-2026-Mar-01 11:05:17.826543
-2026-Mar-01 11:05:17.826543
-#17 [api js-builder  5/12] COPY packages/api-client/package.json ./packages/api-client/
-2026-Mar-01 11:05:17.826543
-#17 DONE 0.0s
-2026-Mar-01 11:05:17.826543
-2026-Mar-01 11:05:17.826543
-#18 [api js-builder  6/12] COPY apps/injector/package.json ./apps/injector/
-2026-Mar-01 11:05:17.826543
-#18 DONE 0.0s
-2026-Mar-01 11:05:17.826543
-2026-Mar-01 11:05:17.826543
-#19 [api js-builder  7/12] COPY apps/injector/ ./apps/injector/
-2026-Mar-01 11:05:17.826543
-#19 DONE 0.0s
-2026-Mar-01 11:05:17.826543
-2026-Mar-01 11:05:17.826543
-#20 [api js-builder  8/12] COPY packages/ ./packages/
-2026-Mar-01 11:05:17.826543
-#20 DONE 0.1s
-2026-Mar-01 11:05:17.826543
-2026-Mar-01 11:05:17.826543
-#21 [frontend builder 4/6] RUN npm install
-2026-Mar-01 11:05:20.851734
-#21 ...
-2026-Mar-01 11:05:20.851734
-2026-Mar-01 11:05:20.851734
-#22 [api js-builder  9/12] RUN pnpm install --frozen-lockfile
-2026-Mar-01 11:05:20.851734
-#22 0.611 Scope: all 3 workspace projects
-2026-Mar-01 11:05:20.851734
-#22 0.692 Lockfile is up to date, resolution step is skipped
-2026-Mar-01 11:05:20.851734
-#22 0.728 Progress: resolved 1, reused 0, downloaded 0, added 0
-2026-Mar-01 11:05:20.851734
-#22 0.780 Packages: +105
-2026-Mar-01 11:05:20.851734
-#22 0.780 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-2026-Mar-01 11:05:20.851734
-#22 1.729 Progress: resolved 105, reused 0, downloaded 95, added 95
-2026-Mar-01 11:05:20.851734
-#22 2.467 Progress: resolved 105, reused 0, downloaded 105, added 105, done
-2026-Mar-01 11:05:20.851734
-#22 2.537 .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
-2026-Mar-01 11:05:20.851734
-#22 2.602 .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
-2026-Mar-01 11:05:20.851734
-#22 2.672
-2026-Mar-01 11:05:20.851734
-#22 2.774 Done in 2.6s using pnpm v10.30.3
-2026-Mar-01 11:05:20.851734
-#22 DONE 2.9s
-2026-Mar-01 11:05:21.001932
-#23 [api js-builder 10/12] RUN pnpm --filter @downloadtool/injector build
-2026-Mar-01 11:05:21.310850
-#23 0.609
-2026-Mar-01 11:05:21.310850
-#23 0.609 > @downloadtool/injector@0.0.1 build /app/apps/injector
-2026-Mar-01 11:05:21.310850
-#23 0.609 > vite build && vite build --config vite.userscript.config.ts
-2026-Mar-01 11:05:21.310850
-#23 0.609
-2026-Mar-01 11:05:21.545440
-#23 0.844 vite v6.4.1 building for production...
-2026-Mar-01 11:05:21.657149
-#23 0.889 transforming...
-2026-Mar-01 11:05:21.657149
-#23 0.935 ✓ 4 modules transformed.
-2026-Mar-01 11:05:21.657149
-#23 0.956 rendering chunks...
-2026-Mar-01 11:05:21.814755
-#23 0.960 computing gzip size...
-2026-Mar-01 11:05:21.814755
-#23 0.963 dist/bm.js  6.00 kB │ gzip: 2.27 kB
-2026-Mar-01 11:05:21.814755
-#23 0.963 ✓ built in 92ms
-2026-Mar-01 11:05:21.930420
-#23 1.229 vite v6.4.1 building for production...
-2026-Mar-01 11:05:22.094442
-#23 1.264 transforming...
-2026-Mar-01 11:05:22.094442
-#23 1.311 ✓ 4 modules transformed.
-2026-Mar-01 11:05:22.094442
-#23 1.327 rendering chunks...
-2026-Mar-01 11:05:22.094442
-#23 1.393 computing gzip size...
-2026-Mar-01 11:05:22.313219
-#23 1.395 dist/youtube-downloader.user.js  10.03 kB │ gzip: 3.09 kB
-2026-Mar-01 11:05:22.313219
-#23 1.395 ✓ built in 153ms
-2026-Mar-01 11:05:22.313219
-#23 DONE 1.4s
-2026-Mar-01 11:05:22.313219
-2026-Mar-01 11:05:22.313219
-#24 [api js-builder 11/12] COPY extractors/ ./extractors/
-2026-Mar-01 11:05:22.313219
-#24 DONE 0.0s
-2026-Mar-01 11:05:22.313219
-2026-Mar-01 11:05:22.313219
-#25 [api js-builder 12/12] RUN mkdir -p extractors/dist &&     npx --yes esbuild extractors/types.ts --bundle --format=iife --global-name=types --platform=neutral --target=es2020 --outfile=extractors/dist/types.js &&     npx --yes esbuild extractors/youtube.ts --bundle --format=iife --global-name=youtube --platform=neutral --target=es2020 --outfile=extractors/dist/youtube.js
-2026-Mar-01 11:05:24.378927
-#25 2.216
-2026-Mar-01 11:05:24.378927
-#25 2.216   extractors/dist/types.js  1.2kb
-2026-Mar-01 11:05:24.378927
-#25 2.216
-2026-Mar-01 11:05:24.378927
-#25 2.216 ⚡ Done in 2ms
-2026-Mar-01 11:05:25.059752
-#25 2.897
-2026-Mar-01 11:05:25.059752
-#25 2.897   extractors/dist/youtube.js  22.4kb
-2026-Mar-01 11:05:25.059752
-#25 2.897
-2026-Mar-01 11:05:25.059752
-#25 2.897 ⚡ Done in 3ms
-2026-Mar-01 11:05:25.245245
-#25 DONE 2.9s
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#26 [api builder 10/10] RUN cargo build --release --bin api-server
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#15 [frontend runtime 3/6] COPY --from=builder /app/build ./build
+2026-Mar-10 02:21:51.795897
+#15 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#16 [frontend builder 7/8] RUN npm run paraglide:compile
+2026-Mar-10 02:21:51.795897
+#16 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#17 [frontend builder 6/8] RUN test -n "https://api-download.khoadangbui.online" || (echo "VITE_API_URL build arg is required" && exit 1)
+2026-Mar-10 02:21:51.795897
+#17 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#18 [frontend builder 3/8] COPY frontend/ ./
+2026-Mar-10 02:21:51.795897
+#18 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#19 [frontend builder 8/8] RUN node build-docker.mjs
+2026-Mar-10 02:21:51.795897
+#19 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#20 [frontend builder 4/8] COPY config/ /config/
+2026-Mar-10 02:21:51.795897
+#20 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#21 [frontend builder 5/8] RUN npm install
+2026-Mar-10 02:21:51.795897
+#21 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#22 [frontend runtime 4/6] COPY --from=builder /app/package.json ./
+2026-Mar-10 02:21:51.795897
+#22 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#23 [worker js-builder  7/11] COPY packages/ ./packages/
+2026-Mar-10 02:21:51.795897
+#23 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#24 [worker js-builder 11/11] RUN mkdir -p extractors/dist &&     npx --yes esbuild extractors/types.ts --bundle --format=iife --global-name=types --platform=neutral --target=es2020 --outfile=extractors/dist/types.js &&     npx --yes esbuild extractors/youtube.ts --bundle --format=iife --global-name=youtube --platform=neutral --target=es2020 --outfile=extractors/dist/youtube.js
+2026-Mar-10 02:21:51.795897
+#24 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#25 [worker js-builder  8/11] COPY apps/injector/ ./apps/injector/
+2026-Mar-10 02:21:51.795897
+#25 CACHED
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#26 [worker js-builder  9/11] COPY extractors/ ./extractors/
+2026-Mar-10 02:21:51.795897
 #26 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#27 [api builder  2/10] WORKDIR /app
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#27 [worker js-builder 10/11] RUN pnpm install --frozen-lockfile
+2026-Mar-10 02:21:51.795897
 #27 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#28 [api builder  6/10] COPY crates/ ./crates/
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#28 [worker builder 10/10] RUN cargo build --release --bin mux-worker
+2026-Mar-10 02:21:51.795897
 #28 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#29 [api builder  4/10] COPY Cargo.toml ./
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#29 [worker builder  9/10] COPY --from=js-builder /app/extractors/dist ./extractors/dist/
+2026-Mar-10 02:21:51.795897
 #29 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#30 [api runtime 4/7] RUN set -eux;     arch="$(dpkg --print-architecture)";     case "$arch" in       amd64) ytdlp_asset="yt-dlp_linux" ;;       arm64) ytdlp_asset="yt-dlp_linux_aarch64" ;;       *) echo "Unsupported architecture: $arch" >&2; exit 1 ;;     esac;     curl -fL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlp_asset}" -o /usr/local/bin/yt-dlp;     chmod +x /usr/local/bin/yt-dlp;     /usr/local/bin/yt-dlp --version
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#30 [worker runtime 6/7] COPY --from=builder /app/target/release/mux-worker /usr/local/bin/
+2026-Mar-10 02:21:51.795897
 #30 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#31 [api runtime 6/7] COPY --from=builder /app/target/release/api-server /usr/local/bin/
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#31 [worker builder  8/10] COPY extractors/ ./extractors/
+2026-Mar-10 02:21:51.795897
 #31 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#32 [api builder  5/10] COPY Cargo.lock ./
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#32 [frontend runtime 6/6] RUN npm ci --omit=dev
+2026-Mar-10 02:21:51.795897
 #32 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#33 [api runtime 3/7] RUN apt-get update && apt-get install -y     ca-certificates     curl     libssl3     && rm -rf /var/lib/apt/lists/*
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#33 [api js-builder  8/12] COPY packages/ ./packages/
+2026-Mar-10 02:21:51.795897
 #33 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
 #34 [api builder  3/10] RUN apt-get update && apt-get install -y     pkg-config     libssl-dev     && rm -rf /var/lib/apt/lists/*
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
 #34 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#35 [api runtime 2/7] WORKDIR /app
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#35 [api runtime 4/7] RUN set -eux;     arch="$(dpkg --print-architecture)";     case "$arch" in       amd64) ytdlp_asset="yt-dlp_linux" ;;       arm64) ytdlp_asset="yt-dlp_linux_aarch64" ;;       *) echo "Unsupported architecture: $arch" >&2; exit 1 ;;     esac;     curl -fL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlp_asset}" -o /usr/local/bin/yt-dlp;     chmod +x /usr/local/bin/yt-dlp;     /usr/local/bin/yt-dlp --version
+2026-Mar-10 02:21:51.795897
 #35 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#36 [api builder  9/10] COPY --from=js-builder /app/extractors/dist ./extractors/dist/
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#36 [api builder  9/11] COPY extractors/ ./extractors/
+2026-Mar-10 02:21:51.795897
 #36 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#37 [api runtime 5/7] RUN useradd -m -u 1000 -s /bin/bash appuser
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#37 [api builder  6/10] COPY crates/ ./crates/
+2026-Mar-10 02:21:51.795897
 #37 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#38 [api builder  7/10] COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#38 [api builder  8/11] COPY --from=js-builder /app/apps/injector/dist ./apps/injector/dist
+2026-Mar-10 02:21:51.795897
 #38 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#39 [api builder  8/10] COPY extractors/ ./extractors/
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#39 [api builder 10/11] COPY --from=js-builder /app/extractors/dist ./extractors/dist/
+2026-Mar-10 02:21:51.795897
 #39 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#40 [api runtime 7/7] RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
-2026-Mar-01 11:05:25.245245
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#40 [api builder  2/10] WORKDIR /app
+2026-Mar-10 02:21:51.795897
 #40 CACHED
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#41 [api] exporting to image
-2026-Mar-01 11:05:25.245245
-#41 exporting layers done
-2026-Mar-01 11:05:25.245245
-#41 exporting manifest sha256:f5b0bcd070464b28c3580aa37d8711bd150587cdd63791a68c63bccc76af1efa done
-2026-Mar-01 11:05:25.245245
-#41 exporting config sha256:c130a01b9c696cdc8626f9be4379392bfe9ed4fb0835cee91b8275c8f67e9f16 done
-2026-Mar-01 11:05:25.245245
-#41 exporting attestation manifest sha256:d79777df5900189c2778afc56b705e11c15f0785501fb96601ab61fafcca21d1 0.0s done
-2026-Mar-01 11:05:25.245245
-#41 exporting manifest list sha256:103845730051175fe89b44e5a41d73b59bdcc9640528d1b818c84991f51f564b 0.0s done
-2026-Mar-01 11:05:25.245245
-#41 naming to docker.io/library/o8kccgkgwsockoocow8sg88s_api:02f799165d0773b805376bd1a9ca3429b83f1489 done
-2026-Mar-01 11:05:25.245245
-#41 unpacking to docker.io/library/o8kccgkgwsockoocow8sg88s_api:02f799165d0773b805376bd1a9ca3429b83f1489 done
-2026-Mar-01 11:05:25.245245
-#41 DONE 0.1s
-2026-Mar-01 11:05:25.245245
-2026-Mar-01 11:05:25.245245
-#42 [api] resolving provenance for metadata file
-2026-Mar-01 11:05:25.403593
-#42 DONE 0.0s
-2026-Mar-01 11:05:25.403593
-2026-Mar-01 11:05:25.403593
-#21 [frontend builder 4/6] RUN npm install
-2026-Mar-01 11:05:25.700223
-#21 8.031
-2026-Mar-01 11:05:25.700223
-#21 8.031 > frontend@0.0.1 prepare
-2026-Mar-01 11:05:25.700223
-#21 8.031 > svelte-kit sync || echo ''
-2026-Mar-01 11:05:25.700223
-#21 8.031
-2026-Mar-01 11:05:26.518207
-#21 8.849
-2026-Mar-01 11:05:26.518207
-#21 8.849 added 237 packages, and audited 238 packages in 9s
-2026-Mar-01 11:05:26.518207
-#21 8.849
-2026-Mar-01 11:05:26.518207
-#21 8.849 43 packages are looking for funding
-2026-Mar-01 11:05:26.518207
-#21 8.849   run `npm fund` for details
-2026-Mar-01 11:05:26.669905
-#21 8.864
-2026-Mar-01 11:05:26.669905
-#21 8.864 3 vulnerabilities (2 low, 1 moderate)
-2026-Mar-01 11:05:26.669905
-#21 8.864
-2026-Mar-01 11:05:26.669905
-#21 8.864 To address all issues, run:
-2026-Mar-01 11:05:26.669905
-#21 8.864   npm audit fix
-2026-Mar-01 11:05:26.669905
-#21 8.864
-2026-Mar-01 11:05:26.669905
-#21 8.864 Run `npm audit` for details.
-2026-Mar-01 11:05:26.669905
-#21 8.865 npm notice
-2026-Mar-01 11:05:26.669905
-#21 8.865 npm notice New major version of npm available! 10.9.4 -> 11.11.0
-2026-Mar-01 11:05:26.669905
-#21 8.865 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.11.0
-2026-Mar-01 11:05:26.669905
-#21 8.865 npm notice To update run: npm install -g npm@11.11.0
-2026-Mar-01 11:05:26.669905
-#21 8.865 npm notice
-2026-Mar-01 11:05:26.669905
-#21 DONE 9.0s
-2026-Mar-01 11:05:26.820913
-#43 [frontend builder 5/6] RUN test -n "https://api-download.khoadangbui.online" || (echo "VITE_API_URL build arg is required" && exit 1)
-2026-Mar-01 11:05:26.939157
-#43 DONE 0.3s
-2026-Mar-01 11:05:27.090206
-#44 [frontend builder 6/6] RUN node build-docker.mjs
-2026-Mar-01 11:05:28.001909
-#44 1.062 The following Vite config options will be overridden by SvelteKit:
-2026-Mar-01 11:05:28.001909
-#44 1.062   - build.outDir
-2026-Mar-01 11:05:28.198196
-#44 1.091 vite v6.4.1 building SSR bundle for production...
-2026-Mar-01 11:05:28.198196
-#44 1.108 transforming...
-2026-Mar-01 11:05:28.874322
-#44 1.934 ✓ 145 modules transformed.
-2026-Mar-01 11:05:28.957360
-#44 1.938 ✗ Build failed in 846ms
-2026-Mar-01 11:05:28.957360
-#44 1.939 node:internal/modules/run_main:123
-2026-Mar-01 11:05:28.957360
-#44 1.939     triggerUncaughtException(
-2026-Mar-01 11:05:28.957360
-#44 1.939     ^
-2026-Mar-01 11:05:28.957360
-#44 1.939
-2026-Mar-01 11:05:28.957360
-#44 1.939 [vite:load-fallback] Could not load /app/src/lib/paraglide/runtime (imported by src/routes/(auth)/account/+page.svelte): ENOENT: no such file or directory, open '/app/src/lib/paraglide/runtime'
-2026-Mar-01 11:05:28.957360
-#44 1.939     at async open (node:internal/fs/promises:636:25)
-2026-Mar-01 11:05:28.957360
-#44 1.939     at async Object.readFile (node:internal/fs/promises:1235:14)
-2026-Mar-01 11:05:28.957360
-#44 1.939     at async Object.handler (file:///app/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:45872:27)
-2026-Mar-01 11:05:28.957360
-#44 1.939     at async PluginDriver.hookFirstAndGetPlugin (file:///app/node_modules/rollup/dist/es/shared/node-entry.js:22453:28)
-2026-Mar-01 11:05:28.957360
-#44 1.939     at async file:///app/node_modules/rollup/dist/es/shared/node-entry.js:21445:33
-2026-Mar-01 11:05:28.957360
-#44 1.939     at async Queue.work (file:///app/node_modules/rollup/dist/es/shared/node-entry.js:22681:32) {
-2026-Mar-01 11:05:28.957360
-#44 1.939   errno: -2,
-2026-Mar-01 11:05:28.957360
-#44 1.939   code: 'PLUGIN_ERROR',
-2026-Mar-01 11:05:28.957360
-#44 1.939   syscall: 'open',
-2026-Mar-01 11:05:28.957360
-#44 1.939   path: '/app/src/lib/paraglide/runtime',
-2026-Mar-01 11:05:28.957360
-#44 1.939   pluginCode: 'ENOENT',
-2026-Mar-01 11:05:28.957360
-#44 1.939   plugin: 'vite:load-fallback',
-2026-Mar-01 11:05:28.957360
-#44 1.939   hook: 'load',
-2026-Mar-01 11:05:28.957360
-#44 1.939   watchFiles: [
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/index.js',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/index.js',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/api/auth/[...all]/+server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/.svelte-kit/generated/server/internal.js',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/api/checkout/+server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/api/checkout/callback/+server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/api/proxy/extract/+server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/share-target/+server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/sitemap.xml/+server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/components/svelte-5/error.svelte',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/+layout.svelte',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/+page.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/(auth)/account/+page.svelte',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/(auth)/account/+page.server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/+page.svelte',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/routes/privacy/+page.svelte',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/hooks.server.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/src/hooks.ts',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/package.json',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/command.js',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/form.js',
-2026-Mar-01 11:05:28.957360
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/prerender.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/query.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/promise.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/respond.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/constants.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/shared-server.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/esm-env/index.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/env.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/utils.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/app.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/paths/internal/server.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/.svelte-kit/generated/root.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/state/index.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/index.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/lib/auth-actions.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/navigation.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/environment/index.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/index-server.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/AuthModal.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/SiteHeader.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/SiteFooter.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/DownloadBtn.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/FormatPicker.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/BatchProgress.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/BatchInput.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/lib/api.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/stores/download.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/lib/analytics.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/stores.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/app.css',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/CookieConsent.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/form-utils.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/server/remote/shared.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/shared.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/esm-env/true.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/esm-env/false.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/error.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/http.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/escape.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/constants.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/legacy/legacy-server.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/state/client.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/.svelte-kit/generated/root.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/app/state/server.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/shared/utils.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/shared/attributes.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/constants.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/store/utils.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/escaping.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/hydration.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/shared/validate.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/context.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/blocks/html.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/utils.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/renderer.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/errors.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/dev.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/shared/clone.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/hydratable.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/blocks/snippet.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/svelte/src/internal/server/abort-signal.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/lib/auth-client.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/LanguageSwitcher.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/UserMenu.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/stores/batch.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/lib/playlist-download-worker.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/components/BatchActiveState.svelte',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/src/lib/playlist-download-stream-selection.ts',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/client/client.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/endpoint.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/respond_with_error.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/url.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/render.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/routing.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/index.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/cookie.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/data/index.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/fetch.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     '/app/node_modules/@sveltejs/kit/src/utils/page_nodes.js',
-2026-Mar-01 11:05:28.960110
-#44 1.939     ... 47 more items
-2026-Mar-01 11:05:28.960110
-#44 1.939   ]
-2026-Mar-01 11:05:28.960110
-#44 1.939 }
-2026-Mar-01 11:05:28.960110
-#44 1.939
-2026-Mar-01 11:05:28.960110
-#44 1.939 Node.js v22.22.0
-2026-Mar-01 11:05:28.960110
-#44 ERROR: process "/bin/sh -c node build-docker.mjs" did not complete successfully: exit code: 1
-2026-Mar-01 11:05:28.960110
-------
-2026-Mar-01 11:05:28.960110
-> [frontend builder 6/6] RUN node build-docker.mjs:
-2026-Mar-01 11:05:28.960110
-1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/page/index.js',
-2026-Mar-01 11:05:28.960110
-1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/cookie.js',
-2026-Mar-01 11:05:28.960110
-1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/data/index.js',
-2026-Mar-01 11:05:28.960110
-1.939     '/app/node_modules/@sveltejs/kit/src/runtime/server/fetch.js',
-2026-Mar-01 11:05:28.960110
-1.939     '/app/node_modules/@sveltejs/kit/src/utils/page_nodes.js',
-2026-Mar-01 11:05:28.960110
-1.939     ... 47 more items
-2026-Mar-01 11:05:28.960110
-1.939   ]
-2026-Mar-01 11:05:28.960110
-1.939 }
-2026-Mar-01 11:05:28.960110
-1.939
-2026-Mar-01 11:05:28.960110
-1.939 Node.js v22.22.0
-2026-Mar-01 11:05:28.960110
-------
-2026-Mar-01 11:05:28.962310
-Dockerfile.frontend:36
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
---------------------
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
-34 |
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
-35 |     # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
-36 | >>> RUN node build-docker.mjs
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
-37 |
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
-38 |     # Runtime
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
---------------------
-2026-Mar-01 11:05:28.962310
-2026-Mar-01 11:05:28.962310
-target frontend: failed to solve: process "/bin/sh -c node build-docker.mjs" did not complete successfully: exit code: 1
-2026-Mar-01 11:05:28.964481
-exit status 1
-2026-Mar-01 11:05:28.998839
-========================================
-2026-Mar-01 11:05:29.005641
-Deployment failed: Command execution failed (exit code 1): docker exec wsgos4ws0cgwg8kg8s8kgg04 bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/build-time.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/wsgos4ws0cgwg8kg8s8kgg04 -f /artifacts/wsgos4ws0cgwg8kg8s8kgg04/docker/docker-compose.server.yml build --pull --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg SERVICE_URL_API --build-arg SERVICE_FQDN_FRONTEND --build-arg SERVICE_FQDN_API --build-arg ORIGIN --build-arg SERVICE_URL_FRONTEND --build-arg WHOP_WEBHOOK_SECRET --build-arg POSTGRES_PASSWORD --build-arg BETTER_AUTH_TRUSTED_ORIGINS --build-arg BETTER_AUTH_SECRET --build-arg GOOGLE_CLIENT_ID --build-arg GOOGLE_CLIENT_SECRET --build-arg WHOP_PLAN_ID --build-arg COOLIFY_BUILD_SECRETS_HASH=5211b99f02c8ef84c5b4387c0c0250f5d88df66df08eae10ee3d4d4bf2231816'
-2026-Mar-01 11:05:29.005641
-Error: Dockerfile.frontend:36
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
---------------------
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
-34 |
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
-35 |     # Build via programmatic API — bypasses vite.config.ts loading (esbuild issues on Alpine)
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
-36 | >>> RUN node build-docker.mjs
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
-37 |
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
-38 |     # Runtime
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
---------------------
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
-target frontend: failed to solve: process "/bin/sh -c node build-docker.mjs" did not complete successfully: exit code: 1
-2026-Mar-01 11:05:29.005641
-2026-Mar-01 11:05:29.005641
-exit status 1
-2026-Mar-01 11:05:29.014812
-Error type: RuntimeException
-2026-Mar-01 11:05:29.020786
-Error code: 0
-2026-Mar-01 11:05:29.026704
-Location: /var/www/html/app/Traits/ExecuteRemoteCommand.php:243
-2026-Mar-01 11:05:29.031791
-Stack trace (first 5 lines):
-2026-Mar-01 11:05:29.036872
-#0 /var/www/html/app/Traits/ExecuteRemoteCommand.php(104): App\Jobs\ApplicationDeploymentJob->executeCommandWithProcess()
-2026-Mar-01 11:05:29.042407
-#1 /var/www/html/vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php(272): App\Jobs\ApplicationDeploymentJob->{closure:App\Traits\ExecuteRemoteCommand::execute_remote_command():71}()
+2026-Mar-10 02:21:51.795897
+2026-Mar-10 02:21:51.795897
+#41 [api js-builder 10/12] RUN pnpm --filter @downloadtool/injector build
+2026-Mar-10 02:21:51.795897
+#41 CACHED
+2026-Mar-10 02:21:51.798151
+#42 [api js-builder  4/11] COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+2026-Mar-10 02:21:51.798151
+#42 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#43 [api js-builder  3/11] RUN npm install -g pnpm
+2026-Mar-10 02:21:51.798151
+#43 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#44 [api runtime 6/7] COPY --from=builder /app/target/release/api-server /usr/local/bin/
+2026-Mar-10 02:21:51.798151
+#44 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#45 [api js-builder  9/12] RUN pnpm install --frozen-lockfile
+2026-Mar-10 02:21:51.798151
+#45 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#46 [api builder  7/10] COPY config/ ./config/
+2026-Mar-10 02:21:51.798151
+#46 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#47 [api builder  4/10] COPY Cargo.toml ./
+2026-Mar-10 02:21:51.798151
+#47 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#48 [api js-builder 12/12] RUN mkdir -p extractors/dist &&     npx --yes esbuild extractors/types.ts --bundle --format=iife --global-name=types --platform=neutral --target=es2020 --outfile=extractors/dist/types.js &&     npx --yes esbuild extractors/youtube.ts --bundle --format=iife --global-name=youtube --platform=neutral --target=es2020 --outfile=extractors/dist/youtube.js
+2026-Mar-10 02:21:51.798151
+#48 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#49 [api runtime 2/7] WORKDIR /app
+2026-Mar-10 02:21:51.798151
+#49 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#50 [api builder 2/8] WORKDIR /app
+2026-Mar-10 02:21:51.798151
+#50 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#51 [api js-builder  5/11] COPY packages/api-client/package.json ./packages/api-client/
+2026-Mar-10 02:21:51.798151
+#51 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#52 [api js-builder 11/12] COPY extractors/ ./extractors/
+2026-Mar-10 02:21:51.798151
+#52 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#53 [api js-builder  7/12] COPY apps/injector/ ./apps/injector/
+2026-Mar-10 02:21:51.798151
+#53 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#54 [api runtime 3/7] RUN apt-get update && apt-get install -y     ca-certificates     curl     libssl3     && rm -rf /var/lib/apt/lists/*
+2026-Mar-10 02:21:51.798151
+#54 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#55 [api builder 11/11] RUN cargo build --release --bin api-server
+2026-Mar-10 02:21:51.798151
+#55 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#56 [api js-builder  6/11] COPY apps/injector/package.json ./apps/injector/
+2026-Mar-10 02:21:51.798151
+#56 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#57 [api runtime 5/7] RUN useradd -m -u 1000 -s /bin/bash appuser
+2026-Mar-10 02:21:51.798151
+#57 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#58 [api builder  5/10] COPY Cargo.lock ./
+2026-Mar-10 02:21:51.798151
+#58 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#59 [worker runtime 7/7] RUN mkdir -p /app/extractors /app/mux-artifacts && chown -R appuser:appuser /app
+2026-Mar-10 02:21:51.798151
+#59 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#60 [api runtime 7/7] RUN mkdir -p /app/extractors /app/data && chown -R appuser:appuser /app
+2026-Mar-10 02:21:51.798151
+#60 CACHED
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#61 [api] exporting to image
+2026-Mar-10 02:21:51.798151
+#61 exporting layers done
+2026-Mar-10 02:21:51.798151
+#61 exporting manifest sha256:57df27dea0155dbd599f3916a09b0135099e477ef5becb8a3e107d67cedeba6d done
+2026-Mar-10 02:21:51.798151
+#61 exporting config sha256:b4343efbb7a49a4d93057f19c585c14404a73e94b85839e79a6ae56625909bfc done
+2026-Mar-10 02:21:51.798151
+#61 exporting attestation manifest sha256:e582d18e8c0176875fb00d341e084bb51aa92b39e22c2a6cc35331a33387f49b 0.0s done
+2026-Mar-10 02:21:51.798151
+#61 exporting manifest list sha256:366d93557f2cfd6919d7d33753321ad006cd44d80e7182e72f3a033435a4f0f3 done
+2026-Mar-10 02:21:51.798151
+#61 naming to docker.io/library/o8kccgkgwsockoocow8sg88s_api:6e96c70cad023efec322d476ffeb62cf7afd80e0 done
+2026-Mar-10 02:21:51.798151
+#61 unpacking to docker.io/library/o8kccgkgwsockoocow8sg88s_api:6e96c70cad023efec322d476ffeb62cf7afd80e0 done
+2026-Mar-10 02:21:51.798151
+#61 DONE 0.1s
+2026-Mar-10 02:21:51.798151
+2026-Mar-10 02:21:51.798151
+#62 [worker] exporting to image
+2026-Mar-10 02:21:51.798151
+#62 exporting layers done
+2026-Mar-10 02:21:51.798151
+#62 exporting manifest sha256:1c68706a59e921993c437c05287ef2860711645d14dbf71bea222d526adfb433 done
+2026-Mar-10 02:21:51.798151
+#62 exporting config sha256:b9175a2a3c5c1826c794c1493f8edebab04f34ff72ae5d2df82f8741012a5fc7 done
+2026-Mar-10 02:21:51.798151
+#62 exporting attestation manifest sha256:2830bb3c02dab3084ee1cbca71b9fa87629a685d9d156be2a527600b47c65bfd 0.0s done
+2026-Mar-10 02:21:51.798151
+#62 exporting manifest list sha256:f3098a26fd5e9c56409c82fffdd260334e1f2808efc5f849ff4ff8ff13bbfbe7 done
+2026-Mar-10 02:21:51.798151
+#62 naming to docker.io/library/o8kccgkgwsockoocow8sg88s_worker:6e96c70cad023efec322d476ffeb62cf7afd80e0 done
+2026-Mar-10 02:21:51.798151
+#62 unpacking to docker.io/library/o8kccgkgwsockoocow8sg88s_worker:6e96c70cad023efec322d476ffeb62cf7afd80e0 done
+2026-Mar-10 02:21:51.905002
+#62 DONE 0.1s
+2026-Mar-10 02:21:51.905002
+2026-Mar-10 02:21:51.905002
+#63 [frontend] exporting to image
+2026-Mar-10 02:21:51.905002
+#63 exporting layers done
+2026-Mar-10 02:21:51.905002
+#63 exporting manifest sha256:80116d119f721e6b95bea86669e9a41afc9f87846c0c6a9499ad0bb08722adb9 done
+2026-Mar-10 02:21:51.905002
+#63 exporting config sha256:3c40f57d302cff2764c22c21aae1ba298100a723cfc32e005a83e4d7e2ffee1c done
+2026-Mar-10 02:21:51.905002
+#63 exporting attestation manifest sha256:2c66d6f1d7551bfcfc503301022c6cc0db5fa95842a10fb929f13cb69bf36aa2 0.0s done
+2026-Mar-10 02:21:51.905002
+#63 exporting manifest list sha256:fe30f24f10354d8625dcc7dc83cdee0256a79810df2c45430e910a457321f854 done
+2026-Mar-10 02:21:51.905002
+#63 naming to docker.io/library/o8kccgkgwsockoocow8sg88s_frontend:6e96c70cad023efec322d476ffeb62cf7afd80e0 done
+2026-Mar-10 02:21:51.905002
+#63 unpacking to docker.io/library/o8kccgkgwsockoocow8sg88s_frontend:6e96c70cad023efec322d476ffeb62cf7afd80e0 done
+2026-Mar-10 02:21:51.905002
+#63 DONE 0.1s
+2026-Mar-10 02:21:51.905002
+2026-Mar-10 02:21:51.905002
+#64 [api] resolving provenance for metadata file
+2026-Mar-10 02:21:51.991447
+#64 DONE 0.0s
+2026-Mar-10 02:21:51.991447
+2026-Mar-10 02:21:51.991447
+#65 [frontend] resolving provenance for metadata file
+2026-Mar-10 02:21:51.991447
+#65 DONE 0.0s
+2026-Mar-10 02:21:51.991447
+2026-Mar-10 02:21:51.991447
+#66 [worker] resolving provenance for metadata file
+2026-Mar-10 02:21:51.991447
+#66 DONE 0.0s
+2026-Mar-10 02:21:51.994094
+frontend  Built
+2026-Mar-10 02:21:51.994094
+api  Built
+2026-Mar-10 02:21:51.994094
+worker  Built
+2026-Mar-10 02:21:52.042589
+Creating .env file with runtime variables for container.
+2026-Mar-10 02:21:52.676825
+Removing old containers.
+2026-Mar-10 02:21:53.459320
+[CMD]: docker stop -t 30 frontend-o8kccgkgwsockoocow8sg88s-021445506257
+2026-Mar-10 02:21:53.459320
+frontend-o8kccgkgwsockoocow8sg88s-021445506257
+2026-Mar-10 02:21:53.783869
+[CMD]: docker rm -f frontend-o8kccgkgwsockoocow8sg88s-021445506257
+2026-Mar-10 02:21:53.783869
+frontend-o8kccgkgwsockoocow8sg88s-021445506257
+2026-Mar-10 02:22:24.446508
+[CMD]: docker stop -t 30 api-o8kccgkgwsockoocow8sg88s-021445490722
+2026-Mar-10 02:22:24.446508
+api-o8kccgkgwsockoocow8sg88s-021445490722
+2026-Mar-10 02:22:24.768284
+[CMD]: docker rm -f api-o8kccgkgwsockoocow8sg88s-021445490722
+2026-Mar-10 02:22:24.768284
+api-o8kccgkgwsockoocow8sg88s-021445490722
+2026-Mar-10 02:22:55.216936
+[CMD]: docker stop -t 30 worker-o8kccgkgwsockoocow8sg88s-021445499593
+2026-Mar-10 02:22:55.216936
+worker-o8kccgkgwsockoocow8sg88s-021445499593
+2026-Mar-10 02:22:55.535394
+[CMD]: docker rm -f worker-o8kccgkgwsockoocow8sg88s-021445499593
+2026-Mar-10 02:22:55.535394
+worker-o8kccgkgwsockoocow8sg88s-021445499593
+2026-Mar-10 02:22:55.976652
+[CMD]: docker stop -t 30 postgres-o8kccgkgwsockoocow8sg88s-021445481555
+2026-Mar-10 02:22:55.976652
+postgres-o8kccgkgwsockoocow8sg88s-021445481555
+2026-Mar-10 02:22:56.285170
+[CMD]: docker rm -f postgres-o8kccgkgwsockoocow8sg88s-021445481555
+2026-Mar-10 02:22:56.285170
+postgres-o8kccgkgwsockoocow8sg88s-021445481555
+2026-Mar-10 02:22:56.789414
+[CMD]: docker stop -t 30 redis-o8kccgkgwsockoocow8sg88s-021445486598
+2026-Mar-10 02:22:56.789414
+redis-o8kccgkgwsockoocow8sg88s-021445486598
+2026-Mar-10 02:22:57.115444
+[CMD]: docker rm -f redis-o8kccgkgwsockoocow8sg88s-021445486598
+2026-Mar-10 02:22:57.115444
+redis-o8kccgkgwsockoocow8sg88s-021445486598
+2026-Mar-10 02:22:57.118749
+Starting new application.
+2026-Mar-10 02:22:58.185254
+[CMD]: docker exec woc844so8wg0cks08cwcgowg bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=o8kccgkgwsockoocow8sg88s  docker compose --env-file /artifacts/woc844so8wg0cks08cwcgowg/.env --project-name o8kccgkgwsockoocow8sg88s --project-directory /artifacts/woc844so8wg0cks08cwcgowg -f /artifacts/woc844so8wg0cks08cwcgowg/docker/docker-compose.server.yml up -d'
+2026-Mar-10 02:22:58.185254
+time="2026-03-10T02:22:58Z" level=warning msg="volume \"o8kccgkgwsockoocow8sg88s_postgres-data\" already exists but was not created by Docker Compose. Use `external: true` to use an existing volume"
+2026-Mar-10 02:22:58.187776
+Container redis-o8kccgkgwsockoocow8sg88s-022146056898  Creating
+2026-Mar-10 02:22:58.187776
+Container postgres-o8kccgkgwsockoocow8sg88s-022146051516  Creating
+2026-Mar-10 02:22:58.549163
+Container redis-o8kccgkgwsockoocow8sg88s-022146056898  Created
+2026-Mar-10 02:22:58.549163
+Container postgres-o8kccgkgwsockoocow8sg88s-022146051516  Created
+2026-Mar-10 02:22:58.551812
+Container api-o8kccgkgwsockoocow8sg88s-022146061268  Creating
+2026-Mar-10 02:22:58.551812
+Container worker-o8kccgkgwsockoocow8sg88s-022146070609  Creating
+2026-Mar-10 02:22:58.577144
+Container api-o8kccgkgwsockoocow8sg88s-022146061268  Created
+2026-Mar-10 02:22:58.577144
+Container frontend-o8kccgkgwsockoocow8sg88s-022146077647  Creating
+2026-Mar-10 02:22:58.579746
+Container worker-o8kccgkgwsockoocow8sg88s-022146070609  Created
+2026-Mar-10 02:22:58.946770
+Container frontend-o8kccgkgwsockoocow8sg88s-022146077647  Created
+2026-Mar-10 02:22:58.962270
+Container redis-o8kccgkgwsockoocow8sg88s-022146056898  Starting
+2026-Mar-10 02:22:58.962270
+Container postgres-o8kccgkgwsockoocow8sg88s-022146051516  Starting
+2026-Mar-10 02:22:59.080882
+Container postgres-o8kccgkgwsockoocow8sg88s-022146051516  Started
+2026-Mar-10 02:22:59.088637
+Container redis-o8kccgkgwsockoocow8sg88s-022146056898  Started
+2026-Mar-10 02:22:59.091281
+Container worker-o8kccgkgwsockoocow8sg88s-022146070609  Starting
+2026-Mar-10 02:22:59.091281
+Container api-o8kccgkgwsockoocow8sg88s-022146061268  Starting
+2026-Mar-10 02:22:59.208450
+Container worker-o8kccgkgwsockoocow8sg88s-022146070609  Started
+2026-Mar-10 02:22:59.216421
+Container api-o8kccgkgwsockoocow8sg88s-022146061268  Started
+2026-Mar-10 02:22:59.216421
+Container frontend-o8kccgkgwsockoocow8sg88s-022146077647  Starting
+2026-Mar-10 02:22:59.333410
+Container frontend-o8kccgkgwsockoocow8sg88s-022146077647  Started
+2026-Mar-10 02:23:00.223303
+New container started.
+2026-Mar-10 02:23:01.139801
+Gracefully shutting down build container: woc844so8wg0cks08cwcgowg
+2026-Mar-10 02:23:01.695231
+[CMD]: docker stop -t 30 woc844so8wg0cks08cwcgowg
+2026-Mar-10 02:23:01.695231
+woc844so8wg0cks08cwcgowg

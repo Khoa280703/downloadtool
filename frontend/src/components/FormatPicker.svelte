@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { Stream } from '$lib/types';
+	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
 		streams: Stream[];
 		onSelect: (videoStream: Stream, audioStream: Stream | null) => void;
 	}
 
-	type TabMode = 'video' | 'audio';
+	type TabMode = 'video' | 'videoOnly' | 'audio';
 	type PreferredFormat = {
 		mode: TabMode;
 		qualityValue?: number;
@@ -47,6 +48,20 @@
 			.sort((a, b) => {
 				const q = qualityScore(b.quality) - qualityScore(a.quality);
 				if (q !== 0) return q;
+				const fastFirst = (b.hasAudio ? 1 : 0) - (a.hasAudio ? 1 : 0);
+				if (fastFirst !== 0) return fastFirst;
+				const c = codecPriority(a) - codecPriority(b);
+				if (c !== 0) return c;
+				return (b.bitrate ?? 0) - (a.bitrate ?? 0);
+			})
+	);
+
+	const videoOnlyOptions = $derived.by(() =>
+		streams
+			.filter((s) => !s.isAudioOnly && !s.hasAudio)
+			.sort((a, b) => {
+				const q = qualityScore(b.quality) - qualityScore(a.quality);
+				if (q !== 0) return q;
 				const c = codecPriority(a) - codecPriority(b);
 				if (c !== 0) return c;
 				return (b.bitrate ?? 0) - (a.bitrate ?? 0);
@@ -67,7 +82,7 @@
 	function savePreferredFormat(mode: TabMode, stream: Stream): void {
 		const nextPreference: PreferredFormat = {
 			mode,
-			qualityValue: mode === 'video' ? qualityScore(stream.quality) : undefined,
+			qualityValue: mode === 'audio' ? undefined : qualityScore(stream.quality),
 			format: stream.format,
 			codecLabel: stream.codecLabel,
 			bitrate: stream.bitrate
@@ -87,7 +102,7 @@
 			const raw = window.localStorage.getItem(PREFERRED_FORMAT_KEY);
 			if (!raw) return null;
 			const parsed = JSON.parse(raw) as PreferredFormat;
-			if (parsed.mode !== 'video' && parsed.mode !== 'audio') return null;
+			if (parsed.mode !== 'video' && parsed.mode !== 'videoOnly' && parsed.mode !== 'audio') return null;
 			return parsed;
 		} catch {
 			return null;
@@ -127,6 +142,39 @@
 		return videoOptions[0] ?? null;
 	}
 
+	function pickPreferredVideoOnly(): Stream | null {
+		if (videoOnlyOptions.length === 0) return null;
+		if (!preferredFormat || preferredFormat.mode !== 'videoOnly') return videoOnlyOptions[0] ?? null;
+
+		const targetQuality = preferredFormat.qualityValue ?? 0;
+		const targetFormat = preferredFormat.format;
+		const targetCodec = preferredFormat.codecLabel;
+
+		const exactMatch = videoOnlyOptions.find(
+			(stream) =>
+				qualityScore(stream.quality) === targetQuality &&
+				stream.format === targetFormat &&
+				(targetCodec ? stream.codecLabel === targetCodec : true)
+		);
+		if (exactMatch) return exactMatch;
+
+		const qualityAndFormat = videoOnlyOptions.find(
+			(stream) =>
+				qualityScore(stream.quality) === targetQuality &&
+				(targetFormat ? stream.format === targetFormat : true)
+		);
+		if (qualityAndFormat) return qualityAndFormat;
+
+		const closestByQuality = [...videoOnlyOptions].sort(
+			(a, b) =>
+				Math.abs(qualityScore(a.quality) - targetQuality) -
+				Math.abs(qualityScore(b.quality) - targetQuality)
+		);
+		if (closestByQuality[0]) return closestByQuality[0];
+
+		return videoOnlyOptions[0] ?? null;
+	}
+
 	function pickPreferredAudio(): Stream | null {
 		if (audioOptions.length === 0) return null;
 		if (!preferredFormat || preferredFormat.mode !== 'audio') return audioOptions[0] ?? null;
@@ -154,6 +202,15 @@
 		onSelect(videoStream, audioStream);
 	}
 
+	function emitSelectionForActiveTab(stream: Stream): void {
+		if (activeTab === 'video') {
+			emitSelection(stream, stream.hasAudio ? null : bestAudioForMux);
+			return;
+		}
+
+		emitSelection(stream, null);
+	}
+
 	$effect(() => {
 		if (hasHydratedPreference || !IS_BROWSER) return;
 		preferredFormat = loadPreferredFormat();
@@ -171,6 +228,7 @@
 		if (!selectedStream) {
 			const preferredAudio = pickPreferredAudio();
 			const preferredVideo = pickPreferredVideo();
+			const preferredVideoOnly = pickPreferredVideoOnly();
 
 			if (preferredFormat?.mode === 'audio' && preferredAudio) {
 				selectedStream = preferredAudio;
@@ -179,10 +237,24 @@
 				return;
 			}
 
+			if (preferredFormat?.mode === 'videoOnly' && preferredVideoOnly) {
+				selectedStream = preferredVideoOnly;
+				activeTab = 'videoOnly';
+				emitSelection(preferredVideoOnly, null);
+				return;
+			}
+
 			if (preferredVideo) {
 				selectedStream = preferredVideo;
 				activeTab = 'video';
 				emitSelection(preferredVideo, preferredVideo.hasAudio ? null : bestAudioForMux);
+				return;
+			}
+
+			if (preferredVideoOnly) {
+				selectedStream = preferredVideoOnly;
+				activeTab = 'videoOnly';
+				emitSelection(preferredVideoOnly, null);
 				return;
 			}
 
@@ -194,11 +266,57 @@
 		}
 	});
 
+	$effect(() => {
+		if (IS_BROWSER && !hasHydratedPreference) return;
+
+		const activeOptions =
+			activeTab === 'video'
+				? videoOptions
+				: activeTab === 'videoOnly'
+					? videoOnlyOptions
+					: audioOptions;
+
+		const selectedInActiveTab =
+			selectedStream !== null && activeOptions.some((stream) => stream.url === selectedStream?.url);
+		if (selectedInActiveTab && selectedStream) {
+			emitSelectionForActiveTab(selectedStream);
+			return;
+		}
+
+		if (activeTab === 'video') {
+			const preferredVideo = pickPreferredVideo();
+			if (!preferredVideo) return;
+			selectedStream = preferredVideo;
+			emitSelectionForActiveTab(preferredVideo);
+			return;
+		}
+
+		if (activeTab === 'videoOnly') {
+			const preferredVideoOnly = pickPreferredVideoOnly();
+			if (!preferredVideoOnly) return;
+			selectedStream = preferredVideoOnly;
+			emitSelectionForActiveTab(preferredVideoOnly);
+			return;
+		}
+
+		const preferredAudio = pickPreferredAudio();
+		if (!preferredAudio) return;
+		selectedStream = preferredAudio;
+		emitSelectionForActiveTab(preferredAudio);
+	});
+
 	function selectVideo(stream: Stream): void {
 		selectedStream = stream;
 		activeTab = 'video';
 		savePreferredFormat('video', stream);
 		emitSelection(stream, stream.hasAudio ? null : bestAudioForMux);
+	}
+
+	function selectVideoOnly(stream: Stream): void {
+		selectedStream = stream;
+		activeTab = 'videoOnly';
+		savePreferredFormat('videoOnly', stream);
+		emitSelection(stream, null);
 	}
 
 	function selectAudio(stream: Stream): void {
@@ -217,7 +335,7 @@
 	}
 
 	function formatSize(bytes?: number): string {
-		if (!bytes) return 'Unknown size';
+		if (!bytes) return m.format_picker_unknown_size();
 		const units = ['B', 'KB', 'MB', 'GB'];
 		let value = bytes;
 		let unit = 0;
@@ -230,7 +348,7 @@
 
 	function formatQualityMeta(stream: Stream): string {
 		if (stream.bitrate) return `${Math.round(stream.bitrate / 1000)}kbps`;
-		return stream.isAudioOnly ? 'Audio only' : 'Video';
+		return stream.isAudioOnly ? m.format_picker_meta_audio_only() : m.format_picker_meta_video();
 	}
 
 	function iconFor(stream: Stream): string {
@@ -251,10 +369,22 @@
 		if (score >= 720) return 'accent-cyan';
 		return 'accent-slate';
 	}
+
+	function deliveryLabel(mode: TabMode, stream?: Stream): string {
+		if (mode === 'video') return stream?.hasAudio ? m.format_picker_delivery_fast() : m.format_picker_delivery_mux();
+		if (mode === 'videoOnly') return m.format_picker_delivery_video_only();
+		return m.format_picker_delivery_audio_only();
+	}
+
+	function deliveryChipClass(mode: TabMode, stream?: Stream): string {
+		if (mode === 'video') return stream?.hasAudio ? 'delivery-chip-fast' : 'delivery-chip-mux';
+		if (mode === 'videoOnly') return 'delivery-chip-video-only';
+		return 'delivery-chip-audio-only';
+	}
 </script>
 
 <div class="picker-shell">
-	<div class="tabs" role="tablist" aria-label="Download type">
+	<div class="tabs" role="tablist" aria-label={m.format_picker_tablist_aria()}>
 		<button
 			type="button"
 			class={`tab-btn ${activeTab === 'video' ? 'tab-btn-active' : ''}`}
@@ -263,7 +393,17 @@
 			onclick={() => (activeTab = 'video')}
 		>
 			<span class="material-symbols-outlined tab-icon">movie</span>
-			<span>Video</span>
+			<span>{m.format_picker_tab_video()}</span>
+		</button>
+		<button
+			type="button"
+			class={`tab-btn ${activeTab === 'videoOnly' ? 'tab-btn-active' : ''}`}
+			role="tab"
+			aria-selected={activeTab === 'videoOnly'}
+			onclick={() => (activeTab = 'videoOnly')}
+		>
+			<span class="material-symbols-outlined tab-icon">videocam_off</span>
+			<span>{m.format_picker_tab_video_only()}</span>
 		</button>
 		<button
 			type="button"
@@ -273,16 +413,26 @@
 			onclick={() => (activeTab = 'audio')}
 		>
 			<span class="material-symbols-outlined tab-icon">headphones</span>
-			<span>Audio</span>
+			<span>{m.format_picker_tab_audio()}</span>
 		</button>
 	</div>
 
-	<div class="list-scroll" role="radiogroup" aria-label={activeTab === 'audio' ? 'Audio options' : 'Video options'}>
+	<div
+		class="list-scroll"
+		role="radiogroup"
+		aria-label={
+			activeTab === 'audio'
+				? m.format_picker_audio_options_aria()
+				: activeTab === 'videoOnly'
+					? m.format_picker_video_only_options_aria()
+					: m.format_picker_video_options_aria()
+		}
+	>
 		{#if activeTab === 'video'}
 			{#if videoOptions.length === 0}
 				<div class="empty-state">
 					<span class="material-symbols-outlined">movie</span>
-					<p>No compatible video formats found.</p>
+					<p>{m.format_picker_empty_video()}</p>
 				</div>
 			{:else}
 				{#each videoOptions as stream, idx}
@@ -295,9 +445,9 @@
 							checked={isSelected(stream)}
 							onchange={() => selectVideo(stream)}
 						/>
-						{#if idx === 0}
-							<span class="badge-best">Best Quality</span>
-						{/if}
+							{#if idx === 0}
+								<span class="badge-best">{m.format_picker_best_quality()}</span>
+							{/if}
 						<div class="option-left">
 							<div class={`option-icon ${accentClass(stream)} ${isSelected(stream) ? 'option-icon-selected' : ''}`}>
 								<span class="material-symbols-outlined">{iconFor(stream)}</span>
@@ -306,8 +456,10 @@
 								<p class="option-title">{cleanQuality(stream.quality)}</p>
 								<div class="option-submeta">
 									<span class="fmt-chip">{stream.format.toUpperCase()}</span>
+									<span class={`delivery-chip ${deliveryChipClass('video', stream)}`}>
+										{deliveryLabel('video', stream)}
+									</span>
 									{#if stream.codecLabel}<span>{stream.codecLabel}</span>{/if}
-									{#if !stream.hasAudio}<span>+ Auto audio</span>{/if}
 								</div>
 							</div>
 						</div>
@@ -318,13 +470,53 @@
 					</label>
 				{/each}
 			{/if}
-		{:else}
-			{#if audioOptions.length === 0}
-				<div class="empty-state">
-					<span class="material-symbols-outlined">headphones</span>
-					<p>No audio-only stream available.</p>
-				</div>
+			{:else if activeTab === 'videoOnly'}
+				{#if videoOnlyOptions.length === 0}
+					<div class="empty-state">
+						<span class="material-symbols-outlined">videocam_off</span>
+						<p>{m.format_picker_empty_video_only()}</p>
+					</div>
 			{:else}
+				{#each videoOnlyOptions as stream, idx}
+					<label class={`option-card ${isSelected(stream) ? 'option-card-selected' : ''}`} for={`stream-video-only-${idx}`}>
+						<input
+							id={`stream-video-only-${idx}`}
+							class="option-radio"
+							type="radio"
+							name="download-quality"
+							checked={isSelected(stream)}
+							onchange={() => selectVideoOnly(stream)}
+						/>
+						<div class="option-left">
+							<div class={`option-icon ${accentClass(stream)} ${isSelected(stream) ? 'option-icon-selected' : ''}`}>
+								<span class="material-symbols-outlined">{iconFor(stream)}</span>
+							</div>
+							<div class="option-meta">
+								<p class="option-title">{cleanQuality(stream.quality)}</p>
+								<div class="option-submeta">
+									<span class="fmt-chip">{stream.format.toUpperCase()}</span>
+									<span class={`delivery-chip ${deliveryChipClass('videoOnly')}`}>
+										{deliveryLabel('videoOnly')}
+									</span>
+									{#if stream.codecLabel}<span>{stream.codecLabel}</span>{/if}
+										<span>{m.format_picker_meta_no_audio()}</span>
+									</div>
+								</div>
+						</div>
+						<div class="option-right">
+							<span class="size-pill">{formatSize(stream.size)}</span>
+							<span class={`check-pill ${isSelected(stream) ? 'check-pill-active' : ''}`}>✓</span>
+						</div>
+					</label>
+				{/each}
+			{/if}
+			{:else}
+				{#if audioOptions.length === 0}
+					<div class="empty-state">
+						<span class="material-symbols-outlined">headphones</span>
+						<p>{m.format_picker_empty_audio()}</p>
+					</div>
+				{:else}
 				{#each audioOptions as stream, idx}
 					<label class={`option-card ${isSelected(stream) ? 'option-card-selected' : ''}`} for={`stream-audio-${idx}`}>
 						<input
@@ -340,9 +532,12 @@
 								<span class="material-symbols-outlined">{iconFor(stream)}</span>
 							</div>
 							<div class="option-meta">
-								<p class="option-title">Audio</p>
+									<p class="option-title">{m.format_picker_audio_title()}</p>
 								<div class="option-submeta">
 									<span class="fmt-chip">{stream.format.toUpperCase()}</span>
+									<span class={`delivery-chip ${deliveryChipClass('audio')}`}>
+										{deliveryLabel('audio')}
+									</span>
 									<span>{formatQualityMeta(stream)}</span>
 								</div>
 							</div>
@@ -362,12 +557,12 @@
 	.picker-shell {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 
 	.tabs {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 0.5rem;
 		padding: 0.35rem;
 		background: #f3f4f6;
@@ -570,6 +765,35 @@
 		font-size: 0.65rem;
 	}
 
+	.delivery-chip {
+		border-radius: 999px;
+		padding: 0.14rem 0.42rem;
+		font-size: 0.62rem;
+		font-weight: 900;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.delivery-chip-fast {
+		background: #dcfce7;
+		color: #166534;
+	}
+
+	.delivery-chip-mux {
+		background: #ede9fe;
+		color: #6d28d9;
+	}
+
+	.delivery-chip-video-only {
+		background: #fef3c7;
+		color: #92400e;
+	}
+
+	.delivery-chip-audio-only {
+		background: #ede9fe;
+		color: #6d28d9;
+	}
+
 	.option-right {
 		flex: none;
 		display: flex;
@@ -685,6 +909,26 @@
 	:global(.page-root.theme-dark) .fmt-chip {
 		background: #2a344c;
 		color: #d8e2ff;
+	}
+
+	:global(.page-root.theme-dark) .delivery-chip-fast {
+		background: #163322;
+		color: #86efac;
+	}
+
+	:global(.page-root.theme-dark) .delivery-chip-mux {
+		background: #332451;
+		color: #d8b4fe;
+	}
+
+	:global(.page-root.theme-dark) .delivery-chip-video-only {
+		background: #4a3514;
+		color: #fcd34d;
+	}
+
+	:global(.page-root.theme-dark) .delivery-chip-audio-only {
+		background: #332451;
+		color: #d8b4fe;
 	}
 
 	:global(.page-root.theme-dark) .size-pill {

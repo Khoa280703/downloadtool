@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { extract, isValidVideoUrl } from '$lib/api';
+	import * as m from '$lib/paraglide/messages';
 	import {
 		currentDownload,
 		setVideoUrl,
@@ -28,7 +29,7 @@
 			return false;
 		}
 		if (!isValidVideoUrl(input)) {
-			validationError = 'Please enter a valid YouTube URL';
+			validationError = m.url_input_error_invalid_url();
 			return false;
 		}
 		validationError = '';
@@ -56,7 +57,7 @@
 			validate(text);
 		} catch (err) {
 			console.error('Failed to read clipboard:', err);
-			validationError = 'Could not access clipboard. Please paste manually.';
+			validationError = m.url_input_error_clipboard_unavailable();
 		} finally {
 			isPasting = false;
 		}
@@ -76,7 +77,7 @@
 			setExtracted(result.streams);
 			onExtract?.(result);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Extraction failed';
+			const message = err instanceof Error ? err.message : m.api_extract_failed();
 			setError(message);
 		}
 	}
@@ -94,10 +95,10 @@
 		<div class="input-wrapper">
 			<input
 				type="url"
-				placeholder="Paste YouTube link..."
+				placeholder={m.url_input_placeholder()}
 				value={url}
 				oninput={handleInput}
-				aria-label="Video URL"
+				aria-label={m.url_input_aria_video_url()}
 				aria-invalid={validationError ? 'true' : 'false'}
 				aria-describedby={validationError ? 'url-error' : undefined}
 				class="url-field"
@@ -107,7 +108,7 @@
 				class="paste-btn"
 				onclick={handlePaste}
 				disabled={isPasting}
-				aria-label="Paste from clipboard"
+				aria-label={m.url_input_aria_paste_clipboard()}
 			>
 				{#if isPasting}
 					<span class="spinner-small"></span>
@@ -130,9 +131,9 @@
 		>
 			{#if $currentDownload.isExtracting}
 				<span class="spinner"></span>
-				Analyzing...
+				{m.url_input_button_analyzing()}
 			{:else}
-				Get Video
+				{m.url_input_button_get_video()}
 			{/if}
 		</button>
 	</form>
