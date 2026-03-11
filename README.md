@@ -30,6 +30,17 @@ Frontend URL:
 http://<server-ip>:5168
 ```
 
+### Local isolation
+- `pnpm dev:db` starts project-local containers: `downloadtool-postgres` and `downloadtool-redis`.
+- `pnpm dev:be` and `pnpm dev:worker` are intended to use those local containers, not shared server services.
+- Keep local `.env` aligned with `.env.example`:
+```text
+DATABASE_URL=postgres://downloadtool:...@127.0.0.1:5432/downloadtool
+REDIS_URL=redis://127.0.0.1:6379
+```
+- Production uses the internal Compose service names `postgres` and `redis` inside the deployed stack.
+- Do not point local `.env` to shared services like `server-redis`, otherwise dev and non-dev state becomes ambiguous.
+
 ## Logs
 
 ### Recommended when debugging app flow
@@ -55,7 +66,8 @@ pnpm dev:down
 
 ```bash
 pnpm dev:db    # start postgres container
-pnpm dev:be    # run rust api on host
+pnpm dev:be    # run rust api on host (expects local postgres/redis from dev:db)
+pnpm dev:worker # run mux worker on host (expects local postgres/redis from dev:db)
 pnpm dev:fe    # run sveltekit on host (auto-load .env + auto-resolve DB container IP)
 pnpm logs:db   # follow postgres container logs
 pnpm logs:api  # follow api container logs
@@ -69,6 +81,12 @@ pnpm dev:down  # stop docker compose services
 - If you run full Docker stack (`api` + `frontend` containers), requests go to API container.
 - If you run `pnpm dev:be` + `pnpm dev:fe`, requests go to host API and logs appear in Terminal B.
 - Env source of truth is root `.env` (see `.env.example`) for secrets/runtime endpoints.
+- Local dev target should stay isolated:
+- `DATABASE_URL` -> `127.0.0.1:5432/downloadtool`
+- `REDIS_URL` -> `127.0.0.1:6379`
+- Production should keep using internal service names from `docker/docker-compose.server.yml`:
+- `DATABASE_URL=postgres://downloadtool:...@postgres:5432/downloadtool`
+- `REDIS_URL=redis://redis:6379`
 - Proxy pool quarantine:
 - Khi extractor gặp lỗi bot-check (`Sign in to confirm you're not a bot`), proxy đó sẽ bị loại khỏi vòng xoay ngay lập tức.
 - Danh sách proxy bị loại được ghi riêng vào `PROXY_QUARANTINE_FILE` (mặc định: `/tmp/downloadtool-quarantined-proxies.txt`) để dễ thay proxy mới.

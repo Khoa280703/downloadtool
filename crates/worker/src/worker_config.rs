@@ -124,6 +124,39 @@ impl WorkerConfig {
         raw_url.replacen("//localhost:", &format!("//{}:", ip), 1)
     }
 
+    fn replace_local_service_host_and_port(raw_url: &str, ip: &str, port: u16) -> String {
+        let Some(scheme_end) = raw_url.find("//").map(|idx| idx + 2) else {
+            return Self::replace_local_loopback_host(raw_url, ip);
+        };
+        let authority_end = raw_url[scheme_end..]
+            .find(['/', '?', '#'])
+            .map(|idx| scheme_end + idx)
+            .unwrap_or(raw_url.len());
+        let authority = &raw_url[scheme_end..authority_end];
+        let (userinfo, host_port) = authority
+            .rsplit_once('@')
+            .map(|(userinfo, host_port)| (Some(userinfo), host_port))
+            .unwrap_or((None, authority));
+
+        let is_local_loopback =
+            host_port.starts_with("127.0.0.1") || host_port.starts_with("localhost");
+        if !is_local_loopback {
+            return raw_url.to_string();
+        }
+
+        let rewritten_authority = match userinfo {
+            Some(userinfo) => format!("{userinfo}@{ip}:{port}"),
+            None => format!("{ip}:{port}"),
+        };
+
+        format!(
+            "{}{}{}",
+            &raw_url[..scheme_end],
+            rewritten_authority,
+            &raw_url[authority_end..]
+        )
+    }
+
     fn resolve_local_database_url(raw_url: &str) -> String {
         let uses_localhost = raw_url.contains("@127.0.0.1:") || raw_url.contains("@localhost:");
         if !uses_localhost {
@@ -134,7 +167,7 @@ impl WorkerConfig {
             return raw_url.to_string();
         };
 
-        Self::replace_local_loopback_host(raw_url, &ip)
+        Self::replace_local_service_host_and_port(raw_url, &ip, 5432)
     }
 
     fn resolve_local_redis_url(raw_url: &str) -> String {
@@ -147,7 +180,7 @@ impl WorkerConfig {
             return raw_url.to_string();
         };
 
-        Self::replace_local_loopback_host(raw_url, &ip)
+        Self::replace_local_service_host_and_port(raw_url, &ip, 6379)
     }
 
     pub fn from_env() -> anyhow::Result<Self> {
@@ -203,5 +236,35 @@ impl WorkerConfig {
                 .unwrap_or(false),
             extractor_dir: env::var("EXTRACTOR_DIR").unwrap_or_else(|_| "./extractors".to_string()),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WorkerConfig;
+
+    #[test]
+    fn rewrites_local_redis_port_to_compose_default() {
+        let rewritten = WorkerConfig::replace_local_service_host_and_port(
+            "redis://127.0.0.1:6380",
+            "172.18.0.5",
+            6379,
+        );
+
+        assert_eq!(rewritten, "redis://172.18.0.5:6379");
+    }
+
+    #[test]
+    fn rewrites_local_database_port_to_compose_default() {
+        let rewritten = WorkerConfig::replace_local_service_host_and_port(
+            "postgres://user:pass@127.0.0.1:15432/downloadtool",
+            "172.18.0.10",
+            5432,
+        );
+
+        assert_eq!(
+            rewritten,
+            "postgres://user:pass@172.18.0.10:5432/downloadtool"
+        );
     }
 }
