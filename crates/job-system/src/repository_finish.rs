@@ -132,6 +132,16 @@ impl JobRepository {
         } else {
             JobStatus::Queued
         };
+        let event_type = if next_status == JobStatus::Failed {
+            "job_failed"
+        } else {
+            "job_requeued"
+        };
+        let mut tx = self
+            .pool()
+            .begin()
+            .await
+            .context("failed to begin job failure tx")?;
         sqlx::query(
             r#"
             UPDATE mux_jobs
@@ -146,9 +156,31 @@ impl JobRepository {
         .bind(next_status.as_str())
         .bind(error_message)
         .bind(now_ms())
-        .execute(self.pool())
+        .execute(&mut *tx)
         .await
         .with_context(|| format!("failed to mark job {job_id} failed"))?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO mux_job_events (job_id, event_type, payload_json)
+            VALUES ($1, $2, $3::jsonb)
+            "#,
+        )
+        .bind(job_id)
+        .bind(event_type)
+        .bind(serde_json::json!({
+            "worker_id": worker_id,
+            "status": next_status.as_str(),
+            "final_failure": final_failure,
+            "error": error_message
+        }))
+        .execute(&mut *tx)
+        .await
+        .with_context(|| format!("failed to record {event_type} event for job {job_id}"))?;
+
+        tx.commit()
+            .await
+            .context("failed to commit job failure tx")?;
         Ok(next_status)
     }
 

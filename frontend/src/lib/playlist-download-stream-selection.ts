@@ -13,6 +13,7 @@ export const PLAYLIST_QUALITY_OPTIONS = [
 
 export const PLAYLIST_DOWNLOAD_MODE_OPTIONS = [
 	{ value: 'video', label: m.home_playlist_download_mode_video_audio() },
+	{ value: 'video-only', label: m.format_picker_delivery_video_only() },
 	{ value: 'audio', label: m.home_playlist_download_mode_audio_only() }
 ] as const;
 
@@ -24,7 +25,7 @@ const PLAYLIST_DOWNLOAD_MODE_KEY = 'fetchtube.playlist-download-mode.v1';
 const PREFERRED_FORMAT_KEY = 'fetchtube.preferred-format.v1';
 
 interface StoredPreferredFormat {
-	mode?: 'video' | 'audio';
+	mode?: 'video' | 'videoOnly' | 'audio';
 	qualityValue?: number;
 }
 
@@ -72,7 +73,9 @@ export function getStoredPlaylistDownloadMode(): PlaylistDownloadMode {
 		if (!raw) return 'video';
 
 		const parsed = JSON.parse(raw) as StoredPreferredFormat;
-		return parsed.mode === 'audio' ? 'audio' : 'video';
+		if (parsed.mode === 'audio') return 'audio';
+		if (parsed.mode === 'videoOnly') return 'video-only';
+		return 'video';
 	} catch {
 		return 'video';
 	}
@@ -109,6 +112,10 @@ export function pickBestStreams(
 	});
 
 	const video = selectByTargetCeiling(sortedVideo, quality);
+
+	if (mode === 'video-only') {
+		return { video, audio: null };
+	}
 
 	return { video, audio };
 }
@@ -150,7 +157,7 @@ function formatRank(format: string): number {
 	return format.toLowerCase() === 'mp4' ? 0 : 1;
 }
 
-function resolutionScore(label: string): number {
+export function resolutionScore(label: string): number {
 	const lower = label.toLowerCase();
 	if (lower.includes('8k')) return 4320;
 	if (lower.includes('4k')) return 2160;
@@ -159,6 +166,18 @@ function resolutionScore(label: string): number {
 	if (!match) return 0;
 	const parsed = Number.parseInt(match[1], 10);
 	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function isSingleCombined360pMp4Fallback(streams: Stream[]): boolean {
+	if (streams.length !== 1) return false;
+
+	const [stream] = streams;
+	return (
+		!stream.isAudioOnly &&
+		stream.hasAudio &&
+		stream.format.toLowerCase() === 'mp4' &&
+		resolutionScore(stream.quality) === 360
+	);
 }
 
 function qualityFromScore(score: number): PlaylistQuality {

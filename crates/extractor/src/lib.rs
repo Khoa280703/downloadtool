@@ -66,8 +66,19 @@ pub async fn init(bundle_path: Option<&Path>) -> Result<(), ExtractionError> {
 /// Uses `yt-dlp -J --no-playlist` which handles PO Token, signature decryption
 /// and throttle bypass automatically.
 pub async fn extract(url: &str) -> Result<VideoInfo, ExtractionError> {
-    debug!("Extracting via yt-dlp: {}", url);
-    ytdlp::extract_via_ytdlp(url).await
+    extract_with_options(url, false).await
+}
+
+/// Extract video information from a URL with cache control options.
+pub async fn extract_with_options(
+    url: &str,
+    bypass_cache: bool,
+) -> Result<VideoInfo, ExtractionError> {
+    debug!(
+        "Extracting via yt-dlp: {} (bypass_cache={})",
+        url, bypass_cache
+    );
+    ytdlp::extract_via_ytdlp(url, bypass_cache).await
 }
 
 /// Resolve pinned proxy URL for a direct stream URL, if previously extracted.

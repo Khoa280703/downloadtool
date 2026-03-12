@@ -13,23 +13,64 @@
 	let fatalError = $state<string | null>(null);
 	let bootstrapped = false;
 
+	function formatPercentSuffix(percent?: number | null): string {
+		if (typeof percent !== 'number' || Number.isNaN(percent)) return '';
+		return ` · ${Math.max(0, Math.min(100, Math.round(percent)))}%`;
+	}
+
 	function describeMuxStatus(update: MuxJobStatusUpdate): { stage: string; detail: string } {
 		const elapsedSeconds = Math.floor(update.elapsedMs / 1000);
+		const percentSuffix = formatPercentSuffix(update.percent);
+
+		if (update.phase === 'starting') {
+			return {
+				stage: m.mux_job_stage_processing_still_running(),
+				detail: `${m.mux_job_detail_processing_still_running({ jobId: update.jobId })}${percentSuffix}`
+			};
+		}
+
+		if (update.phase === 'fetching_streams') {
+			return {
+				stage: m.mux_job_stage_processing_fetching_streams(),
+				detail: `${m.mux_job_detail_processing_fetching_streams({ jobId: update.jobId })}${percentSuffix}`
+			};
+		}
+
+		if (update.phase === 'muxing_uploading') {
+			return {
+				stage: m.mux_job_stage_processing_muxing(),
+				detail: `${m.mux_job_detail_processing_muxing({ jobId: update.jobId })}${percentSuffix}`
+			};
+		}
+
+		if (update.phase === 'completing_upload') {
+			return {
+				stage: m.mux_job_stage_processing_finalizing(),
+				detail: `${m.mux_job_detail_processing_finalizing({ jobId: update.jobId })}${percentSuffix}`
+			};
+		}
+
+		if (update.phase === 'retrying') {
+			return {
+				stage: m.mux_job_stage_queued(),
+				detail: `${m.mux_job_detail_queued_waiting({ jobId: update.jobId })}${percentSuffix}`
+			};
+		}
 
 		if (update.status === 'queued') {
 			return {
 				stage: m.mux_job_stage_queued(),
 				detail:
 					elapsedSeconds >= 8
-						? m.mux_job_detail_queued_waiting({ jobId: update.jobId })
-						: m.mux_job_detail_queued_received({ jobId: update.jobId })
+						? `${m.mux_job_detail_queued_waiting({ jobId: update.jobId })}${percentSuffix}`
+						: `${m.mux_job_detail_queued_received({ jobId: update.jobId })}${percentSuffix}`
 			};
 		}
 
 		if (update.status === 'leased') {
 			return {
 				stage: m.mux_job_stage_leased(),
-				detail: m.mux_job_detail_leased({ jobId: update.jobId })
+				detail: `${m.mux_job_detail_leased({ jobId: update.jobId })}${percentSuffix}`
 			};
 		}
 
@@ -38,31 +79,31 @@
 			if (phase === 0) {
 				return {
 					stage: m.mux_job_stage_processing_fetching_streams(),
-					detail: m.mux_job_detail_processing_fetching_streams({ jobId: update.jobId })
+					detail: `${m.mux_job_detail_processing_fetching_streams({ jobId: update.jobId })}${percentSuffix}`
 				};
 			}
 			if (phase === 1) {
 				return {
 					stage: m.mux_job_stage_processing_muxing(),
-					detail: m.mux_job_detail_processing_muxing({ jobId: update.jobId })
+					detail: `${m.mux_job_detail_processing_muxing({ jobId: update.jobId })}${percentSuffix}`
 				};
 			}
 			if (phase === 2) {
 				return {
 					stage: m.mux_job_stage_processing_finalizing(),
-					detail: m.mux_job_detail_processing_finalizing({ jobId: update.jobId })
+					detail: `${m.mux_job_detail_processing_finalizing({ jobId: update.jobId })}${percentSuffix}`
 				};
 			}
 			return {
 				stage: m.mux_job_stage_processing_still_running(),
-				detail: m.mux_job_detail_processing_still_running({ jobId: update.jobId })
+				detail: `${m.mux_job_detail_processing_still_running({ jobId: update.jobId })}${percentSuffix}`
 			};
 		}
 
 		if (update.status === 'ready') {
 			return {
 				stage: m.mux_job_stage_ready(),
-				detail: m.mux_job_detail_ready({ jobId: update.jobId })
+				detail: `${m.mux_job_detail_ready({ jobId: update.jobId })}${percentSuffix || ' · 100%'}`
 			};
 		}
 

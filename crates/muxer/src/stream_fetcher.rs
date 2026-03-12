@@ -131,6 +131,40 @@ fn is_auth_like_antibot_error(error: &AntiBotError) -> bool {
         || is_auth_like_error_message(&error.to_string())
 }
 
+fn active_proxy_label(client: &AntiBotClient) -> String {
+    sanitize_proxy_label(client.active_proxy())
+}
+
+fn sanitize_proxy_label(proxy: Option<&str>) -> String {
+    let Some(raw) = proxy else {
+        return String::new();
+    };
+
+    let Ok(mut parsed) = reqwest::Url::parse(raw) else {
+        return mask_proxy_credential_segment(raw);
+    };
+
+    let has_credentials = !parsed.username().is_empty() || parsed.password().is_some();
+    if has_credentials {
+        let _ = parsed.set_username("***");
+        let _ = parsed.set_password(Some("***"));
+    }
+
+    parsed.to_string()
+}
+
+fn mask_proxy_credential_segment(raw: &str) -> String {
+    let Some((prefix, suffix)) = raw.rsplit_once('@') else {
+        return raw.to_string();
+    };
+
+    let scheme = prefix
+        .split_once("://")
+        .map(|(value, _)| value)
+        .unwrap_or("proxy");
+    format!("{scheme}://***:***@{suffix}")
+}
+
 fn find_refreshed_format_url(
     formats: &[VideoFormat],
     format_id: Option<&str>,
@@ -233,6 +267,10 @@ async fn fetch_stream_chunked(
             forced_proxy = extractor::resolve_stream_proxy(&active_url).await;
         }
         let mut client = AntiBotClient::new_with_proxy(platform, forced_proxy.clone())?;
+        info!(
+            proxy = active_proxy_label(&client),
+            "Opening single-stream fetch client"
+        );
         let max_refresh_attempts = refresh_context
             .as_ref()
             .map(|context| context.max_refresh_attempts)
@@ -252,8 +290,10 @@ async fn fetch_stream_chunked(
                             refresh_attempts += 1;
                             if let Some(new_url) = refresh_stream_url(context, &active_url).await {
                                 info!(
+                                    proxy = sanitize_proxy_label(forced_proxy.as_deref()),
                                     "Refreshed single stream URL after auth error (attempt {}/{})",
-                                    refresh_attempts, max_refresh_attempts
+                                    refresh_attempts,
+                                    max_refresh_attempts
                                 );
                                 active_url = new_url;
                                 let refreshed_proxy =
@@ -263,6 +303,10 @@ async fn fetch_stream_chunked(
                                 }
                                 client =
                                     AntiBotClient::new_with_proxy(platform, forced_proxy.clone())?;
+                                info!(
+                                    proxy = active_proxy_label(&client),
+                                    "Rebuilt single-stream client after URL refresh"
+                                );
                                 continue;
                             }
                         }
@@ -296,6 +340,10 @@ async fn fetch_stream_chunked(
                 return;
             }
         };
+        info!(
+            proxy = active_proxy_label(task_client.as_ref()),
+            total_size, "Starting chunked stream fetch worker"
+        );
 
         let max_refresh_attempts = refresh_context
             .as_ref()
@@ -335,6 +383,7 @@ async fn fetch_stream_chunked(
             'retry: loop {
                 let range = format!("bytes={}-{}", fetch_start, chunk_end);
                 debug!(
+                    proxy = active_proxy_label(task_client.as_ref()),
                     "Chunk fetch: bytes={}-{} / {} (attempt {})",
                     fetch_start,
                     chunk_end,
@@ -365,6 +414,7 @@ async fn fetch_stream_chunked(
                                             refresh_stream_url(context, &active_url).await
                                         {
                                             info!(
+                                                proxy = sanitize_proxy_label(forced_proxy.as_deref()),
                                                 "Refreshed chunk URL after auth error (attempt {}/{})",
                                                 refresh_attempts, max_refresh_attempts
                                             );
@@ -384,6 +434,10 @@ async fn fetch_stream_chunked(
                                                     return;
                                                 }
                                             };
+                                            info!(
+                                                proxy = active_proxy_label(task_client.as_ref()),
+                                                "Rebuilt chunk fetch client after URL refresh"
+                                            );
                                             if let Some(clen) = extract_clen_from_url(&active_url) {
                                                 active_total_size = clen;
                                             }
@@ -399,8 +453,12 @@ async fn fetch_stream_chunked(
                                 retry_count += 1;
                                 if retry_count > CHUNK_MAX_RETRIES {
                                     error!(
+                                        proxy = active_proxy_label(task_client.as_ref()),
                                         "Chunk fetch failed after {} retries bytes={}-{}: {}",
-                                        CHUNK_MAX_RETRIES, fetch_start, chunk_end, error
+                                        CHUNK_MAX_RETRIES,
+                                        fetch_start,
+                                        chunk_end,
+                                        error
                                     );
                                     if let Some(handle) = prefetch.take() {
                                         handle.abort();
@@ -410,6 +468,7 @@ async fn fetch_stream_chunked(
                                 }
                                 let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
                                 warn!(
+                                    proxy = active_proxy_label(task_client.as_ref()),
                                     "Chunk request failed (retry {}/{}): {} — retrying in {}s",
                                     retry_count,
                                     CHUNK_MAX_RETRIES,
@@ -437,8 +496,10 @@ async fn fetch_stream_chunked(
                                         refresh_stream_url(context, &active_url).await
                                     {
                                         info!(
+                                            proxy = sanitize_proxy_label(forced_proxy.as_deref()),
                                             "Refreshed chunk URL after auth error (attempt {}/{})",
-                                            refresh_attempts, max_refresh_attempts
+                                            refresh_attempts,
+                                            max_refresh_attempts
                                         );
                                         active_url = new_url;
                                         let refreshed_proxy =
@@ -456,6 +517,10 @@ async fn fetch_stream_chunked(
                                                 return;
                                             }
                                         };
+                                        info!(
+                                            proxy = active_proxy_label(task_client.as_ref()),
+                                            "Rebuilt chunk fetch client after retry URL refresh"
+                                        );
                                         if let Some(clen) = extract_clen_from_url(&active_url) {
                                             active_total_size = clen;
                                         }
@@ -471,8 +536,12 @@ async fn fetch_stream_chunked(
                             retry_count += 1;
                             if retry_count > CHUNK_MAX_RETRIES {
                                 error!(
+                                    proxy = active_proxy_label(task_client.as_ref()),
                                     "Chunk fetch failed after {} retries bytes={}-{}: {}",
-                                    CHUNK_MAX_RETRIES, fetch_start, chunk_end, error
+                                    CHUNK_MAX_RETRIES,
+                                    fetch_start,
+                                    chunk_end,
+                                    error
                                 );
                                 if let Some(handle) = prefetch.take() {
                                     handle.abort();
@@ -482,6 +551,7 @@ async fn fetch_stream_chunked(
                             }
                             let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
                             warn!(
+                                proxy = active_proxy_label(task_client.as_ref()),
                                 "Chunk request failed (retry {}/{}): {} — retrying in {}s",
                                 retry_count,
                                 CHUNK_MAX_RETRIES,
@@ -519,6 +589,7 @@ async fn fetch_stream_chunked(
                                         refresh_stream_url(context, &active_url).await
                                     {
                                         info!(
+                                            proxy = sanitize_proxy_label(forced_proxy.as_deref()),
                                             "Refreshed stream URL after mid-chunk auth error (attempt {}/{})",
                                             refresh_attempts, max_refresh_attempts
                                         );
@@ -538,6 +609,10 @@ async fn fetch_stream_chunked(
                                                 return;
                                             }
                                         };
+                                        info!(
+                                            proxy = active_proxy_label(task_client.as_ref()),
+                                            "Rebuilt chunk fetch client after mid-chunk URL refresh"
+                                        );
                                         if let Some(clen) = extract_clen_from_url(&active_url) {
                                             active_total_size = clen;
                                         }
@@ -553,8 +628,11 @@ async fn fetch_stream_chunked(
                             retry_count += 1;
                             if retry_count > CHUNK_MAX_RETRIES {
                                 error!(
+                                    proxy = active_proxy_label(task_client.as_ref()),
                                     "Stream interrupted after {} retries at byte {}: {}",
-                                    CHUNK_MAX_RETRIES, fetch_start, error
+                                    CHUNK_MAX_RETRIES,
+                                    fetch_start,
+                                    error
                                 );
                                 if let Some(handle) = prefetch.take() {
                                     handle.abort();
@@ -564,6 +642,7 @@ async fn fetch_stream_chunked(
                             }
                             let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
                             warn!(
+                                proxy = active_proxy_label(task_client.as_ref()),
                                 "Stream interrupted at byte {} (retry {}/{}): {} — retrying in {}s",
                                 fetch_start,
                                 retry_count,
@@ -584,8 +663,11 @@ async fn fetch_stream_chunked(
                                     fetch_start, chunk_end
                                 ));
                                 error!(
+                                    proxy = active_proxy_label(task_client.as_ref()),
                                     "Chunk idle-read timeout after {} retries bytes={}-{}",
-                                    CHUNK_MAX_RETRIES, fetch_start, chunk_end
+                                    CHUNK_MAX_RETRIES,
+                                    fetch_start,
+                                    chunk_end
                                 );
                                 if let Some(handle) = prefetch.take() {
                                     handle.abort();
@@ -595,6 +677,7 @@ async fn fetch_stream_chunked(
                             }
                             let delay = std::time::Duration::from_secs(1 << (retry_count - 1));
                             warn!(
+                                proxy = active_proxy_label(task_client.as_ref()),
                                 "Chunk idle-read timeout (retry {}/{}), bytes={}-{}, retrying in {}s",
                                 retry_count,
                                 CHUNK_MAX_RETRIES,
@@ -720,5 +803,21 @@ mod tests {
             None
         );
         assert_eq!(extract_clen_from_url("not-a-url"), None);
+    }
+
+    #[test]
+    fn test_sanitize_proxy_label_masks_credentials() {
+        assert_eq!(
+            sanitize_proxy_label(Some("socks5h://user:pass@127.0.0.1:1080")),
+            "socks5h://***:***@127.0.0.1:1080"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_proxy_label_leaves_host_only_proxy() {
+        assert_eq!(
+            sanitize_proxy_label(Some("socks5h://127.0.0.1:1080")),
+            "socks5h://127.0.0.1:1080"
+        );
     }
 }

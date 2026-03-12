@@ -207,20 +207,27 @@ fn extract_video_id(url: &str) -> Option<&str> {
 }
 
 /// Extract video info via `yt-dlp -J --no-playlist`
-pub async fn extract_via_ytdlp(url: &str) -> Result<VideoInfo, ExtractionError> {
+pub async fn extract_via_ytdlp(
+    url: &str,
+    bypass_cache: bool,
+) -> Result<VideoInfo, ExtractionError> {
     debug!("yt-dlp extracting: {}", url);
 
     let cache_key = normalize_cache_key(url);
     let cache = get_cache();
 
-    if let Some(cached_video_info) = cache.get(&cache_key).await {
-        let hits = EXTRACT_CACHE_HITS.fetch_add(1, Ordering::Relaxed) + 1;
-        debug!(
-            cache_key = %cache_key,
-            cache_hits = hits,
-            "extract cache hit"
-        );
-        return Ok((*cached_video_info).clone());
+    if !bypass_cache {
+        if let Some(cached_video_info) = cache.get(&cache_key).await {
+            let hits = EXTRACT_CACHE_HITS.fetch_add(1, Ordering::Relaxed) + 1;
+            debug!(
+                cache_key = %cache_key,
+                cache_hits = hits,
+                "extract cache hit"
+            );
+            return Ok((*cached_video_info).clone());
+        }
+    } else {
+        debug!(cache_key = %cache_key, "extract bypassing cache");
     }
 
     let misses = EXTRACT_CACHE_MISSES.fetch_add(1, Ordering::Relaxed) + 1;
@@ -230,11 +237,36 @@ pub async fn extract_via_ytdlp(url: &str) -> Result<VideoInfo, ExtractionError> 
         "extract cache miss"
     );
 
-    cache
-        .try_get_with(cache_key, extract_subprocess(url.to_string()))
-        .await
-        .map(|video_info| (*video_info).clone())
-        .map_err(|error: Arc<ExtractionError>| (*error).clone())
+    let video_info = extract_subprocess(url.to_string()).await?;
+    maybe_cache_extract_result(&cache_key, &video_info).await;
+    Ok((*video_info).clone())
+}
+
+async fn maybe_cache_extract_result(cache_key: &str, video_info: &VideoInfo) {
+    if is_single_combined_360p_fallback(video_info) {
+        debug!(
+            cache_key = %cache_key,
+            "skipping extract cache insert for degraded single 360p combined result"
+        );
+        get_cache().invalidate(cache_key).await;
+        return;
+    }
+
+    get_cache()
+        .insert(cache_key.to_string(), Arc::new(video_info.clone()))
+        .await;
+}
+
+fn is_single_combined_360p_fallback(video_info: &VideoInfo) -> bool {
+    if video_info.formats.len() != 1 {
+        return false;
+    }
+
+    let format = &video_info.formats[0];
+    !format.is_audio_only
+        && format.has_audio
+        && format.ext.eq_ignore_ascii_case("mp4")
+        && format.height == Some(360)
 }
 
 async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionError> {

@@ -62,8 +62,9 @@ impl StorageTicketService {
                 .clone()
                 .unwrap_or_else(|| "video/mp4".to_string()),
         };
+        let content_disposition = build_download_content_disposition(job.title.as_deref(), "mp4");
         let presigned = storage_backend
-            .presign_get(&artifact, self.ticket_ttl_secs)
+            .presign_get(&artifact, self.ticket_ttl_secs, Some(&content_disposition))
             .await
             .with_context(|| format!("failed to presign download for job {}", job.job_id))?;
 
@@ -82,6 +83,59 @@ impl StorageTicketService {
         job.local_path
             .as_deref()
             .ok_or_else(|| anyhow!("ready artifact is missing local storage path"))
+    }
+}
+
+fn build_download_content_disposition(title: Option<&str>, extension: &str) -> String {
+    let filename = build_download_filename(title, extension);
+    let ascii_name: String = filename
+        .chars()
+        .map(|c| if c.is_ascii() { c } else { '_' })
+        .collect();
+    let encoded: String = filename
+        .bytes()
+        .flat_map(|b| {
+            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                vec![b as char]
+            } else {
+                format!("%{:02X}", b).chars().collect::<Vec<_>>()
+            }
+        })
+        .collect();
+
+    format!(
+        r#"attachment; filename="{}"; filename*=UTF-8''{}"#,
+        ascii_name, encoded
+    )
+}
+
+fn build_download_filename(title: Option<&str>, extension: &str) -> String {
+    let base = sanitize_filename(title.unwrap_or("video"));
+    let ext = extension.trim_start_matches('.').trim();
+    if ext.is_empty() {
+        base
+    } else {
+        format!("{base}.{ext}")
+    }
+}
+
+fn sanitize_filename(name: &str) -> String {
+    let sanitized = name
+        .chars()
+        .map(|c| match c {
+            c if c.is_control() => '_',
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            c => c,
+        })
+        .take(180)
+        .collect::<String>()
+        .trim()
+        .to_string();
+
+    if sanitized.is_empty() {
+        "video".to_string()
+    } else {
+        sanitized
     }
 }
 
@@ -121,5 +175,13 @@ mod tests {
 
         assert_eq!(ticket.download_url, "/api/jobs/job-1/file");
         assert!(!ticket.direct_download);
+    }
+
+    #[test]
+    fn content_disposition_uses_video_title() {
+        let disposition = build_download_content_disposition(Some("Rick Astley / Demo"), "mp4");
+        assert!(disposition.contains("attachment; filename="));
+        assert!(disposition.contains("Rick Astley _ Demo.mp4"));
+        assert!(disposition.contains("filename*=UTF-8''"));
     }
 }

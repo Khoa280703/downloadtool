@@ -88,6 +88,7 @@ impl StorageBackend for LocalFsStorageBackend {
         &self,
         _artifact: &StoredArtifact,
         _expires_secs: u64,
+        _content_disposition: Option<&str>,
     ) -> Result<DownloadTicket> {
         Err(anyhow!(
             "localfs backend requires API-signed download ticket route"

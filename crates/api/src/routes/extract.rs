@@ -9,6 +9,7 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use tracing::{error, info, warn};
 
 use crate::auth::user_tier::UserTier;
@@ -25,6 +26,9 @@ pub struct ExtractRequest {
     pub quality: Option<String>,
     /// Optional format preference (e.g., "mp4", "webm")
     pub format: Option<String>,
+    /// Force extractor to bypass metadata cache and perform a fresh upstream fetch.
+    #[serde(default)]
+    pub bypass_cache: bool,
 }
 
 /// Response for video extraction.
@@ -136,9 +140,28 @@ pub async fn extract_handler(
     }
 
     // Call extractor
-    match extractor::extract(&body.url).await {
+    match extractor::extract_with_options(&body.url, body.bypass_cache).await {
         Ok(video_info) => {
             info!("Successfully extracted video: {}", video_info.title);
+            info!(
+                title = %video_info.title,
+                original_url = %video_info.original_url,
+                total_formats = video_info.formats.len(),
+                combined_streams = count_combined_streams(&video_info.formats),
+                video_only_streams = count_video_only_streams(&video_info.formats),
+                audio_only_streams = count_audio_only_streams(&video_info.formats),
+                mp4_combined_qualities = %summarize_matching_qualities(&video_info.formats, |format| {
+                    !format.is_audio_only && format.has_audio && format.ext.eq_ignore_ascii_case("mp4")
+                }),
+                mp4_video_only_qualities = %summarize_matching_qualities(&video_info.formats, |format| {
+                    !format.is_audio_only && !format.has_audio && format.ext.eq_ignore_ascii_case("mp4")
+                }),
+                webm_video_only_qualities = %summarize_matching_qualities(&video_info.formats, |format| {
+                    !format.is_audio_only && !format.has_audio && format.ext.eq_ignore_ascii_case("webm")
+                }),
+                audio_formats = %summarize_matching_qualities(&video_info.formats, |format| format.is_audio_only),
+                "Extractor format summary"
+            );
 
             // Convert to response format
             let metadata = VideoMetadata {
@@ -202,6 +225,41 @@ fn convert_format(format: &VideoFormat) -> StreamFormat {
         bitrate: format.bitrate,
         filesize: format.filesize,
     }
+}
+
+fn count_combined_streams(formats: &[VideoFormat]) -> usize {
+    formats
+        .iter()
+        .filter(|format| !format.is_audio_only && format.has_audio)
+        .count()
+}
+
+fn count_video_only_streams(formats: &[VideoFormat]) -> usize {
+    formats
+        .iter()
+        .filter(|format| !format.is_audio_only && !format.has_audio)
+        .count()
+}
+
+fn count_audio_only_streams(formats: &[VideoFormat]) -> usize {
+    formats.iter().filter(|format| format.is_audio_only).count()
+}
+
+fn summarize_matching_qualities(
+    formats: &[VideoFormat],
+    predicate: impl Fn(&VideoFormat) -> bool,
+) -> String {
+    let values: BTreeSet<String> = formats
+        .iter()
+        .filter(|format| predicate(format))
+        .map(|format| format.quality.clone())
+        .collect();
+
+    if values.is_empty() {
+        return "none".to_string();
+    }
+
+    values.into_iter().collect::<Vec<_>>().join(", ")
 }
 
 /// Select the best stream URL based on quality preference.

@@ -1,14 +1,17 @@
 use std::io::ErrorKind;
+use std::time::Duration;
 
 use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Redirect};
 use axum::{Extension, Json};
-use futures::TryStreamExt;
-use job_system::{JobOwner, JobStatus, MuxJobRequest};
+use futures::{StreamExt, TryStreamExt};
+use job_system::{JobOwner, JobProgressPhase, JobProgressSnapshot, JobStatus, MuxJobRequest};
 use serde::{Deserialize, Serialize};
 use tokio_util::io::ReaderStream;
+use tracing::warn;
 use utoipa::ToSchema;
 
 use crate::auth::authenticated_user::AuthenticatedUser;
@@ -70,6 +73,16 @@ pub struct JobStatusResponse {
     pub file_size_bytes: Option<u64>,
     pub error: Option<String>,
     pub file_ticket_url: Option<String>,
+    pub progress: Option<JobProgressResponse>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct JobProgressResponse {
+    pub phase: String,
+    pub percent: Option<f32>,
+    pub uploaded_bytes: u64,
+    pub total_bytes: Option<u64>,
+    pub updated_at_ms: u64,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -134,17 +147,114 @@ pub async fn job_status_handler(
         .await
         .map_err(map_control_plane_error)?
         .ok_or_else(not_found_error)?;
+    let progress = load_job_progress(
+        &state,
+        &snapshot.job_id,
+        snapshot.status,
+        snapshot.updated_at_ms,
+    )
+    .await;
 
-    Ok(Json(JobStatusResponse {
-        job_id: snapshot.job_id,
-        status: snapshot.status.as_str().to_string(),
+    Ok(Json(build_job_status_response(snapshot, progress)))
+}
+
+pub async fn job_events_handler(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthenticatedUser>,
+    headers: HeaderMap,
+    Path(job_id): Path<String>,
+) -> Result<Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>>, JobsApiError>
+{
+    let owner = resolve_job_owner(&user, &headers)?;
+    let initial_snapshot = state
+        .job_control_plane
+        .get_job_for_user(&job_id, &owner)
+        .await
+        .map_err(map_control_plane_error)?
+        .ok_or_else(not_found_error)?;
+    let initial_progress = load_job_progress(
+        &state,
+        &initial_snapshot.job_id,
+        initial_snapshot.status,
+        initial_snapshot.updated_at_ms,
+    )
+    .await;
+    let initial_event = build_job_status_response(initial_snapshot, initial_progress);
+
+    let mut pubsub = state
+        .job_progress_store
+        .subscribe(&job_id)
+        .await
+        .map_err(map_control_plane_error)?;
+
+    let stream = async_stream::stream! {
+        yield Ok(sse_event("status", &initial_event));
+
+        if is_terminal_status(&initial_event.status) {
+            return;
+        }
+
+        let mut messages = pubsub.on_message();
+        while let Some(message) = messages.next().await {
+            let payload: Result<String, _> = message.get_payload();
+            let Ok(payload) = payload else {
+                warn!(job_id, "Failed to decode job progress pubsub payload");
+                continue;
+            };
+
+            let Ok(snapshot) = serde_json::from_str::<JobProgressSnapshot>(&payload) else {
+                warn!(job_id, "Failed to parse job progress pubsub payload");
+                continue;
+            };
+
+            let event_payload = build_job_status_event(snapshot);
+            let terminal = is_terminal_status(&event_payload.status);
+            yield Ok(sse_event("status", &event_payload));
+            if terminal {
+                break;
+            }
+        }
+    };
+
+    Ok(Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("keepalive"),
+    ))
+}
+
+fn build_job_status_response(
+    snapshot: crate::services::job_control_plane::JobStatusRecord,
+    progress: Option<JobProgressResponse>,
+) -> JobStatusResponse {
+    let status = snapshot.status;
+    let job_id = snapshot.job_id;
+    JobStatusResponse {
+        job_id: job_id.clone(),
+        status: status.as_str().to_string(),
         created_at_ms: snapshot.created_at_ms,
         updated_at_ms: snapshot.updated_at_ms,
         file_size_bytes: snapshot.file_size_bytes,
         error: snapshot.error,
-        file_ticket_url: (snapshot.status == JobStatus::Ready)
-            .then(|| build_file_ticket_url(&job_id)),
-    }))
+        file_ticket_url: (status == JobStatus::Ready).then(|| build_file_ticket_url(&job_id)),
+        progress,
+    }
+}
+
+fn build_job_status_event(snapshot: JobProgressSnapshot) -> JobStatusResponse {
+    let status = phase_to_job_status(snapshot.phase);
+    let updated_at_ms = snapshot.updated_at_ms.max(0) as u64;
+    JobStatusResponse {
+        job_id: snapshot.job_id.clone(),
+        status: status.as_str().to_string(),
+        created_at_ms: updated_at_ms,
+        updated_at_ms,
+        file_size_bytes: None,
+        error: None,
+        file_ticket_url: (status == JobStatus::Ready)
+            .then(|| build_file_ticket_url(&snapshot.job_id)),
+        progress: Some(map_job_progress(snapshot)),
+    }
 }
 
 pub async fn job_file_ticket_handler(
@@ -260,6 +370,76 @@ pub async fn release_job_handler(
         .await
         .map_err(map_control_plane_error)?;
     Ok(Json(JobReleaseResponse { released }))
+}
+
+async fn load_job_progress(
+    state: &AppState,
+    job_id: &str,
+    status: JobStatus,
+    updated_at_ms: u64,
+) -> Option<JobProgressResponse> {
+    let snapshot = match state.job_progress_store.read_snapshot(job_id).await {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            warn!(job_id, err = %error, "Failed to load job progress snapshot");
+            None
+        }
+    };
+
+    snapshot
+        .map(map_job_progress)
+        .or_else(|| synthesize_terminal_progress(status, updated_at_ms))
+}
+
+fn map_job_progress(snapshot: JobProgressSnapshot) -> JobProgressResponse {
+    JobProgressResponse {
+        phase: snapshot.phase.as_str().to_string(),
+        percent: snapshot.percent.map(|value| value.clamp(0.0, 100.0)),
+        uploaded_bytes: snapshot.uploaded_bytes,
+        total_bytes: snapshot.total_bytes,
+        updated_at_ms: snapshot.updated_at_ms.max(0) as u64,
+    }
+}
+
+fn phase_to_job_status(phase: JobProgressPhase) -> JobStatus {
+    match phase {
+        JobProgressPhase::Retrying => JobStatus::Queued,
+        JobProgressPhase::Ready => JobStatus::Ready,
+        JobProgressPhase::Failed => JobStatus::Failed,
+        JobProgressPhase::Starting
+        | JobProgressPhase::FetchingStreams
+        | JobProgressPhase::MuxingUploading
+        | JobProgressPhase::CompletingUpload => JobStatus::Processing,
+    }
+}
+
+fn is_terminal_status(status: &str) -> bool {
+    matches!(status, "ready" | "failed" | "expired")
+}
+
+fn sse_event(event: &str, payload: &JobStatusResponse) -> Event {
+    let data =
+        serde_json::to_string(payload).unwrap_or_else(|_| "{\"status\":\"failed\"}".to_string());
+    Event::default().event(event).data(data)
+}
+
+fn synthesize_terminal_progress(
+    status: JobStatus,
+    updated_at_ms: u64,
+) -> Option<JobProgressResponse> {
+    let phase = match status {
+        JobStatus::Ready => JobProgressPhase::Ready,
+        JobStatus::Failed => JobProgressPhase::Failed,
+        _ => return None,
+    };
+
+    Some(JobProgressResponse {
+        phase: phase.as_str().to_string(),
+        percent: (status == JobStatus::Ready).then_some(100.0),
+        uploaded_bytes: 0,
+        total_bytes: None,
+        updated_at_ms,
+    })
 }
 
 fn resolve_job_owner(

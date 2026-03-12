@@ -17,6 +17,11 @@ type FileWritableHandle = WritableStream & {
 export interface SaveDownloadOptions {
 	requireFsaa?: boolean;
 	allowAnchorFallback?: boolean;
+	onProgress?: (update: {
+		receivedBytes: number;
+		totalBytes: number | null;
+		percent: number | null;
+	}) => void;
 }
 
 let saveDirectoryHandle: SaveDirectoryHandle | null = null;
@@ -68,7 +73,7 @@ export async function saveDownload(
 				filename,
 				url
 			});
-			await saveWithDirectory(url, filename, saveDirectoryHandle, signal);
+			await saveWithDirectory(url, filename, saveDirectoryHandle, signal, options.onProgress);
 			return;
 		} catch (error) {
 			if (isAbortError(error)) throw error;
@@ -102,7 +107,8 @@ async function saveWithDirectory(
 	url: string,
 	filename: string,
 	dirHandle: SaveDirectoryHandle,
-	signal: AbortSignal
+	signal: AbortSignal,
+	onProgress?: SaveDownloadOptions['onProgress']
 ): Promise<void> {
 	const response = await fetchWithRetry(url, signal);
 
@@ -117,7 +123,36 @@ async function saveWithDirectory(
 	}
 
 	try {
-		await response.body.pipeTo(writable as WritableStream, { signal });
+		const reader = response.body.getReader();
+		const writer = (writable as WritableStream<Uint8Array>).getWriter();
+		const totalBytesHeader = response.headers.get('content-length');
+		const parsedTotalBytes = totalBytesHeader ? Number.parseInt(totalBytesHeader, 10) : NaN;
+		const totalBytes =
+			Number.isFinite(parsedTotalBytes) && parsedTotalBytes > 0 ? parsedTotalBytes : null;
+		let receivedBytes = 0;
+
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				if (!value) continue;
+
+				await writer.write(value);
+				receivedBytes += value.byteLength;
+				onProgress?.({
+					receivedBytes,
+					totalBytes,
+					percent:
+						totalBytes && totalBytes > 0
+							? Math.min(100, (receivedBytes / totalBytes) * 100)
+							: null
+				});
+			}
+			await writer.close();
+		} finally {
+			reader.releaseLock();
+			writer.releaseLock();
+		}
 	} catch (error) {
 		if (typeof writable.abort === 'function') {
 			try {

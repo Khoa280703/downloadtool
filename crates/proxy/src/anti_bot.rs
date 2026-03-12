@@ -269,6 +269,11 @@ impl AntiBotClient {
         self.platform
     }
 
+    /// Get the currently pinned proxy URL for this client instance.
+    pub fn active_proxy(&self) -> Option<&str> {
+        self.active_proxy.as_deref()
+    }
+
     /// Get a reference to the proxy pool
     pub fn proxy_pool(&self) -> &ProxyPool {
         &self.proxy_pool

@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 hex = { workspace = true }
+redis = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

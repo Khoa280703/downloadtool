@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import {
 		buildStreamUrl,
 		createMuxedDownloadJob,
@@ -7,6 +8,7 @@
 		type MuxJobStatusUpdate
 	} from '$lib/api';
 	import { currentDownload, setDownloading, downloadProgress } from '$stores/download';
+	import { get } from 'svelte/store';
 	import { trackDownloadStarted } from '$lib/analytics';
 	import { saveDownload } from '$lib/playlist-download-file-saver';
 	import * as m from '$lib/paraglide/messages';
@@ -32,6 +34,26 @@
 	let isLoading = $state(false);
 	let progressLabel = $state('');
 	let progressIndeterminate = $state(false);
+	let progressAnimationFrame: number | null = null;
+	let lastAnimationFrameAtMs = 0;
+	let lastRealProgress = 0;
+	let lastRealProgressAtMs = 0;
+	let estimatedVelocityPerSecond = 0;
+
+	const MAX_PROGRESS_BEFORE_READY = 99.4;
+	const MIN_PROGRESS_VELOCITY = 0.12;
+	const MAX_PROGRESS_VELOCITY = 4.8;
+	const MIN_DISPLAY_VELOCITY = 0.65;
+	const MAX_DISPLAY_VELOCITY = 10;
+	const READY_DISPLAY_VELOCITY = 40;
+	const MAX_PROGRESS_LEAD = 4.2;
+
+	function nowMs(): number {
+		if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+			return performance.now();
+		}
+		return Date.now();
+	}
 
 	function enforceHttps(url: string): string {
 		if (
@@ -66,19 +88,151 @@
 
 	function setProgressState(
 		label: string,
-		options: { value?: number; indeterminate?: boolean } = {}
+		options: { value?: number; indeterminate?: boolean; allowDecrease?: boolean } = {}
 	): void {
 		progressLabel = label;
 		progressIndeterminate = options.indeterminate ?? false;
-		if (typeof options.value === 'number') {
-			downloadProgress.set(options.value);
+		if (progressIndeterminate) {
+			stopProgressAnimation();
+			return;
+		}
+		if (!progressIndeterminate && typeof options.value === 'number') {
+			animateProgressTo(options.value, options.allowDecrease ?? false);
 		}
 	}
 
 	function resetProgressState(): void {
+		stopProgressAnimation();
 		progressLabel = '';
 		progressIndeterminate = false;
+		lastAnimationFrameAtMs = 0;
+		lastRealProgress = 0;
+		lastRealProgressAtMs = 0;
+		estimatedVelocityPerSecond = 0;
 		downloadProgress.set(0);
+	}
+
+	function stopProgressAnimation(): void {
+		if (progressAnimationFrame === null || typeof window === 'undefined') return;
+		window.cancelAnimationFrame(progressAnimationFrame);
+		progressAnimationFrame = null;
+		lastAnimationFrameAtMs = 0;
+	}
+
+	function clamp(value: number, min: number, max: number): number {
+		return Math.min(max, Math.max(min, value));
+	}
+
+	function ensureProgressAnimation(): void {
+		if (typeof window === 'undefined' || progressAnimationFrame !== null) return;
+
+		const step = (frameTimeMs: number) => {
+			const current = get(downloadProgress);
+			const lastFrameAt = lastAnimationFrameAtMs || frameTimeMs;
+			const deltaSeconds = Math.min(Math.max((frameTimeMs - lastFrameAt) / 1000, 0.001), 0.1);
+			lastAnimationFrameAtMs = frameTimeMs;
+
+			let desired = current;
+			let displayVelocity = MIN_DISPLAY_VELOCITY;
+			let hasFutureSoftAdvance = false;
+
+			if (lastRealProgress >= 100) {
+				desired = 100;
+				displayVelocity = READY_DISPLAY_VELOCITY;
+			} else if (lastRealProgress > 0 && lastRealProgressAtMs > 0) {
+				const elapsedSinceRealSeconds = Math.max(0, (frameTimeMs - lastRealProgressAtMs) / 1000);
+				const softLead = clamp(
+					Math.max(estimatedVelocityPerSecond * 2.8, 0.85),
+					0.85,
+					MAX_PROGRESS_LEAD
+				);
+				const projectedDelta = Math.min(estimatedVelocityPerSecond * elapsedSinceRealSeconds, softLead);
+				const projected = lastRealProgress + projectedDelta;
+				desired = Math.min(MAX_PROGRESS_BEFORE_READY, Math.min(projected, lastRealProgress + softLead));
+				hasFutureSoftAdvance =
+					projectedDelta + 0.02 < softLead && desired + 0.02 < MAX_PROGRESS_BEFORE_READY;
+				displayVelocity = clamp(
+					Math.max(estimatedVelocityPerSecond * 1.7, MIN_DISPLAY_VELOCITY),
+					MIN_DISPLAY_VELOCITY,
+					MAX_DISPLAY_VELOCITY
+				);
+			}
+
+			const next = desired > current ? current + Math.min(desired - current, displayVelocity * deltaSeconds) : current;
+			downloadProgress.set(clamp(next, 0, 100));
+
+			if (
+				lastRealProgress >= 100 &&
+				Math.abs(100 - next) <= 0.02
+			) {
+				downloadProgress.set(100);
+				progressAnimationFrame = null;
+				lastAnimationFrameAtMs = 0;
+				return;
+			}
+
+			if (next + 0.01 < desired || hasFutureSoftAdvance) {
+				progressAnimationFrame = window.requestAnimationFrame(step);
+				return;
+			}
+
+			progressAnimationFrame = null;
+			lastAnimationFrameAtMs = 0;
+		};
+
+		progressAnimationFrame = window.requestAnimationFrame(step);
+	}
+
+	function animateProgressTo(value: number, allowDecrease = false): void {
+		const clamped = clamp(value, 0, 100);
+		const effectiveValue =
+			allowDecrease
+				? clamped
+				: clamped >= 100
+					? 100
+					: Math.min(MAX_PROGRESS_BEFORE_READY, Math.max(lastRealProgress, clamped));
+		const timestampMs = nowMs();
+
+		if (allowDecrease && effectiveValue <= 0) {
+			lastRealProgress = 0;
+			lastRealProgressAtMs = timestampMs;
+			estimatedVelocityPerSecond = 0;
+		} else if (effectiveValue > lastRealProgress) {
+			if (lastRealProgressAtMs > 0) {
+				const deltaProgress = effectiveValue - lastRealProgress;
+				const deltaSeconds = Math.max((timestampMs - lastRealProgressAtMs) / 1000, 0.08);
+				const observedVelocity = deltaProgress / deltaSeconds;
+				estimatedVelocityPerSecond =
+					estimatedVelocityPerSecond > 0
+						? clamp(
+								estimatedVelocityPerSecond * 0.45 + observedVelocity * 0.55,
+								MIN_PROGRESS_VELOCITY,
+								MAX_PROGRESS_VELOCITY
+							)
+						: clamp(observedVelocity, MIN_PROGRESS_VELOCITY, MAX_PROGRESS_VELOCITY);
+			} else {
+				estimatedVelocityPerSecond = clamp(effectiveValue / 6, MIN_PROGRESS_VELOCITY, 1.2);
+			}
+
+			lastRealProgress = effectiveValue;
+			lastRealProgressAtMs = timestampMs;
+		} else if (effectiveValue >= 100) {
+			lastRealProgress = 100;
+			lastRealProgressAtMs = timestampMs;
+		}
+
+		if (typeof window === 'undefined') {
+			downloadProgress.set(lastRealProgress);
+			return;
+		}
+
+		ensureProgressAnimation();
+	}
+
+	function formatProgressPercent(value: number): string {
+		if (!Number.isFinite(value)) return '0%';
+		if (value >= 100) return '100%';
+		return `${value.toFixed(2)}%`;
 	}
 
 	function buildFilename(extension: string): string {
@@ -87,8 +241,56 @@
 		return `${safeTitle}.${normalizedExt}`;
 	}
 
-	function formatMuxStatus(update: MuxJobStatusUpdate): { label: string; value: number } {
+	function clampProgressPercent(
+		value: number | null | undefined,
+		status: MuxJobStatusUpdate['status']
+	): number | null {
+		if (typeof value !== 'number' || Number.isNaN(value)) return null;
+		const max = status === 'ready' ? 100 : 99;
+		return Math.max(0, Math.min(max, value));
+	}
+
+	function resolveMuxPhaseLabel(update: MuxJobStatusUpdate): string | null {
+		switch (update.phase) {
+			case 'starting':
+				return m.download_btn_mux_status_processing_running();
+			case 'fetching_streams':
+				return m.download_btn_mux_status_processing_fetching();
+			case 'muxing_uploading':
+				return m.download_btn_mux_status_processing_muxing();
+			case 'completing_upload':
+				return m.download_btn_mux_status_processing_finalizing();
+			case 'retrying':
+				return m.download_btn_mux_status_queued_waiting();
+			case 'ready':
+				return m.download_btn_mux_status_ready();
+			case 'failed':
+				return m.download_btn_mux_status_failed();
+			default:
+				return null;
+		}
+	}
+
+	function formatMuxStatus(
+		update: MuxJobStatusUpdate
+	): { label: string; value: number; indeterminate: boolean; allowDecrease?: boolean } {
 		const elapsedSeconds = Math.floor(update.elapsedMs / 1000);
+		const livePercent = clampProgressPercent(update.percent, update.status);
+		const phaseLabel = resolveMuxPhaseLabel(update);
+
+		if (phaseLabel) {
+			return {
+				label: phaseLabel,
+				value:
+					update.status === 'ready'
+						? 100
+						: update.status === 'failed'
+							? 0
+							: (livePercent ?? 18),
+				indeterminate: livePercent === null && update.status !== 'ready' && update.status !== 'failed',
+				allowDecrease: update.status === 'failed'
+			};
+		}
 
 		if (update.status === 'queued') {
 			return {
@@ -96,7 +298,8 @@
 					elapsedSeconds >= 8
 						? m.download_btn_mux_status_queued_waiting()
 						: m.download_btn_mux_status_queued(),
-				value: 14
+				value: livePercent ?? 14,
+				indeterminate: livePercent === null
 			};
 		}
 
@@ -106,33 +309,60 @@
 					elapsedSeconds >= 10
 						? m.download_btn_mux_status_leased_waiting()
 						: m.download_btn_mux_status_leased(),
-				value: 28
+				value: livePercent ?? 28,
+				indeterminate: livePercent === null
 			};
 		}
 
 		if (update.status === 'processing') {
 			const phase = Math.floor(elapsedSeconds / 6) % 4;
 			if (phase === 0) {
-				return { label: m.download_btn_mux_status_processing_fetching(), value: 46 };
+				return {
+					label: m.download_btn_mux_status_processing_fetching(),
+					value: livePercent ?? 46,
+					indeterminate: livePercent === null
+				};
 			}
 			if (phase === 1) {
-				return { label: m.download_btn_mux_status_processing_muxing(), value: 58 };
+				return {
+					label: m.download_btn_mux_status_processing_muxing(),
+					value: livePercent ?? 58,
+					indeterminate: livePercent === null
+				};
 			}
 			if (phase === 2) {
-				return { label: m.download_btn_mux_status_processing_finalizing(), value: 68 };
+				return {
+					label: m.download_btn_mux_status_processing_finalizing(),
+					value: livePercent ?? 68,
+					indeterminate: livePercent === null
+				};
 			}
-			return { label: m.download_btn_mux_status_processing_running(), value: 76 };
+			return {
+				label: m.download_btn_mux_status_processing_running(),
+				value: livePercent ?? 76,
+				indeterminate: livePercent === null
+			};
 		}
 
 		if (update.status === 'ready') {
-			return { label: m.download_btn_mux_status_ready(), value: 88 };
+			return { label: m.download_btn_mux_status_ready(), value: 100, indeterminate: false };
 		}
 
 		if (update.status === 'failed') {
-			return { label: m.download_btn_mux_status_failed(), value: 0 };
+			return {
+				label: m.download_btn_mux_status_failed(),
+				value: 0,
+				indeterminate: false,
+				allowDecrease: true
+			};
 		}
 
-		return { label: m.download_btn_mux_status_expired(), value: 0 };
+		return {
+			label: m.download_btn_mux_status_expired(),
+			value: 0,
+			indeterminate: false,
+			allowDecrease: true
+		};
 	}
 
 	/** Trigger browser download */
@@ -195,7 +425,8 @@
 							const nextState = formatMuxStatus(update);
 							setProgressState(nextState.label, {
 								value: nextState.value,
-								indeterminate: update.status !== 'ready'
+								indeterminate: nextState.indeterminate,
+								allowDecrease: nextState.allowDecrease
 							});
 						}
 					},
@@ -267,6 +498,10 @@
 			resetProgressState();
 		}
 	}
+
+	onDestroy(() => {
+		stopProgressAnimation();
+	});
 </script>
 
 <div class="cta-shell">
@@ -300,7 +535,7 @@
 				<div class="progress-meta">
 					<span class="progress-text">{progressLabel || m.download_btn_preparing()}</span>
 				{#if !progressIndeterminate}
-					<span class="progress-percent">{$downloadProgress}%</span>
+					<span class="progress-percent">{formatProgressPercent($downloadProgress)}</span>
 				{/if}
 			</div>
 		</div>
@@ -396,7 +631,6 @@
 		height: 100%;
 		background: linear-gradient(135deg, #4f46e5, #8b5cf6);
 		border-radius: 999px;
-		transition: width 0.3s ease;
 	}
 
 	.progress-fill.indeterminate {

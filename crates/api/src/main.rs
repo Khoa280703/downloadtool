@@ -37,6 +37,7 @@ mod routes;
 mod services;
 
 use config::{Config, MuxArtifactBackend};
+use job_system::JobProgressStore;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -44,6 +45,7 @@ pub struct AppState {
     pub jwt_secret: String,
     pub whop_webhook_secret: String,
     pub job_control_plane: Arc<services::job_control_plane::JobControlPlaneService>,
+    pub job_progress_store: Arc<JobProgressStore>,
     pub storage_ticket_service: Arc<services::storage_ticket_service::StorageTicketService>,
     pub mux_direct_download: bool,
 }
@@ -133,6 +135,7 @@ fn build_app(
         .route("/api/stream", get(routes::stream_handler))
         .route("/api/jobs", post(routes::create_job_handler))
         .route("/api/jobs/{job_id}", get(routes::job_status_handler))
+        .route("/api/jobs/{job_id}/events", get(routes::job_events_handler))
         .route(
             "/api/jobs/{job_id}/file-ticket",
             get(routes::job_file_ticket_handler),
@@ -256,11 +259,13 @@ async fn main() -> anyhow::Result<()> {
         storage_backend,
         config.mux_file_ticket_ttl_secs,
     );
+    let job_progress_store = Arc::new(JobProgressStore::new(&config.redis_url)?);
     let app_state = AppState {
         db_pool,
         jwt_secret: config.jwt_secret,
         whop_webhook_secret: config.whop_webhook_secret,
         job_control_plane,
+        job_progress_store,
         storage_ticket_service,
         mux_direct_download: config.mux_direct_download,
     };
@@ -324,6 +329,10 @@ mod tests {
             jwt_secret: "test-secret".to_string(),
             whop_webhook_secret: "test-whop-secret".to_string(),
             job_control_plane,
+            job_progress_store: Arc::new(
+                JobProgressStore::new("redis://127.0.0.1:6379")
+                    .expect("test job progress store should initialize"),
+            ),
             storage_ticket_service: services::storage_ticket_service::StorageTicketService::new(
                 None, 900,
             ),

@@ -3,19 +3,21 @@ use std::time::Duration;
 use std::time::Instant;
 
 use anyhow::Result;
-use job_system::{JobRepository, JobStatus};
+use job_system::{JobProgressPhase, JobProgressStore, JobRepository, JobStatus};
 use object_store::{StorageBackend, StoredArtifact};
 use queue::{ClaimedQueueMessage, JobQueuePublisher, QueueJobMessage};
 use tokio::sync::oneshot;
 use tracing::{error, info, warn};
 
-use crate::mux_pipeline::upload_muxed_artifact;
+use crate::job_progress_publisher::JobProgressPublisher;
+use crate::mux_pipeline::{resolve_mux_job_sources, upload_muxed_artifact};
 use crate::worker_config::WorkerConfig;
 
 pub async fn run_claimed_job(
     repo: &JobRepository,
     queue: Arc<dyn JobQueuePublisher>,
     storage: Arc<dyn StorageBackend>,
+    progress_store: Arc<JobProgressStore>,
     config: &WorkerConfig,
     claimed: ClaimedQueueMessage,
 ) -> Result<bool> {
@@ -63,6 +65,14 @@ pub async fn run_claimed_job(
         return Ok(true);
     }
 
+    let resolved_sources = resolve_mux_job_sources(&job.request).await;
+    let progress = JobProgressPublisher::new(
+        progress_store.clone(),
+        job.id.clone(),
+        &resolved_sources.video_url,
+        &resolved_sources.audio_url,
+    );
+
     let processing_result = async {
         if let Some(artifact) = repo
             .find_ready_artifact_by_dedupe_key(&job.dedupe_key)
@@ -89,6 +99,25 @@ pub async fn run_claimed_job(
             lease_expires_at_ms(config.lease_secs),
         )
         .await?;
+        publish_progress(&progress, JobProgressPhase::Starting, None).await;
+        repo.record_event(
+            &job.id,
+            "resolved_mux_sources",
+            serde_json::json!({
+                "artifact_id": artifact.id,
+                "resolution_strategy": resolved_sources.resolution_strategy,
+                "fallback_reason": resolved_sources.fallback_reason,
+                "video_url_refreshed": resolved_sources.video_url != job.request.video_url,
+                "audio_url_refreshed": resolved_sources.audio_url != job.request.audio_url,
+                "video_proxy": sanitize_proxy_for_event(
+                    resolved_sources.proxy_binding.video_proxy.as_deref()
+                ),
+                "audio_proxy": sanitize_proxy_for_event(
+                    resolved_sources.proxy_binding.audio_proxy.as_deref()
+                )
+            }),
+        )
+        .await?;
         let (heartbeat_stop, heartbeat_task) = spawn_lease_heartbeat(
             repo.clone(),
             job.id.clone(),
@@ -97,8 +126,15 @@ pub async fn run_claimed_job(
         );
 
         let upload_started_at = Instant::now();
-        let upload_result =
-            upload_muxed_artifact(&job.id, &job.request, storage.clone(), &job.dedupe_key).await;
+        let upload_result = upload_muxed_artifact(
+            &job.id,
+            &job.request,
+            storage.clone(),
+            &job.dedupe_key,
+            &resolved_sources,
+            &progress,
+        )
+        .await;
 
         let _ = heartbeat_stop.send(());
         let _ = heartbeat_task.await;
@@ -138,6 +174,7 @@ pub async fn run_claimed_job(
             }),
         )
         .await?;
+        publish_progress(&progress, JobProgressPhase::Ready, Some(100.0)).await;
         Ok(())
     }
     .await;
@@ -159,6 +196,12 @@ pub async fn run_claimed_job(
                     final_failure,
                 )
                 .await?;
+            let phase = if next_status == JobStatus::Queued {
+                JobProgressPhase::Retrying
+            } else {
+                JobProgressPhase::Failed
+            };
+            publish_progress(&progress, phase, None).await;
             error!(
                 job_id = job.id,
                 err = %error,
@@ -177,6 +220,21 @@ pub async fn run_claimed_job(
             }
             Ok(next_status != JobStatus::Queued)
         }
+    }
+}
+
+async fn publish_progress(
+    publisher: &JobProgressPublisher,
+    phase: JobProgressPhase,
+    percent_override: Option<f32>,
+) {
+    if let Err(error) = publisher.publish_phase(phase, percent_override).await {
+        warn!(
+            job_id = publisher.job_id(),
+            err = %error,
+            phase = phase.as_str(),
+            "Failed to publish mux job progress"
+        );
     }
 }
 
@@ -264,4 +322,31 @@ fn spawn_lease_heartbeat(
 fn heartbeat_interval_secs(lease_secs: i64) -> u64 {
     let lease_secs = lease_secs.max(15) as u64;
     (lease_secs / 3).max(5)
+}
+
+fn sanitize_proxy_for_event(proxy: Option<&str>) -> Option<String> {
+    let raw = proxy?;
+    let Ok(mut parsed) = reqwest::Url::parse(raw) else {
+        return Some(mask_proxy_credential_segment(raw));
+    };
+
+    let has_credentials = !parsed.username().is_empty() || parsed.password().is_some();
+    if has_credentials {
+        let _ = parsed.set_username("***");
+        let _ = parsed.set_password(Some("***"));
+    }
+
+    Some(parsed.to_string())
+}
+
+fn mask_proxy_credential_segment(raw: &str) -> String {
+    let Some((prefix, suffix)) = raw.rsplit_once('@') else {
+        return raw.to_string();
+    };
+
+    let scheme = prefix
+        .split_once("://")
+        .map(|(value, _)| value)
+        .unwrap_or("proxy");
+    format!("{scheme}://***:***@{suffix}")
 }

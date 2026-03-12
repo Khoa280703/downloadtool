@@ -24,10 +24,7 @@ pub(crate) async fn upload_stream_parts(
 
     info!(
         bucket,
-        artifact_key,
-        upload_id,
-        part_size_bytes,
-        "Starting multipart upload stream ingestion"
+        artifact_key, upload_id, part_size_bytes, "Starting multipart upload stream ingestion"
     );
 
     while let Some(chunk) = stream.next().await {

@@ -6,12 +6,16 @@
 import * as m from '$lib/paraglide/messages';
 import type { ExtractResult, BatchMessage } from './types';
 import { apiClientLimitConfig, muxJobClientLimitConfig } from './runtime-limit-config';
+import { isSingleCombined360pMp4Fallback } from './playlist-download-stream-selection';
 
 const RAW_API_BASE = import.meta.env.VITE_API_URL || '';
 const RETRYABLE_HTTP_STATUS = new Set([429, 502, 503, 504]);
 const EXTRACT_MAX_RETRY_ATTEMPTS = apiClientLimitConfig.extractMaxRetryAttempts;
 const EXTRACT_RETRY_BASE_DELAY_MS = apiClientLimitConfig.extractRetryBaseDelayMs;
 const EXTRACT_RETRY_MAX_DELAY_MS = apiClientLimitConfig.extractRetryMaxDelayMs;
+const EXTRACT_DEGRADED_RETRY_ATTEMPTS = 3;
+const EXTRACT_DEGRADED_RETRY_BASE_DELAY_MS = 900;
+const EXTRACT_DEGRADED_RETRY_MAX_DELAY_MS = 2_500;
 const BATCH_MAX_RECONNECT_ATTEMPTS = apiClientLimitConfig.batchMaxReconnectAttempts;
 const BATCH_RECONNECT_BASE_DELAY_MS = apiClientLimitConfig.batchReconnectBaseDelayMs;
 const BATCH_RECONNECT_MAX_DELAY_MS = apiClientLimitConfig.batchReconnectMaxDelayMs;
@@ -37,6 +41,13 @@ type MuxJobStatusApiResponse = {
 	error?: string | null;
 	file_ticket_url?: string | null;
 	file_url?: string | null;
+	progress?: {
+		phase: string;
+		percent?: number | null;
+		uploaded_bytes: number;
+		total_bytes?: number | null;
+		updated_at_ms: number;
+	} | null;
 };
 
 export type MuxJobLifecycleStatus = MuxJobStatusApiResponse['status'];
@@ -46,6 +57,11 @@ export type MuxJobStatusUpdate = {
 	status: MuxJobLifecycleStatus;
 	elapsedMs: number;
 	pollCount: number;
+	phase?: string | null;
+	percent?: number | null;
+	uploadedBytes?: number | null;
+	totalBytes?: number | null;
+	updatedAtMs?: number | null;
 };
 
 type FileTicketApiResponse = {
@@ -242,7 +258,13 @@ async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 	});
 }
 
-async function fetchExtractWithRetry(requestUrl: string, signal?: AbortSignal): Promise<Response> {
+async function fetchExtractWithRetry(
+	requestUrl: string,
+	options?: {
+		bypassCache?: boolean;
+	},
+	signal?: AbortSignal
+): Promise<Response> {
 	let lastError: unknown;
 
 	for (let attempt = 1; attempt <= EXTRACT_MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -252,7 +274,10 @@ async function fetchExtractWithRetry(requestUrl: string, signal?: AbortSignal): 
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ url: requestUrl }),
+				body: JSON.stringify({
+					url: requestUrl,
+					bypass_cache: options?.bypassCache === true
+				}),
 				signal
 			});
 
@@ -310,33 +335,60 @@ function normalizeExtractUrl(url: string): string {
  */
 export async function extract(url: string, signal?: AbortSignal): Promise<ExtractResult> {
 	const requestUrl = normalizeExtractUrl(url);
-	const response = await fetchExtractWithRetry(requestUrl, signal);
+	for (let attempt = 1; attempt <= EXTRACT_DEGRADED_RETRY_ATTEMPTS; attempt += 1) {
+		const bypassCache = attempt > 1;
+		const response = await fetchExtractWithRetry(requestUrl, { bypassCache }, signal);
 
-	if (!response.ok) {
-		const status = response.status;
-		const rawBody = await response.text();
-		let message = rawBody;
+		if (!response.ok) {
+			const status = response.status;
+			const rawBody = await response.text();
+			let message = rawBody;
 
-		try {
-			const parsed = JSON.parse(rawBody) as { error?: string; message?: string };
-			message = parsed.error || parsed.message || rawBody;
-		} catch {
-			// Keep plain text body as-is when response is not JSON.
+			try {
+				const parsed = JSON.parse(rawBody) as { error?: string; message?: string };
+				message = parsed.error || parsed.message || rawBody;
+			} catch {
+				// Keep plain text body as-is when response is not JSON.
+			}
+
+			const apiError = new Error(mapExtractErrorMessage(status, message, url)) as Error & {
+				status?: number;
+			};
+			apiError.status = status;
+			throw apiError;
 		}
 
-		const apiError = new Error(mapExtractErrorMessage(status, message, url)) as Error & {
-			status?: number;
-		};
-		apiError.status = status;
-		throw apiError;
+		const raw = await response.json();
+		const result = mapExtractResponse(raw, url);
+		if (
+			!isSingleCombined360pMp4Fallback(result.streams) ||
+			attempt >= EXTRACT_DEGRADED_RETRY_ATTEMPTS
+		) {
+			return result;
+		}
+
+		const delayMs = computeBackoffWithJitter(
+			attempt,
+			EXTRACT_DEGRADED_RETRY_BASE_DELAY_MS,
+			EXTRACT_DEGRADED_RETRY_MAX_DELAY_MS,
+			400
+		);
+		console.warn('[downloadtool] extract degraded to single 360p stream, retrying', {
+			url: requestUrl,
+			attempt,
+			maxAttempts: EXTRACT_DEGRADED_RETRY_ATTEMPTS,
+			bypassCacheNextAttempt: true,
+			delayMs
+		});
+		await sleep(delayMs, signal);
 	}
 
-	const raw = await response.json();
+	throw new Error(m.api_extract_request_failed_after_retries());
+}
 
-	// Map backend { status, metadata: { title, formats, ... } } to ExtractResult
+function mapExtractResponse(raw: any, url: string): ExtractResult {
 	const meta = raw.metadata || {};
 	const streams = (meta.formats || []).map((f: any) => {
-		// Backend StreamFormat fields: quality, ext, url, has_audio, is_audio_only, codec_label, bitrate, filesize
 		return {
 			url: f.url,
 			formatId: f.format_id,
@@ -444,6 +496,31 @@ export async function waitForMuxedDownloadJobReady(
 	},
 	signal?: AbortSignal
 ): Promise<string> {
+	const stopRealtime =
+		typeof window !== 'undefined' && typeof EventSource !== 'undefined'
+			? startMuxJobProgressStream(jobId, options?.onStatus)
+			: null;
+
+	if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
+		console.info('[downloadtool] mux job realtime progress enabled', { jobId });
+	}
+
+	try {
+		return await pollForMuxedDownloadJobReady(jobId, options, signal);
+	} finally {
+		stopRealtime?.();
+	}
+}
+
+async function pollForMuxedDownloadJobReady(
+	jobId: string,
+	options?: {
+		timeoutMs?: number;
+		pollIntervalMs?: number;
+		onStatus?: (update: MuxJobStatusUpdate) => void;
+	},
+	signal?: AbortSignal
+): Promise<string> {
 	const startedAt = Date.now();
 	const timeoutMs = options?.timeoutMs ?? MUX_JOB_MAX_WAIT_MS;
 	const pollIntervalMs = options?.pollIntervalMs ?? MUX_JOB_POLL_INTERVAL_MS;
@@ -459,31 +536,11 @@ export async function waitForMuxedDownloadJobReady(
 		}
 
 		const cacheBuster = Date.now().toString();
-		const response = await fetch(`${jobPath}?t=${cacheBuster}`, { signal });
-		if (!response.ok) {
-			throw await parseApiError(
-				response,
-				m.api_mux_query_status_failed({ status: String(response.status) })
-			);
-		}
-
-		const status = (await response.json()) as MuxJobStatusApiResponse;
+		const status = await fetchMuxJobStatus(jobPath, cacheBuster, signal);
 		pollCount += 1;
-		options?.onStatus?.({
-			jobId: status.job_id,
-			status: status.status,
-			elapsedMs: Date.now() - startedAt,
-			pollCount
-		});
+		emitMuxJobStatusUpdate(status, startedAt, pollCount, options?.onStatus);
 		if (status.status === 'ready') {
-			const ticketResponse = await fetch(`${jobPath}/file-ticket?t=${cacheBuster}`, { signal });
-			if (!ticketResponse.ok) {
-				throw await parseApiError(
-					ticketResponse,
-					m.api_mux_file_ticket_failed({ status: String(ticketResponse.status) })
-				);
-			}
-			const ticket = (await ticketResponse.json()) as FileTicketApiResponse;
+			const ticket = await fetchMuxJobFileTicket(jobPath, cacheBuster, signal);
 			return toAbsoluteDownloadUrl(appendCacheBuster(ticket.download_url, cacheBuster));
 		}
 		if (status.status === 'failed') {
@@ -496,6 +553,98 @@ export async function waitForMuxedDownloadJobReady(
 		await sleep(pollIntervalMs, signal);
 	}
 }
+
+function startMuxJobProgressStream(
+	jobId: string,
+	onStatus?: (update: MuxJobStatusUpdate) => void
+): (() => void) | null {
+	const startedAt = Date.now();
+	const jobPath = `/api/proxy/jobs/${encodeURIComponent(jobId)}`;
+	let eventCount = 0;
+	const eventSource = new EventSource(`${jobPath}/events?t=${Date.now()}`);
+	let closed = false;
+
+	eventSource.addEventListener('status', (rawEvent) => {
+		try {
+			const event = rawEvent as MessageEvent<string>;
+			const status = JSON.parse(event.data) as MuxJobStatusApiResponse;
+			eventCount += 1;
+			emitMuxJobStatusUpdate(status, startedAt, eventCount, onStatus);
+		} catch (error) {
+			console.warn('[downloadtool] mux job SSE payload ignored', {
+				jobId,
+				error
+			});
+		}
+	});
+
+	eventSource.onerror = () => {
+		if (closed) return;
+		console.warn('[downloadtool] mux job SSE stream closed, polling remains active', {
+			jobId
+		});
+		eventSource.close();
+		closed = true;
+	};
+
+	return () => {
+		if (closed) return;
+		eventSource.close();
+		closed = true;
+	};
+}
+
+function emitMuxJobStatusUpdate(
+	status: MuxJobStatusApiResponse,
+	startedAt: number,
+	pollCount: number,
+	onStatus?: (update: MuxJobStatusUpdate) => void
+): void {
+	onStatus?.({
+		jobId: status.job_id,
+		status: status.status,
+		elapsedMs: Date.now() - startedAt,
+		pollCount,
+		phase: status.progress?.phase ?? null,
+		percent: status.progress?.percent ?? null,
+		uploadedBytes: status.progress?.uploaded_bytes ?? null,
+		totalBytes: status.progress?.total_bytes ?? null,
+		updatedAtMs: status.progress?.updated_at_ms ?? null
+	});
+}
+
+async function fetchMuxJobStatus(
+	jobPath: string,
+	cacheBuster: string,
+	signal?: AbortSignal
+): Promise<MuxJobStatusApiResponse> {
+	const response = await fetch(`${jobPath}?t=${cacheBuster}`, { signal });
+	if (!response.ok) {
+		throw await parseApiError(
+			response,
+			m.api_mux_query_status_failed({ status: String(response.status) })
+		);
+	}
+
+	return (await response.json()) as MuxJobStatusApiResponse;
+}
+
+async function fetchMuxJobFileTicket(
+	jobPath: string,
+	cacheBuster: string,
+	signal?: AbortSignal
+): Promise<FileTicketApiResponse> {
+	const ticketResponse = await fetch(`${jobPath}/file-ticket?t=${cacheBuster}`, { signal });
+	if (!ticketResponse.ok) {
+		throw await parseApiError(
+			ticketResponse,
+			m.api_mux_file_ticket_failed({ status: String(ticketResponse.status) })
+		);
+	}
+
+	return (await ticketResponse.json()) as FileTicketApiResponse;
+}
+
 
 function appendCacheBuster(url: string, value: string): string {
 	const separator = url.includes('?') ? '&' : '?';

@@ -38,9 +38,15 @@
 		return Math.min(100, Math.round((progressDone / progressTotal) * 100));
 	});
 
-	function truncate(text: string, maxLength: number = 32): string {
+	function truncate(text: string, maxLength: number = 56): string {
 		if (text.length <= maxLength) return text;
 		return text.slice(0, maxLength) + '...';
+	}
+
+	function formatProgressPercent(value: number | null | undefined): string {
+		if (typeof value !== 'number' || Number.isNaN(value)) return '0%';
+		if (value >= 100) return '100%';
+		return `${value.toFixed(2)}%`;
 	}
 
 	function formatCooldown(ms: number): string {
@@ -86,18 +92,18 @@
 		setAllPendingBatchItemsSelected(false);
 	}
 
-	function getItemStatusLabel(item: { status: string; selected?: boolean }): string {
+	function getItemStatusLabel(item: { status: string; selected?: boolean; progressLabel?: string }): string {
 		if (item.status === 'completed') return m.playlist_progress_status_success();
 		if (item.status === 'error') return m.playlist_progress_status_fail();
-		if (item.status === 'downloading') return m.playlist_progress_status_in_progress();
+		if (item.status === 'downloading' || item.progressLabel) return m.playlist_progress_status_in_progress();
 		if (item.selected === false) return m.playlist_progress_status_skipped();
 		return m.playlist_progress_status_pending();
 	}
 
-	function getItemStatusClass(item: { status: string; selected?: boolean }): string {
+	function getItemStatusClass(item: { status: string; selected?: boolean; progressLabel?: string }): string {
 		if (item.status === 'completed') return 'status-success';
 		if (item.status === 'error') return 'status-fail';
-		if (item.status === 'downloading') return 'status-in-progress';
+		if (item.status === 'downloading' || item.progressLabel) return 'status-in-progress';
 		if (item.selected === false) return 'status-skipped';
 		return 'status-pending';
 	}
@@ -159,7 +165,7 @@
 		<div class="queue-list" role="list">
 			{#each $batchQueue as item}
 				<div class="queue-item" role="listitem">
-					{#if item.status === 'pending'}
+					{#if item.status === 'pending' && !item.progressLabel}
 						<button
 							type="button"
 							class="item-toggle"
@@ -177,7 +183,38 @@
 					{:else}
 						<span class="item-toggle-spacer"></span>
 					{/if}
-					<span class="item-title" title={item.title}>{truncate(item.title)}</span>
+					{#if item.thumbnail}
+						<img class="item-thumb" src={item.thumbnail} alt={item.title}/>
+					{:else}
+						<span class="item-thumb item-thumb-fallback">
+							<span class="material-symbols-outlined text-[18px]">movie</span>
+						</span>
+					{/if}
+					<div class="item-copy">
+						<span class="item-title" title={item.title}>{truncate(item.title)}</span>
+						{#if item.error}
+							<span class="item-subtitle" title={item.error}>{truncate(item.error, 80)}</span>
+						{:else if item.progressLabel}
+							<div class="item-progress-stack">
+								<div class="item-progress-meta">
+									<span class="item-progress-label">{item.progressLabel}</span>
+									{#if !item.progressIndeterminate && typeof item.progressPercent === 'number'}
+										<span class="item-progress-percent">{formatProgressPercent(item.progressPercent)}</span>
+									{/if}
+								</div>
+								<div
+									class:item-progress-track-indeterminate={item.progressIndeterminate}
+									class="item-progress-track"
+								>
+									<div
+										class:item-progress-fill-indeterminate={item.progressIndeterminate}
+										class="item-progress-fill"
+										style:width={item.progressIndeterminate ? undefined : `${Math.max(0, Math.min(100, item.progressPercent ?? 0))}%`}
+									></div>
+								</div>
+							</div>
+						{/if}
+					</div>
 					<span class={`item-status ${getItemStatusClass(item)}`}>{getItemStatusLabel(item)}</span>
 				</div>
 			{/each}
@@ -191,63 +228,51 @@
 
 <style>
 	.batch-progress {
-		padding: 1rem;
-		background: linear-gradient(155deg, #2d1b36 0%, #3a2347 55%, #4a2a5f 100%);
-		border-radius: 1.5rem;
-		border: 1px solid rgba(255, 255, 255, 0.15);
-		box-shadow: 0 22px 40px -26px rgba(45, 27, 54, 0.9);
+		padding: 0;
+		background: transparent;
+		border: 0;
+		box-shadow: none;
 		position: relative;
-		overflow: hidden;
 		min-height: 240px;
-	}
-
-	.batch-progress::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		background:
-			radial-gradient(circle at 8% 15%, rgba(255, 77, 140, 0.25), transparent 42%),
-			radial-gradient(circle at 90% 90%, rgba(255, 185, 56, 0.18), transparent 35%);
 	}
 
 	.header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 0.75rem;
-		position: relative;
-		z-index: 1;
+		margin-bottom: 0.85rem;
 	}
 
 	h4 {
 		margin: 0;
-		font-size: 0.95rem;
+		font-size: 1rem;
 		font-weight: 800;
-		color: #fff6fc;
+		color: #0f172a;
 		letter-spacing: 0.01em;
 	}
 
 	.count {
-		font-size: 0.875rem;
+		font-size: 0.8rem;
 		font-weight: 800;
-		color: #ffd1e5;
+		color: #64748b;
+		padding: 0.35rem 0.7rem;
+		border-radius: 999px;
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
 	}
 
 	.progress-bar {
-		height: 8px;
-		background: rgba(255, 255, 255, 0.18);
-		border-radius: 4px;
+		height: 0.55rem;
+		background: #e2e8f0;
+		border-radius: 999px;
 		overflow: hidden;
 		margin-bottom: 1rem;
-		position: relative;
-		z-index: 1;
 	}
 
 	.progress-fill {
 		height: 100%;
 		background: linear-gradient(90deg, #ff4d8c 0%, #ffb938 100%);
-		border-radius: 4px;
+		border-radius: 999px;
 		transition: width 0.3s ease;
 	}
 
@@ -261,11 +286,9 @@
 		gap: 0.75rem;
 		margin-bottom: 0.75rem;
 		padding: 0.75rem;
-		background: rgba(255, 255, 255, 0.12);
-		border-radius: 0.8rem;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		position: relative;
-		z-index: 1;
+		background: #fff7fb;
+		border-radius: 1rem;
+		border: 1px solid #fbcfe8;
 	}
 
 	.slots {
@@ -277,7 +300,7 @@
 		width: 12px;
 		height: 12px;
 		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.24);
+		background: #fbcfe8;
 		transition: background 0.3s;
 	}
 
@@ -297,70 +320,66 @@
 	}
 
 	.pool-text {
-		font-size: 0.75rem;
-		color: rgba(255, 255, 255, 0.82);
+		font-size: 0.8rem;
+		color: #6b213f;
 		font-weight: 700;
 	}
 
 	.idle-note {
 		margin-top: 0.75rem;
 		padding: 0.85rem 0.9rem;
-		border-radius: 0.75rem;
-		border: 1px solid rgba(255, 255, 255, 0.18);
-		background: rgba(255, 255, 255, 0.12);
-		color: rgba(255, 242, 250, 0.9);
+		border-radius: 1rem;
+		border: 1px solid #e2e8f0;
+		background: #f8fafc;
+		color: #64748b;
 		font-size: 0.78rem;
 		font-weight: 700;
 		line-height: 1.45;
-		position: relative;
-		z-index: 1;
 	}
 
 	.cooldown-note {
 		margin-bottom: 0.75rem;
 		font-size: 0.75rem;
 		font-weight: 600;
-		color: #fcd34d;
-		position: relative;
-		z-index: 1;
+		color: #b45309;
 	}
 
 	.summary-row {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.5rem;
 		margin-bottom: 0.75rem;
-		position: relative;
-		z-index: 1;
 	}
 
 	.summary-pill {
 		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 0.25rem 0.5rem;
+		font-weight: 700;
+		padding: 0.35rem 0.65rem;
 		border-radius: 999px;
+		border: 1px solid transparent;
 	}
 
 	.summary-pill.neutral {
-		background: rgba(255, 255, 255, 0.18);
-		color: #ffe9f6;
+		background: #f8fafc;
+		border-color: #e2e8f0;
+		color: #475569;
 	}
 
 	.selection-actions {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.5rem;
 		margin-bottom: 0.75rem;
-		position: relative;
-		z-index: 1;
 	}
 
 	.selection-btn {
-		font-size: 0.6875rem;
+		font-size: 0.75rem;
 		font-weight: 700;
-		padding: 0.28rem 0.6rem;
+		padding: 0.45rem 0.8rem;
 		border-radius: 999px;
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		background: rgba(255, 255, 255, 0.12);
-		color: #fff4fb;
+		border: 1px solid #fbcfe8;
+		background: #fff;
+		color: #be185d;
 		cursor: pointer;
 		transition: filter 0.2s ease, transform 0.2s ease;
 	}
@@ -371,47 +390,47 @@
 	}
 
 	.summary-pill.success {
-		background: rgba(34, 197, 94, 0.22);
-		color: #dcfce7;
+		background: #f0fdf4;
+		border-color: #bbf7d0;
+		color: #15803d;
 	}
 
 	.summary-pill.error {
-		background: rgba(239, 68, 68, 0.18);
-		color: #fee2e2;
+		background: #fef2f2;
+		border-color: #fecaca;
+		color: #b91c1c;
 	}
 
 	.queue-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
-		max-height: 190px;
+		gap: 0.55rem;
+		max-height: 360px;
 		overflow-y: auto;
-		padding-right: 0.25rem;
-		position: relative;
-		z-index: 1;
+		padding-right: 0.35rem;
 	}
 
 	.queue-item {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.375rem 0.5rem;
-		background: rgba(255, 255, 255, 0.1);
-		border: 1px solid rgba(255, 255, 255, 0.16);
-		border-radius: 0.6rem;
-		font-size: 0.75rem;
+		gap: 0.75rem;
+		padding: 0.7rem 0.8rem;
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		border-radius: 1rem;
+		font-size: 0.8rem;
 	}
 
 	.item-toggle {
-		width: 1rem;
-		height: 1rem;
+		width: 1.2rem;
+		height: 1.2rem;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 0.3rem;
-		border: 1px solid rgba(255, 255, 255, 0.35);
-		background: rgba(255, 255, 255, 0.1);
-		color: rgba(255, 255, 255, 0.75);
+		border-radius: 0.35rem;
+		border: 1px solid #cbd5e1;
+		background: #fff;
+		color: #64748b;
 		padding: 0;
 		cursor: pointer;
 		transition: transform 0.2s ease, filter 0.2s ease, background 0.2s ease, border-color 0.2s ease;
@@ -425,7 +444,7 @@
 
 	.item-toggle.is-selected {
 		background: linear-gradient(135deg, #ff4d8c 0%, #ffb938 100%);
-		border-color: rgba(255, 255, 255, 0.5);
+		border-color: rgba(255, 77, 140, 0.4);
 		color: #ffffff;
 		box-shadow: 0 6px 14px -10px rgba(255, 77, 140, 0.9);
 	}
@@ -441,46 +460,157 @@
 	}
 
 	.item-toggle-spacer {
-		width: 1rem;
-		height: 1rem;
+		width: 1.2rem;
+		height: 1.2rem;
 		flex: 0 0 auto;
 	}
 
-	.item-title {
+	.item-thumb {
+		width: 3.4rem;
+		height: 2rem;
+		flex: 0 0 auto;
+		border-radius: 0.7rem;
+		object-fit: cover;
+		border: 1px solid #e2e8f0;
+		background: #f8fafc;
+	}
+
+	.item-thumb-fallback {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: #94a3b8;
+	}
+
+	.item-copy {
+		min-width: 0;
+		display: flex;
 		flex: 1;
-		color: #fff6fc;
+		flex-direction: column;
+		gap: 0.18rem;
+	}
+
+	.item-title {
+		color: #0f172a;
 		font-weight: 700;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
+	.item-subtitle {
+		color: #64748b;
+		font-size: 0.72rem;
+		font-weight: 600;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.item-progress-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		margin-top: 0.18rem;
+	}
+
+	.item-progress-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		min-width: 0;
+	}
+
+	.item-progress-label {
+		min-width: 0;
+		color: #475569;
+		font-size: 0.72rem;
+		font-weight: 700;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.item-progress-percent {
+		color: #0f172a;
+		font-size: 0.7rem;
+		font-weight: 800;
+		flex: 0 0 auto;
+	}
+
+	.item-progress-track {
+		height: 0.36rem;
+		border-radius: 999px;
+		background: #e2e8f0;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.item-progress-track.item-progress-track-indeterminate {
+		background: #e9d5ff;
+	}
+
+	.item-progress-fill {
+		height: 100%;
+		border-radius: 999px;
+		background: linear-gradient(90deg, #4f46e5 0%, #8b5cf6 100%);
+		transition: width 0.2s ease;
+	}
+
+	.item-progress-fill.item-progress-fill-indeterminate {
+		width: 34%;
+		animation: item-progress-sweep 1.1s ease-in-out infinite;
+	}
+
+	@keyframes item-progress-sweep {
+		0% {
+			transform: translateX(-115%);
+		}
+		100% {
+			transform: translateX(300%);
+		}
+	}
+
 	.item-status {
-		min-width: 4.8rem;
-		text-align: right;
-		font-size: 0.625rem;
+		min-width: 5.9rem;
+		text-align: center;
+		font-size: 0.68rem;
 		font-weight: 800;
 		letter-spacing: 0.01em;
+		padding: 0.35rem 0.55rem;
+		border-radius: 999px;
+		border: 1px solid transparent;
 	}
 
 	.item-status.status-pending {
-		color: rgba(255, 255, 255, 0.82);
+		background: #f8fafc;
+		border-color: #e2e8f0;
+		color: #475569;
 	}
 
 	.item-status.status-in-progress {
-		color: #ffd27b;
+		background: #fff7ed;
+		border-color: #fdba74;
+		color: #c2410c;
 	}
 
 	.item-status.status-success {
-		color: #86efac;
+		background: #f0fdf4;
+		border-color: #bbf7d0;
+		color: #15803d;
 	}
 
 	.item-status.status-fail {
-		color: #fca5a5;
+		background: #fef2f2;
+		border-color: #fecaca;
+		color: #b91c1c;
 	}
 
 	.item-status.status-skipped {
-		color: rgba(255, 255, 255, 0.62);
+		background: #f8fafc;
+		border-color: #e2e8f0;
+		color: #94a3b8;
 	}
 
 	.queue-list::-webkit-scrollbar {
@@ -488,33 +618,40 @@
 	}
 
 	.queue-list::-webkit-scrollbar-thumb {
-		background: rgba(255, 255, 255, 0.32);
+		background: rgba(148, 163, 184, 0.45);
 		border-radius: 999px;
 	}
 
 	:global(.page-root.theme-dark) .batch-progress {
-		background: linear-gradient(180deg, rgba(30, 30, 42, 0.92) 0%, rgba(25, 25, 35, 0.92) 100%);
-		border-color: rgba(255, 77, 140, 0.22);
+		background: transparent;
 	}
 
 	:global(.page-root.theme-dark) h4 {
 		color: #f3e8ff;
 	}
 
+	:global(.page-root.theme-dark) .count,
+	:global(.page-root.theme-dark) .summary-pill.neutral,
+	:global(.page-root.theme-dark) .item-status.status-pending,
+	:global(.page-root.theme-dark) .item-status.status-skipped,
+	:global(.page-root.theme-dark) .idle-note {
+		background: rgba(255, 255, 255, 0.04);
+		border-color: rgba(255, 77, 140, 0.16);
+		color: rgba(224, 208, 245, 0.82);
+	}
+
 	:global(.page-root.theme-dark) .pool-text {
 		color: rgba(224, 208, 245, 0.82);
 	}
 
-	:global(.page-root.theme-dark) .pool-indicator,
-	:global(.page-root.theme-dark) .queue-item {
-		background: rgba(255, 77, 140, 0.1);
-		border-color: rgba(255, 77, 140, 0.22);
+	:global(.page-root.theme-dark) .pool-indicator {
+		background: rgba(255, 77, 140, 0.08);
+		border-color: rgba(255, 77, 140, 0.18);
 	}
 
-	:global(.page-root.theme-dark) .idle-note {
-		background: rgba(255, 77, 140, 0.12);
-		border-color: rgba(255, 77, 140, 0.24);
-		color: rgba(250, 234, 255, 0.95);
+	:global(.page-root.theme-dark) .queue-item {
+		background: rgba(255, 255, 255, 0.03);
+		border-color: rgba(255, 77, 140, 0.16);
 	}
 
 	:global(.page-root.theme-dark) .item-toggle {
@@ -531,5 +668,60 @@
 
 	:global(.page-root.theme-dark) .item-title {
 		color: #ffe8f5;
+	}
+
+	:global(.page-root.theme-dark) .item-subtitle {
+		color: rgba(224, 208, 245, 0.62);
+	}
+
+	:global(.page-root.theme-dark) .item-progress-label {
+		color: rgba(224, 208, 245, 0.82);
+	}
+
+	:global(.page-root.theme-dark) .item-progress-percent {
+		color: #ffffff;
+	}
+
+	:global(.page-root.theme-dark) .item-progress-track {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	:global(.page-root.theme-dark) .item-progress-track.item-progress-track-indeterminate {
+		background: rgba(139, 92, 246, 0.18);
+	}
+
+	:global(.page-root.theme-dark) .item-thumb {
+		border-color: rgba(255, 77, 140, 0.12);
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	@media (max-width: 640px) {
+		.queue-item {
+			display: grid;
+			grid-template-columns: auto auto minmax(0, 1fr);
+			grid-template-areas:
+				'toggle thumb status'
+				'toggle copy copy';
+			align-items: center;
+		}
+
+		.item-toggle,
+		.item-toggle-spacer {
+			grid-area: toggle;
+		}
+
+		.item-thumb {
+			grid-area: thumb;
+		}
+
+		.item-copy {
+			grid-area: copy;
+		}
+
+		.item-status {
+			grid-area: status;
+			min-width: 0;
+			justify-self: end;
+		}
 	}
 </style>

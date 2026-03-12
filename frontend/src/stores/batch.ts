@@ -72,7 +72,69 @@ export function updateBatchItemByVideoId(
 	error?: string
 ): void {
 	batchQueue.update((queue) =>
-		queue.map((item) => (item.videoId === videoId ? { ...item, status, error } : item))
+		queue.map((item) =>
+			item.videoId === videoId
+				? {
+						...item,
+						status,
+						error,
+						progressLabel:
+							status === 'completed' || status === 'error' ? undefined : item.progressLabel,
+						progressPercent:
+							status === 'completed' || status === 'error' ? null : item.progressPercent,
+						progressIndeterminate:
+							status === 'completed' || status === 'error'
+								? false
+								: item.progressIndeterminate
+					}
+				: item
+		)
+	);
+}
+
+/**
+ * Update batch item progress by stable video ID.
+ */
+export function updateBatchItemProgressByVideoId(
+	videoId: string,
+	progress: {
+		label?: string;
+		percent?: number | null;
+		indeterminate?: boolean;
+	}
+): void {
+	batchQueue.update((queue) =>
+		queue.map((item) =>
+			item.videoId === videoId
+				? {
+						...item,
+						progressLabel: progress.label ?? item.progressLabel,
+						progressPercent:
+							typeof progress.percent === 'number' || progress.percent === null
+								? progress.percent
+								: item.progressPercent,
+						progressIndeterminate: progress.indeterminate ?? item.progressIndeterminate ?? false
+					}
+				: item
+		)
+	);
+}
+
+/**
+ * Clear batch item progress by stable video ID.
+ */
+export function clearBatchItemProgressByVideoId(videoId: string): void {
+	batchQueue.update((queue) =>
+		queue.map((item) =>
+			item.videoId === videoId
+				? {
+						...item,
+						progressLabel: undefined,
+						progressPercent: null,
+						progressIndeterminate: false
+					}
+				: item
+		)
 	);
 }
 

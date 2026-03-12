@@ -11,12 +11,14 @@ use sqlx::postgres::PgPoolOptions;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+mod job_progress_publisher;
 mod job_runner;
 mod mux_pipeline;
 mod storage_factory;
 mod worker_config;
 
 use job_runner::{cleanup_expired_artifacts, republish_reclaimed_jobs, run_claimed_job};
+use job_system::JobProgressStore;
 use storage_factory::{build_storage_backend, init_extractor_bundle};
 use worker_config::WorkerConfig;
 
@@ -49,6 +51,7 @@ async fn main() -> Result<()> {
     let queue_publisher: Arc<dyn JobQueuePublisher> = queue.clone();
     let queue_consumer: Arc<dyn JobQueueConsumer> = queue.clone();
     queue_consumer.ensure_group().await?;
+    let progress_store = Arc::new(JobProgressStore::new(&config.redis_url)?);
 
     let storage = build_storage_backend(&config).await?;
     tokio::fs::create_dir_all(Path::new(&config.artifact_dir)).await?;
@@ -84,6 +87,7 @@ async fn main() -> Result<()> {
                     &repo,
                     queue_publisher.clone(),
                     storage.clone(),
+                    progress_store.clone(),
                     &config,
                     claimed.clone(),
                 )

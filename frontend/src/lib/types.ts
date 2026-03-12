@@ -114,6 +114,12 @@ export interface BatchItem {
 	status: 'pending' | 'downloading' | 'completed' | 'error';
 	/** Whether this item is selected for playlist download */
 	selected?: boolean;
+	/** Human-readable progress label */
+	progressLabel?: string;
+	/** Progress percent from 0-100 when known */
+	progressPercent?: number | null;
+	/** Whether current progress is indeterminate */
+	progressIndeterminate?: boolean;
 	/** Error message if failed */
 	error?: string;
 }

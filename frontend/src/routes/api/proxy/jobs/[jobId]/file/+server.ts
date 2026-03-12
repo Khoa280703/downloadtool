@@ -39,12 +39,6 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies }) =
 	});
 
 	const headers = copyRustResponseHeaders(upstream);
-	if (!headers.has('content-disposition')) {
-		headers.set(
-			'content-disposition',
-			`attachment; filename="${encodeURIComponent(params.jobId)}.mp4"`
-		);
-	}
 	applyNoStoreCache(headers);
 
 	return new Response(upstream.body, {

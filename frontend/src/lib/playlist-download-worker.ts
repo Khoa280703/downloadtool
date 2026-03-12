@@ -2,19 +2,27 @@ import {
 	buildStreamUrl,
 	createMuxedDownloadJob,
 	extract,
+	type MuxJobStatusUpdate,
 	waitForMuxedDownloadJobReady
 } from '$lib/api';
 import { playlistWorkerLimitConfig } from '$lib/runtime-limit-config';
-import { updateBatchItemByVideoId } from '$stores/batch';
+import {
+	clearBatchItemProgressByVideoId,
+	updateBatchItemByVideoId,
+	updateBatchItemProgressByVideoId
+} from '$stores/batch';
 import {
 	getStoredPlaylistDownloadMode,
 	getStoredPlaylistQuality,
+	isSingleCombined360pMp4Fallback,
 	pickBestStreams,
+	resolutionScore,
 	safeFilename,
 	toWatchUrl,
 	type PlaylistDownloadMode,
 	type PlaylistQuality
 } from './playlist-download-stream-selection';
+import type { Stream } from './types';
 import {
 	hasSelectedSaveDirectory,
 	isAbortError,
@@ -224,11 +232,16 @@ async function processDownloadSlots(): Promise<void> {
 
 async function startDownload(ready: ReadyEntry): Promise<void> {
 	const epoch = workerEpoch;
-	const { entry, filename } = ready;
+	const { entry } = ready;
 	activeCount += 1;
 	activeEntries.set(entry.videoId, entry);
 
 	updateBatchItemByVideoId(entry.videoId, 'downloading');
+	updateBatchItemProgressByVideoId(entry.videoId, {
+		label: m.download_btn_progress_preparing_browser(),
+		percent: null,
+		indeterminate: true
+	});
 
 	const controller = new AbortController();
 	activeControllers.set(entry.videoId, controller);
@@ -237,10 +250,12 @@ async function startDownload(ready: ReadyEntry): Promise<void> {
 		await saveReadyEntry(ready, controller.signal);
 		if (epoch !== workerEpoch) return;
 		updateBatchItemByVideoId(entry.videoId, 'completed');
+		clearBatchItemProgressByVideoId(entry.videoId);
 	} catch (error) {
 		if (epoch !== workerEpoch) return;
 		if (isAbortError(error)) {
 			updateBatchItemByVideoId(entry.videoId, 'pending');
+			clearBatchItemProgressByVideoId(entry.videoId);
 		} else {
 			const message =
 				error instanceof Error ? error.message : m.playlist_worker_error_download_failed();
@@ -260,7 +275,18 @@ async function startDownload(ready: ReadyEntry): Promise<void> {
 async function saveReadyEntry(ready: ReadyEntry, signal: AbortSignal): Promise<void> {
 	const saveOptions = {
 		requireFsaa: strictFsaaMode,
-		allowAnchorFallback: true
+		allowAnchorFallback: true,
+		onProgress: (progress: {
+			receivedBytes: number;
+			totalBytes: number | null;
+			percent: number | null;
+		}) => {
+			updateBatchItemProgressByVideoId(ready.entry.videoId, {
+				label: m.download_btn_progress_starting_browser(),
+				percent: progress.percent,
+				indeterminate: progress.percent === null
+			});
+		}
 	} as const;
 
 	await saveDownload(ready.downloadUrl, ready.filename, signal, saveOptions);
@@ -280,8 +306,57 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 		preferCombinedStream: !useFsaa,
 		mode: preferredDownloadMode
 	});
+	const selectedResolution = video ? resolutionScore(video.quality) : null;
+	const requestedResolution =
+		preferredQuality === 'best' ? null : Number.parseInt(preferredQuality, 10);
+	const fallbackBelowRequested =
+		selectedResolution !== null &&
+		requestedResolution !== null &&
+		Number.isFinite(requestedResolution) &&
+		selectedResolution < requestedResolution;
+	const degradedSingleStream = isSingleCombined360pMp4Fallback(result.streams);
+
+	console.info('[downloadtool][playlist] stream selection', {
+		videoId: entry.videoId,
+		title: entry.title,
+		requestedQuality: preferredQuality,
+		requestedResolution,
+		mode: preferredDownloadMode,
+		preferCombinedStream: !useFsaa,
+		availableVideoStreams: summarizeVideoStreams(result.streams),
+		selectedVideo: summarizeStream(video),
+		selectedAudio: summarizeStream(audio),
+		fallbackBelowRequested,
+		degradedSingleStream,
+		willMux: Boolean(video && !video.hasAudio && audio),
+		willDirectStream: Boolean(video && video.hasAudio) || Boolean(!video && audio)
+	});
+
+	if (fallbackBelowRequested && degradedSingleStream) {
+		console.warn('[downloadtool][playlist] degraded extract rejected below requested quality', {
+			videoId: entry.videoId,
+			title: entry.title,
+			requestedQuality: preferredQuality,
+			requestedResolution,
+			selectedVideo: summarizeStream(video),
+			availableVideoStreams: summarizeVideoStreams(result.streams)
+		});
+		throw new Error(m.playlist_worker_error_no_streams());
+	}
 
 	if (video && !video.hasAudio && audio) {
+		console.info('[downloadtool][playlist] mux path selected', {
+			videoId: entry.videoId,
+			requestedQuality: preferredQuality,
+			selectedVideo: summarizeStream(video),
+			selectedAudio: summarizeStream(audio),
+			fallbackBelowRequested
+		});
+		updateBatchItemProgressByVideoId(entry.videoId, {
+			label: m.download_btn_progress_queueing_mux(),
+			percent: null,
+			indeterminate: true
+		});
 		const { jobId } = await createMuxedDownloadJob(
 			video.url,
 			audio.url,
@@ -292,7 +367,20 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 				audioFormatId: audio.formatId
 			}
 		);
-		const muxedFileUrl = await waitForMuxedDownloadJobReady(jobId, undefined, signal);
+		const muxedFileUrl = await waitForMuxedDownloadJobReady(
+			jobId,
+			{
+				onStatus: (update) => {
+					const nextState = formatMuxStatus(update);
+					updateBatchItemProgressByVideoId(entry.videoId, {
+						label: nextState.label,
+						percent: nextState.value,
+						indeterminate: nextState.indeterminate
+					});
+				}
+			},
+			signal
+		);
 
 		return {
 			entry,
@@ -303,6 +391,17 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 
 	const stream = video ?? audio;
 	if (!stream) throw new Error(m.playlist_worker_error_no_streams());
+	console.info('[downloadtool][playlist] direct stream path selected', {
+		videoId: entry.videoId,
+		requestedQuality: preferredQuality,
+		selectedStream: summarizeStream(stream),
+		fallbackBelowRequested
+	});
+	updateBatchItemProgressByVideoId(entry.videoId, {
+		label: m.download_btn_progress_preparing_browser(),
+		percent: null,
+		indeterminate: true
+	});
 
 	const downloadUrl = buildStreamUrl(stream.url, entry.title, stream.format || 'mp4', {
 		sourceUrl: result.originalUrl,
@@ -377,6 +476,152 @@ function scheduleCircuitResume(): void {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function summarizeVideoStreams(streams: Stream[]): Array<{
+	formatId?: string;
+	quality: string;
+	format: string;
+	hasAudio: boolean;
+	isAudioOnly: boolean;
+	codecLabel?: string;
+}> {
+	return streams
+		.filter((stream) => !stream.isAudioOnly)
+		.map((stream) => summarizeStream(stream))
+		.filter((stream): stream is NonNullable<typeof stream> => stream !== null);
+}
+
+function summarizeStream(stream: Stream | null): {
+	formatId?: string;
+	quality: string;
+	format: string;
+	hasAudio: boolean;
+	isAudioOnly: boolean;
+	codecLabel?: string;
+} | null {
+	if (!stream) return null;
+	return {
+		formatId: stream.formatId,
+		quality: stream.quality,
+		format: stream.format,
+		hasAudio: stream.hasAudio,
+		isAudioOnly: stream.isAudioOnly,
+		codecLabel: stream.codecLabel
+	};
+}
+
+function clampProgressPercent(
+	value: number | null | undefined,
+	status: MuxJobStatusUpdate['status']
+): number | null {
+	if (typeof value !== 'number' || Number.isNaN(value)) return null;
+	const max = status === 'ready' ? 100 : 99;
+	return Math.max(0, Math.min(max, value));
+}
+
+function resolveMuxPhaseLabel(update: MuxJobStatusUpdate): string | null {
+	switch (update.phase) {
+		case 'starting':
+			return m.download_btn_mux_status_processing_running();
+		case 'fetching_streams':
+			return m.download_btn_mux_status_processing_fetching();
+		case 'muxing_uploading':
+			return m.download_btn_mux_status_processing_muxing();
+		case 'completing_upload':
+			return m.download_btn_mux_status_processing_finalizing();
+		case 'retrying':
+			return m.download_btn_mux_status_queued_waiting();
+		case 'ready':
+			return m.download_btn_mux_status_ready();
+		case 'failed':
+			return m.download_btn_mux_status_failed();
+		default:
+			return null;
+	}
+}
+
+function formatMuxStatus(
+	update: MuxJobStatusUpdate
+): { label: string; value: number | null; indeterminate: boolean } {
+	const elapsedSeconds = Math.floor(update.elapsedMs / 1000);
+	const livePercent = clampProgressPercent(update.percent, update.status);
+	const phaseLabel = resolveMuxPhaseLabel(update);
+
+	if (phaseLabel) {
+		return {
+			label: phaseLabel,
+			value:
+				update.status === 'ready'
+					? 100
+					: update.status === 'failed'
+						? 0
+						: livePercent,
+			indeterminate: livePercent === null && update.status !== 'ready' && update.status !== 'failed'
+		};
+	}
+
+	if (update.status === 'queued') {
+		return {
+			label:
+				elapsedSeconds >= 8
+					? m.download_btn_mux_status_queued_waiting()
+					: m.download_btn_mux_status_queued(),
+			value: livePercent,
+			indeterminate: livePercent === null
+		};
+	}
+
+	if (update.status === 'leased') {
+		return {
+			label:
+				elapsedSeconds >= 10
+					? m.download_btn_mux_status_leased_waiting()
+					: m.download_btn_mux_status_leased(),
+			value: livePercent,
+			indeterminate: livePercent === null
+		};
+	}
+
+	if (update.status === 'processing') {
+		const phase = Math.floor(elapsedSeconds / 6) % 4;
+		if (phase === 0) {
+			return {
+				label: m.download_btn_mux_status_processing_fetching(),
+				value: livePercent,
+				indeterminate: livePercent === null
+			};
+		}
+		if (phase === 1) {
+			return {
+				label: m.download_btn_mux_status_processing_muxing(),
+				value: livePercent,
+				indeterminate: livePercent === null
+			};
+		}
+		if (phase === 2) {
+			return {
+				label: m.download_btn_mux_status_processing_finalizing(),
+				value: livePercent,
+				indeterminate: livePercent === null
+			};
+		}
+		return {
+			label: m.download_btn_mux_status_processing_running(),
+			value: livePercent,
+			indeterminate: livePercent === null
+		};
+	}
+
+	if (update.status === 'ready') {
+		return { label: m.download_btn_mux_status_ready(), value: 100, indeterminate: false };
+	}
+
+	if (update.status === 'failed') {
+		return { label: m.download_btn_mux_status_failed(), value: 0, indeterminate: false };
+	}
+
+	return { label: m.download_btn_mux_status_expired(), value: 0, indeterminate: false };
 }
 
 function isQueued(videoId: string): boolean {

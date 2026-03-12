@@ -42,6 +42,7 @@ pub trait StorageBackend: Send + Sync {
         &self,
         artifact: &StoredArtifact,
         expires_secs: u64,
+        content_disposition: Option<&str>,
     ) -> Result<DownloadTicket>;
     async fn delete(&self, artifact: &StoredArtifact) -> Result<()>;
 }

@@ -80,6 +80,7 @@ impl StorageBackend for S3StorageBackend {
         &self,
         artifact: &StoredArtifact,
         expires_secs: u64,
+        content_disposition: Option<&str>,
     ) -> Result<DownloadTicket> {
         let key = artifact
             .object_key
@@ -88,11 +89,11 @@ impl StorageBackend for S3StorageBackend {
         let config =
             aws_sdk_s3::presigning::PresigningConfig::expires_in(Duration::from_secs(expires_secs))
                 .context("invalid presign expiration")?;
-        let request = self
-            .client
-            .get_object()
-            .bucket(&self.bucket)
-            .key(key)
+        let mut request = self.client.get_object().bucket(&self.bucket).key(key);
+        if let Some(value) = content_disposition {
+            request = request.response_content_disposition(value);
+        }
+        let request = request
             .presigned(config)
             .await
             .with_context(|| format!("failed to presign get for {key}"))?;
