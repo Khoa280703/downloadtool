@@ -1116,11 +1116,11 @@
 								disabled={isExtracting || playlistBusy}
 							/>
 							<button
-								class="absolute right-1.5 top-1.5 bottom-1.5 flex items-center gap-1.5 rounded-full bg-gradient-primary px-4 text-sm font-bold text-white shadow-candy transition-all hover:scale-105 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 md:gap-2 md:px-10 md:text-lg"
+								class="absolute right-1.5 top-1.5 bottom-1.5 flex items-center justify-center rounded-full bg-gradient-primary px-3 text-sm font-bold text-white shadow-candy transition-all hover:scale-105 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 md:gap-2 md:px-10 md:text-lg"
 								type="submit"
 								disabled={isExtracting || playlistBusy}
 							>
-								<span>
+								<span class="hidden md:inline">
 									{isExtracting || playlistBusy
 										? m.home_button_fetching()
 										: m.home_button_fetch()}
@@ -1454,80 +1454,6 @@
 							</div>
 							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step3_title()}</h3>
 							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step3_desc()}</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
-
-		<section class="defer-render-tools py-10 px-6 lg:px-20 bg-white/40 border-y border-white/60" id="tools">
-			<div class="max-w-7xl mx-auto">
-				<div class="mb-8">
-					<div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-						<div class="text-left">
-							<span class="text-xs font-bold text-plum/80 uppercase tracking-wider mb-1 block">{m.home_tools_badge()}</span>
-							<h2 class="text-2xl md:text-3xl lg:text-4xl font-bold text-plum leading-tight">
-								{m.home_tools_title()}
-								<span class="inline-block animate-bounce text-2xl" style="animation-duration: 3s;">😴</span>
-							</h2>
-						</div>
-						<p class="text-sm md:text-base text-plum/70 lg:max-w-[460px] lg:text-right leading-relaxed font-medium">
-							{m.home_tools_subtitle()}
-						</p>
-					</div>
-				</div>
-				<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
-					<div class="bento-card group relative flex flex-col bg-white rounded-2xl p-5 border border-pink-50 shadow-sm overflow-hidden min-h-[300px]">
-						<div class="absolute top-4 right-4 bg-plum text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 tracking-widest uppercase">{m.home_tool_recommended_badge()}</div>
-						<div class="flex-1 flex flex-col items-start z-10 mt-2">
-							<div class="size-14 mb-3 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
-								<AppIcon name="extension" class="text-3xl" />
-							</div>
-							<h3 class="text-lg font-bold text-plum mb-1">{m.home_tool_extension_title()}</h3>
-							<p class="text-plum/75 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_extension_desc()}</p>
-						</div>
-						<div class="mt-auto z-10 w-full">
-							<button class="w-full h-10 bg-plum hover:bg-plum/90 text-white font-bold rounded-xl shadow-candy flex items-center justify-center gap-2 transition-all hover:scale-[1.02] tracking-wide uppercase text-[11px]">
-								<AppIcon name="add_to_queue" class="text-base" />
-								{m.home_tool_extension_cta()}
-							</button>
-						</div>
-					</div>
-					<div class="bento-card group relative flex flex-col bg-white rounded-2xl p-1 border border-pink-100 shadow-sm min-h-[300px]">
-						<div class="h-full flex flex-col p-4 bg-pink-50/30 rounded-xl backdrop-blur-sm">
-							<div class="flex-1 flex flex-col items-start">
-								<div class="size-14 mb-3 bg-secondary/10 rounded-xl flex items-center justify-center text-secondary rotate-3 group-hover:rotate-12 transition-transform">
-									<AppIcon name="bookmarks" class="text-3xl" />
-								</div>
-								<h3 class="text-lg font-bold text-plum mb-1">{m.home_tool_bookmarklet_title()}</h3>
-								<p class="text-plum/75 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_bookmarklet_desc()}</p>
-								<div class="w-full py-3 px-2 bg-white rounded-lg border border-pink-200 border-dashed mb-2 flex justify-center items-center relative overflow-hidden group-hover:border-primary/30 transition-colors">
-									<a class="cursor-grab active:cursor-grabbing inline-flex items-center gap-1.5 bg-gradient-to-r from-primary to-secondary text-white font-bold py-1.5 px-4 rounded-full shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 transition-all select-none z-10 text-xs" href="https://download.khoadangbui.online">
-										<AppIcon name="touch_app" class="text-base" />
-										{m.home_tool_bookmarklet_cta()}
-									</a>
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="bento-card group relative flex flex-col bg-plum rounded-2xl p-5 shadow-xl min-h-[300px] text-white overflow-hidden">
-						<div class="absolute top-0 right-0 w-32 h-32 bg-accent/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-						<div class="flex-1 flex flex-col items-start z-10 relative">
-							<div class="size-14 mb-3 bg-white/10 rounded-xl flex items-center justify-center text-accent border border-white/10">
-								<AppIcon name="terminal" class="text-3xl" />
-							</div>
-							<h3 class="text-lg font-bold mb-1">{m.home_tool_script_title()}</h3>
-							<p class="text-white/80 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_script_desc()}</p>
-							<div class="w-full bg-black/45 rounded-lg p-3 font-mono text-[11px] text-white/95 mb-2 border border-white/10 shadow-inner">
-								<p class="opacity-85">{m.home_tool_script_snippet_comment()}</p>
-								<p class="truncate">{m.home_tool_script_snippet_quality()}</p>
-							</div>
-						</div>
-						<div class="mt-auto z-10 relative w-full">
-							<button class="w-full h-10 bg-accent hover:bg-accent/90 text-white font-bold rounded-xl shadow-lg hover:shadow-accent/50 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] uppercase text-[11px] tracking-wide">
-								<AppIcon name="download" class="text-base" />
-								{m.home_tool_script_cta()}
-							</button>
 						</div>
 					</div>
 				</div>
