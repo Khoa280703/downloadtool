@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AppIcon from '$components/AppIcon.svelte';
 	import LanguageSwitcher from '$components/LanguageSwitcher.svelte';
 	import UserMenu from '$components/UserMenu.svelte';
 	import * as m from '$lib/paraglide/messages';
@@ -24,7 +25,7 @@
 	<div class="max-w-7xl mx-auto flex items-center justify-between">
 		<div class="flex items-center gap-3 group cursor-pointer">
 			<div class="flex size-10 items-center justify-center rounded-full bg-gradient-primary text-white shadow-candy group-hover:rotate-12 transition-transform">
-				<span class="material-symbols-outlined text-2xl">smart_toy</span>
+				<AppIcon name="smart_toy" class="text-2xl" />
 			</div>
 			<h2 class="text-plum text-2xl font-bold tracking-tight">FetchTube</h2>
 		</div>
@@ -55,7 +56,7 @@
 				<div class="h-10 w-10 rounded-full bg-plum/10 animate-pulse"></div>
 			{:else if authUser}
 				<a href="/account" class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors flex items-center">
-					<span class="material-symbols-outlined text-3xl">account_circle</span>
+					<AppIcon name="account_circle" class="text-3xl" />
 				</a>
 			{:else}
 				<button
@@ -63,7 +64,7 @@
 					class="text-plum p-2 rounded-xl hover:bg-white/50 transition-colors flex items-center"
 					onclick={onOpenAuthModal}
 				>
-					<span class="material-symbols-outlined text-3xl">login</span>
+					<AppIcon name="login" class="text-3xl" />
 				</button>
 			{/if}
 		</div>

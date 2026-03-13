@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AppIcon from '$components/AppIcon.svelte';
 	import type { Stream } from '$lib/types';
 	import * as m from '$lib/paraglide/messages';
 
@@ -393,7 +394,7 @@
 			aria-selected={activeTab === 'video'}
 			onclick={() => (activeTab = 'video')}
 		>
-			<span class="material-symbols-outlined tab-icon">movie</span>
+			<AppIcon name="movie" class="tab-icon" />
 			<span>{m.format_picker_tab_video()}</span>
 		</button>
 		<button
@@ -403,7 +404,7 @@
 			aria-selected={activeTab === 'videoOnly'}
 			onclick={() => (activeTab = 'videoOnly')}
 		>
-			<span class="material-symbols-outlined tab-icon">videocam_off</span>
+			<AppIcon name="videocam_off" class="tab-icon" />
 			<span>{m.format_picker_tab_video_only()}</span>
 		</button>
 		<button
@@ -413,7 +414,7 @@
 			aria-selected={activeTab === 'audio'}
 			onclick={() => (activeTab = 'audio')}
 		>
-			<span class="material-symbols-outlined tab-icon">headphones</span>
+			<AppIcon name="headphones" class="tab-icon" />
 			<span>{m.format_picker_tab_audio()}</span>
 		</button>
 	</div>
@@ -432,7 +433,7 @@
 		{#if activeTab === 'video'}
 			{#if videoOptions.length === 0}
 				<div class="empty-state">
-					<span class="material-symbols-outlined">movie</span>
+					<AppIcon name="movie" />
 					<p>{m.format_picker_empty_video()}</p>
 				</div>
 			{:else}
@@ -451,7 +452,7 @@
 							{/if}
 						<div class="option-left">
 							<div class={`option-icon ${accentClass(stream)} ${isSelected(stream) ? 'option-icon-selected' : ''}`}>
-								<span class="material-symbols-outlined">{iconFor(stream)}</span>
+								<AppIcon name={iconFor(stream)} />
 							</div>
 							<div class="option-meta">
 								<p class="option-title">{cleanQuality(stream.quality)}</p>
@@ -474,7 +475,7 @@
 			{:else if activeTab === 'videoOnly'}
 				{#if videoOnlyOptions.length === 0}
 					<div class="empty-state">
-						<span class="material-symbols-outlined">videocam_off</span>
+						<AppIcon name="videocam_off" />
 						<p>{m.format_picker_empty_video_only()}</p>
 					</div>
 			{:else}
@@ -490,7 +491,7 @@
 						/>
 						<div class="option-left">
 							<div class={`option-icon ${accentClass(stream)} ${isSelected(stream) ? 'option-icon-selected' : ''}`}>
-								<span class="material-symbols-outlined">{iconFor(stream)}</span>
+								<AppIcon name={iconFor(stream)} />
 							</div>
 							<div class="option-meta">
 								<p class="option-title">{cleanQuality(stream.quality)}</p>
@@ -514,7 +515,7 @@
 			{:else}
 				{#if audioOptions.length === 0}
 					<div class="empty-state">
-						<span class="material-symbols-outlined">headphones</span>
+						<AppIcon name="headphones" />
 						<p>{m.format_picker_empty_audio()}</p>
 					</div>
 				{:else}
@@ -530,7 +531,7 @@
 						/>
 						<div class="option-left">
 							<div class={`option-icon accent-purple ${isSelected(stream) ? 'option-icon-selected' : ''}`}>
-								<span class="material-symbols-outlined">{iconFor(stream)}</span>
+								<AppIcon name={iconFor(stream)} />
 							</div>
 							<div class="option-meta">
 									<p class="option-title">{m.format_picker_audio_title()}</p>
@@ -707,7 +708,8 @@
 		box-shadow: 0 8px 18px -12px rgba(79, 70, 229, 0.75);
 	}
 
-	.option-icon .material-symbols-outlined {
+	.option-icon :global(.app-icon),
+	.option-icon :global(.app-icon-badge) {
 		font-size: 24px;
 	}
 

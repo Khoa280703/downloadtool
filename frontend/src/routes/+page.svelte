@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
 	import BatchProgress from '$components/BatchProgress.svelte';
+	import AppIcon from '$components/AppIcon.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
@@ -1085,7 +1086,7 @@
 							aria-pressed={!playlistModeEnabled}
 							disabled={playlistBusy || isExtracting}
 						>
-							<span class="material-symbols-outlined text-[16px]">smart_display</span>
+							<AppIcon name="smart_display" class="text-[16px]" />
 							<span>{m.home_playlist_mode_single()}</span>
 						</button>
 						<button
@@ -1095,7 +1096,7 @@
 							aria-pressed={playlistModeEnabled}
 							disabled={playlistBusy || isExtracting}
 						>
-							<span class="material-symbols-outlined text-[16px]">playlist_play</span>
+							<AppIcon name="playlist_play" class="text-[16px]" />
 							<span>{m.home_playlist_mode_playlist()}</span>
 						</button>
 					</div>
@@ -1104,7 +1105,7 @@
 						<div class="absolute -inset-1 rounded-full bg-gradient-to-r from-primary to-secondary blur opacity-25 transition duration-500 group-hover:opacity-50"></div>
 						<div class="relative flex h-[64px] items-center rounded-full bg-white p-2 shadow-float transition-all duration-300 group-focus-within:ring-4 group-focus-within:ring-primary/20">
 							<div class="pl-6 text-plum/30">
-								<span class="material-symbols-outlined text-2xl">link</span>
+								<AppIcon name="link" class="text-2xl" />
 							</div>
 							<input
 								id="video-url-input"
@@ -1124,9 +1125,10 @@
 										? m.home_button_fetching()
 										: m.home_button_fetch()}
 								</span>
-								<span class="material-symbols-outlined text-base font-bold md:text-lg">
-									{isExtracting || playlistBusy ? 'progress_activity' : 'bolt'}
-								</span>
+								<AppIcon
+									name={isExtracting || playlistBusy ? 'progress_activity' : 'bolt'}
+									class="text-base font-bold md:text-lg"
+								/>
 							</button>
 						</div>
 
@@ -1136,22 +1138,22 @@
 
 						{#if isExtracting}
 							<p class="mt-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-bold text-primary shadow-sm">
-								<span class="material-symbols-outlined animate-spin text-base">progress_activity</span>
+								<AppIcon name="progress_activity" class="animate-spin text-base" />
 								{m.home_analyzing_link()}
 							</p>
 						{/if}
 
 						<div class="mt-6 flex flex-wrap justify-center gap-3 opacity-80 transition-opacity hover:opacity-100">
 							<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
-								<span class="material-symbols-outlined text-lg text-green-500">check_circle</span>
+								<AppIcon name="check_circle" class="text-lg text-green-500" />
 								<span class="text-xs font-bold text-plum/70">{m.home_chip_ad_free()}</span>
 							</div>
 							<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
-								<span class="material-symbols-outlined text-lg text-blue-500">verified_user</span>
+								<AppIcon name="verified_user" class="text-lg text-blue-500" />
 								<span class="text-xs font-bold text-plum/70">{m.home_chip_safe_secure()}</span>
 							</div>
 							<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
-								<span class="material-symbols-outlined text-lg text-purple-500">rocket_launch</span>
+								<AppIcon name="rocket_launch" class="text-lg text-purple-500" />
 								<span class="text-xs font-bold text-plum/70">{m.home_chip_super_fast()}</span>
 							</div>
 						</div>
@@ -1167,7 +1169,7 @@
 										<img class="absolute inset-0 h-full w-full object-cover" src={playlistLeadThumbnail} alt={playlistStageTitle}/>
 									{:else}
 										<div class="absolute inset-0 grid place-items-center text-slate-400">
-											<span class="material-symbols-outlined text-6xl">queue_music</span>
+											<AppIcon name="queue_music" class="text-6xl" />
 										</div>
 									{/if}
 									<div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent"></div>
@@ -1175,7 +1177,7 @@
 										{m.home_playlist_panel_label()}
 									</div>
 									<div class="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
-										<span class="material-symbols-outlined text-[15px]">queue_music</span>
+										<AppIcon name="queue_music" class="text-[15px]" />
 										{playlistReadyCount}
 									</div>
 								</div>
@@ -1185,26 +1187,27 @@
 								</div>
 								<div class="flex flex-wrap items-center gap-3">
 									<div class="download-result-chip-duration flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-600 text-sm font-bold">
-										<span class="material-symbols-outlined text-[18px]">queue_music</span>
+										<AppIcon name="queue_music" class="text-[18px]" />
 										{playlistReadyCount}
 									</div>
 									<div class="download-result-chip-view flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full text-pink-600 text-sm font-bold">
-										<span class="material-symbols-outlined text-[18px]">task_alt</span>
+										<AppIcon name="task_alt" class="text-[18px]" />
 										{m.playlist_progress_selected({ count: String(playlistSelectedCount) })}
 									</div>
 									<div class="download-result-chip-channel flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-slate-600 text-sm font-bold">
-										<span class="material-symbols-outlined text-[18px]">
-											{selectedDownloadMode === 'audio'
+										<AppIcon
+											name={selectedDownloadMode === 'audio'
 												? 'graphic_eq'
 												: selectedDownloadMode === 'video-only'
 													? 'movie_edit'
 													: 'movie'}
-										</span>
+											class="text-[18px]"
+										/>
 										{playlistDownloadModeLabel}
 									</div>
 									{#if selectedDownloadMode !== 'audio'}
 										<div class="download-result-chip-channel flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-slate-600 text-sm font-bold">
-											<span class="material-symbols-outlined text-[18px]">high_quality</span>
+											<AppIcon name="high_quality" class="text-[18px]" />
 											{playlistQualityLabel}
 										</div>
 									{/if}
@@ -1213,12 +1216,12 @@
 									<span class="font-bold text-slate-800">{m.home_playlist_mode_playlist()}</span>
 									<div class="mt-2 flex flex-col gap-2">
 										<div class="playlist-summary-line">
-											<span class="material-symbols-outlined text-[16px]">link</span>
+											<AppIcon name="link" class="text-[16px]" />
 											<span class="truncate">{inputUrl}</span>
 										</div>
 										{#if fsaaSupported}
 											<div class="playlist-summary-line">
-												<span class="material-symbols-outlined text-[16px]">folder_open</span>
+												<AppIcon name="folder_open" class="text-[16px]" />
 												<span>{dirPicked ? m.home_playlist_save_folder_selected() : m.home_playlist_choose_save_folder()}</span>
 											</div>
 										{/if}
@@ -1322,12 +1325,12 @@
 									/>
 								{:else}
 									<div class="absolute inset-0 grid place-items-center text-slate-400">
-										<span class="material-symbols-outlined text-6xl">movie</span>
+										<AppIcon name="movie" class="text-6xl" />
 									</div>
 								{/if}
 								<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
 								<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/20 flex items-center gap-1">
-									<span class="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+									<AppIcon name="progress_activity" class="animate-spin text-sm" />
 									{m.home_fetching()}
 								</div>
 							</div>
@@ -1363,7 +1366,7 @@
 									<img class="absolute inset-0 w-full h-full object-cover" src={extractResult.thumbnail} alt={extractResult.title}/>
 								{:else}
 									<div class="absolute inset-0 grid place-items-center text-slate-400">
-										<span class="material-symbols-outlined text-6xl">movie</span>
+										<AppIcon name="movie" class="text-6xl" />
 									</div>
 								{/if}
 								<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -1372,18 +1375,18 @@
 							<h3 class="download-result-title text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{extractResult.title}</h3>
 							<div class="flex flex-wrap items-center gap-3">
 								<div class="download-result-chip-duration flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full text-indigo-600 text-sm font-bold">
-									<span class="material-symbols-outlined text-[18px]">schedule</span>
+									<AppIcon name="schedule" class="text-[18px]" />
 									{formatDuration(extractResult.duration)}
 								</div>
 								{#if extractResult.viewCount}
 									<div class="download-result-chip-view flex items-center gap-2 bg-pink-50 px-3 py-1.5 rounded-full text-pink-600 text-sm font-bold">
-										<span class="material-symbols-outlined text-[18px]">visibility</span>
+										<AppIcon name="visibility" class="text-[18px]" />
 										{formatViews(extractResult.viewCount)}
 									</div>
 								{/if}
 								{#if extractResult.channel}
 									<div class="download-result-chip-channel flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-slate-600 text-sm font-bold">
-										<span class="material-symbols-outlined text-[18px]">person</span>
+										<AppIcon name="person" class="text-[18px]" />
 										{extractResult.channel}
 									</div>
 								{/if}
@@ -1421,33 +1424,33 @@
 						<div class="bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 hover:shadow-float transition-all duration-300 h-full flex flex-col items-center text-center relative overflow-hidden">
 							<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-transparent opacity-50"></div>
 							<div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-								<span class="material-symbols-outlined text-3xl text-primary">search</span>
+								<AppIcon name="search" class="text-3xl text-primary" />
 							</div>
 							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step1_title()}</h3>
 							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step1_desc()}</p>
 						</div>
 						<div class="md:hidden flex justify-center py-2 text-plum/20">
-							<span class="material-symbols-outlined">arrow_downward</span>
+							<AppIcon name="arrow_downward" />
 						</div>
 					</div>
 					<div class="relative group md:-translate-y-4">
 						<div class="step-paste-card bg-gradient-to-br from-white to-pink-50 p-6 rounded-[2rem] shadow-candy border border-pink-100 hover:-translate-y-1 transition-all duration-300 h-full flex flex-col items-center text-center relative overflow-hidden z-10">
 							<div class="absolute -right-10 -top-10 w-24 h-24 bg-secondary/10 rounded-full blur-xl"></div>
 							<div class="w-16 h-16 rounded-full bg-secondary text-white shadow-lg flex items-center justify-center mb-4 animate-bob">
-								<span class="material-symbols-outlined text-3xl">content_paste_go</span>
+								<AppIcon name="content_paste_go" class="text-3xl" />
 							</div>
 							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step2_title()}</h3>
 							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step2_desc()}</p>
 						</div>
 						<div class="md:hidden flex justify-center py-2 text-plum/20">
-							<span class="material-symbols-outlined">arrow_downward</span>
+							<AppIcon name="arrow_downward" />
 						</div>
 					</div>
 					<div class="relative group">
 						<div class="bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 hover:shadow-float transition-all duration-300 h-full flex flex-col items-center text-center relative overflow-hidden">
 							<div class="absolute top-0 right-0 w-full h-1 bg-gradient-to-l from-accent to-transparent opacity-50"></div>
 							<div class="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-								<span class="material-symbols-outlined text-3xl text-accent">download_for_offline</span>
+								<AppIcon name="download_for_offline" class="text-3xl text-accent" />
 							</div>
 							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step3_title()}</h3>
 							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step3_desc()}</p>
@@ -1478,14 +1481,14 @@
 						<div class="absolute top-4 right-4 bg-plum text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 tracking-widest uppercase">{m.home_tool_recommended_badge()}</div>
 						<div class="flex-1 flex flex-col items-start z-10 mt-2">
 							<div class="size-14 mb-3 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
-								<span class="material-symbols-outlined text-3xl">extension</span>
+								<AppIcon name="extension" class="text-3xl" />
 							</div>
 							<h3 class="text-lg font-bold text-plum mb-1">{m.home_tool_extension_title()}</h3>
 							<p class="text-plum/75 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_extension_desc()}</p>
 						</div>
 						<div class="mt-auto z-10 w-full">
 							<button class="w-full h-10 bg-plum hover:bg-plum/90 text-white font-bold rounded-xl shadow-candy flex items-center justify-center gap-2 transition-all hover:scale-[1.02] tracking-wide uppercase text-[11px]">
-								<span class="material-symbols-outlined text-base">add_to_queue</span>
+								<AppIcon name="add_to_queue" class="text-base" />
 								{m.home_tool_extension_cta()}
 							</button>
 						</div>
@@ -1494,13 +1497,13 @@
 						<div class="h-full flex flex-col p-4 bg-pink-50/30 rounded-xl backdrop-blur-sm">
 							<div class="flex-1 flex flex-col items-start">
 								<div class="size-14 mb-3 bg-secondary/10 rounded-xl flex items-center justify-center text-secondary rotate-3 group-hover:rotate-12 transition-transform">
-									<span class="material-symbols-outlined text-3xl">bookmarks</span>
+									<AppIcon name="bookmarks" class="text-3xl" />
 								</div>
 								<h3 class="text-lg font-bold text-plum mb-1">{m.home_tool_bookmarklet_title()}</h3>
 								<p class="text-plum/75 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_bookmarklet_desc()}</p>
 								<div class="w-full py-3 px-2 bg-white rounded-lg border border-pink-200 border-dashed mb-2 flex justify-center items-center relative overflow-hidden group-hover:border-primary/30 transition-colors">
 									<a class="cursor-grab active:cursor-grabbing inline-flex items-center gap-1.5 bg-gradient-to-r from-primary to-secondary text-white font-bold py-1.5 px-4 rounded-full shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 transition-all select-none z-10 text-xs" href="https://download.khoadangbui.online">
-										<span class="material-symbols-outlined text-base">touch_app</span>
+										<AppIcon name="touch_app" class="text-base" />
 										{m.home_tool_bookmarklet_cta()}
 									</a>
 								</div>
@@ -1511,7 +1514,7 @@
 						<div class="absolute top-0 right-0 w-32 h-32 bg-accent/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
 						<div class="flex-1 flex flex-col items-start z-10 relative">
 							<div class="size-14 mb-3 bg-white/10 rounded-xl flex items-center justify-center text-accent border border-white/10">
-								<span class="material-symbols-outlined text-3xl">terminal</span>
+								<AppIcon name="terminal" class="text-3xl" />
 							</div>
 							<h3 class="text-lg font-bold mb-1">{m.home_tool_script_title()}</h3>
 							<p class="text-white/80 font-medium mb-4 text-sm leading-relaxed">{m.home_tool_script_desc()}</p>
@@ -1522,7 +1525,7 @@
 						</div>
 						<div class="mt-auto z-10 relative w-full">
 							<button class="w-full h-10 bg-accent hover:bg-accent/90 text-white font-bold rounded-xl shadow-lg hover:shadow-accent/50 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] uppercase text-[11px] tracking-wide">
-								<span class="material-symbols-outlined text-base">download</span>
+								<AppIcon name="download" class="text-base" />
 								{m.home_tool_script_cta()}
 							</button>
 						</div>
@@ -1577,7 +1580,7 @@
 							</div>
 							<button class="bg-plum text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2">
 								<span>{m.home_join_party_cta()}</span>
-								<span class="material-symbols-outlined text-sm">arrow_forward</span>
+								<AppIcon name="arrow_forward" class="text-sm" />
 							</button>
 							<div class="w-12 h-12 ml-4 animate-wiggle"><span class="text-4xl">🎉</span></div>
 						</div>
@@ -1599,7 +1602,7 @@
 	<footer class="bg-white border-t border-pink-100 py-6 px-6">
 		<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
 			<div class="flex items-center gap-2 transition-all">
-				<span class="material-symbols-outlined text-xl text-plum/75 grayscale hover:grayscale-0">smart_toy</span>
+				<AppIcon name="smart_toy" class="text-xl text-plum/75 grayscale hover:grayscale-0" />
 				<span class="font-bold text-sm text-plum/90">{m.footer_copyright({ year: String(new Date().getFullYear()) })}</span>
 			</div>
 			<div class="flex gap-4 text-plum/80 font-semibold text-xs">
@@ -1616,7 +1619,7 @@
 		onclick={toggleTheme}
 		aria-label={isDarkMode ? m.common_theme_switch_to_light() : m.common_theme_switch_to_dark()}
 	>
-		<span class="material-symbols-outlined text-[18px]">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
+		<AppIcon name={isDarkMode ? 'light_mode' : 'dark_mode'} class="text-[18px]" />
 		<span>{isDarkMode ? m.common_theme_light_mode() : m.common_theme_dark_mode()}</span>
 	</button>
 </div>

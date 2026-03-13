@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import AppIcon from '$components/AppIcon.svelte';
 	import {
 		buildStreamUrl,
 		createMuxedDownloadJob,
@@ -518,7 +519,7 @@
 			<span class="spinner"></span>
 			<span>{m.download_btn_preparing()}</span>
 		{:else}
-			<span class="material-symbols-outlined icon">download</span>
+			<AppIcon name="download" class="icon" />
 			<span>{ctaLabel()}</span>
 		{/if}
 	</button>
@@ -590,7 +591,7 @@
 		box-shadow: none;
 	}
 
-	.icon {
+	:global(.icon) {
 		font-size: 1.15rem;
 	}
 

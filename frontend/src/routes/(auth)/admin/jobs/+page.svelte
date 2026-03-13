@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import AppIcon from '$components/AppIcon.svelte';
 	import AdminJobsTable from '$components/admin/AdminJobsTable.svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -15,7 +16,7 @@
 		<p class="mt-1 text-sm text-slate-500">Theo dõi trạng thái, attempts, artifact backend và lỗi của các job gần nhất.</p>
 	</div>
 	<div class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#137fec]/25">
-		<span class="material-symbols-outlined">table_rows</span>
+		<AppIcon name="table_rows" />
 		<span>Recent jobs</span>
 	</div>
 </div>

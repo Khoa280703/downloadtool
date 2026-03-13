@@ -7,6 +7,7 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import favicon from '$lib/assets/favicon.svg';
+	import AppIcon from '$components/AppIcon.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
 	import { initGA } from '$lib/analytics';
@@ -293,7 +294,7 @@ async function handleAuthSuccess(target: string): Promise<void> {
 		<footer class="bg-white border-t border-pink-100 py-6 px-6">
 			<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
 				<div class="flex items-center gap-2 transition-all">
-					<span class="material-symbols-outlined text-xl text-plum/75 grayscale hover:grayscale-0">smart_toy</span>
+					<AppIcon name="smart_toy" class="text-xl text-plum/75 grayscale hover:grayscale-0" />
 					<span class="font-bold text-sm text-plum/90">{m.footer_copyright({ year: String(new Date().getFullYear()) })}</span>
 				</div>
 				<div class="flex gap-4 text-plum/80 font-semibold text-xs">
@@ -319,7 +320,7 @@ async function handleAuthSuccess(target: string): Promise<void> {
 			onclick={toggleTheme}
 			aria-label={isDarkMode ? m.common_theme_switch_to_light() : m.common_theme_switch_to_dark()}
 		>
-			<span class="material-symbols-outlined text-[18px]">{isDarkMode ? 'light_mode' : 'dark_mode'}</span>
+			<AppIcon name={isDarkMode ? 'light_mode' : 'dark_mode'} class="text-[18px]" />
 			<span>{isDarkMode ? m.common_theme_light_mode() : m.common_theme_dark_mode()}</span>
 		</button>
 	{/if}

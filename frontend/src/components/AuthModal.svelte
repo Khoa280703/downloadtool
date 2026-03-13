@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AppIcon from '$components/AppIcon.svelte';
 	import { authClient } from '$lib/auth-client';
 	import * as m from '$lib/paraglide/messages';
 
@@ -124,7 +125,7 @@
 				aria-label={m.auth_modal_close_aria()}
 				onclick={handleClose}
 			>
-				<span class="material-symbols-outlined">close</span>
+				<AppIcon name="close" />
 			</button>
 
 			<h2 class="text-3xl font-bold text-plum">

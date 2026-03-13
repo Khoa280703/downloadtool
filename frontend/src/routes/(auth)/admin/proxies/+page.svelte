@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ActionData, PageData } from './$types';
+	import AppIcon from '$components/AppIcon.svelte';
 	import AdminProxyTable from '$components/admin/AdminProxyTable.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -18,7 +19,7 @@
 		href="#add-proxy"
 		class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-6 py-3 font-bold text-white shadow-lg shadow-[#137fec]/25 transition-all hover:opacity-90"
 	>
-		<span class="material-symbols-outlined">add</span>
+		<AppIcon name="add" />
 		<span>Add Proxy</span>
 	</a>
 </div>
@@ -92,7 +93,7 @@
 				type="submit"
 				class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-6 py-3 font-bold text-white shadow-lg shadow-[#137fec]/25 transition-all hover:opacity-90"
 			>
-				<span class="material-symbols-outlined">save</span>
+				<AppIcon name="save" />
 				<span>Save Proxy</span>
 			</button>
 		</div>

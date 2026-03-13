@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import AppIcon from '$components/AppIcon.svelte';
 	import AdminActivityTable from '$components/admin/AdminActivityTable.svelte';
 	import AdminJobsTable from '$components/admin/AdminJobsTable.svelte';
 	import AdminProxyTable from '$components/admin/AdminProxyTable.svelte';
@@ -32,7 +33,7 @@
 		href="/admin/jobs"
 		class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-6 py-3 font-bold text-white shadow-lg shadow-[#137fec]/25 transition-all hover:opacity-90"
 	>
-		<span class="material-symbols-outlined">open_in_new</span>
+		<AppIcon name="open_in_new" />
 		<span>Open Queue</span>
 	</a>
 </div>

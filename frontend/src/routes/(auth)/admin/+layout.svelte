@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import AppIcon from '$components/AppIcon.svelte';
 	import type { LayoutData } from './$types';
 	import {
 		adminSectionItems,
@@ -39,7 +40,7 @@
 			<div class="flex flex-col gap-8">
 				<div class="flex items-center gap-3 px-2">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-[#137fec] text-white">
-						<span class="material-symbols-outlined text-2xl">grid_view</span>
+						<AppIcon name="grid_view" class="text-2xl" />
 					</div>
 					<div class="flex flex-col">
 						<h1 class="text-lg font-bold leading-tight text-slate-900">DOWNLOADTOOL</h1>
@@ -57,7 +58,7 @@
 									: 'text-slate-600 hover:bg-slate-100'
 							}`}
 						>
-							<span class="material-symbols-outlined">{navIcon(section.id)}</span>
+							<AppIcon name={navIcon(section.id)} />
 							<span class="text-sm">{section.label}</span>
 							{#if getAdminSectionBadge(section.id, data.overview)}
 								<span class="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
@@ -92,7 +93,7 @@
 					href="/account"
 					class="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-100 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-200"
 				>
-					<span class="material-symbols-outlined text-lg">logout</span>
+					<AppIcon name="logout" class="text-lg" />
 					<span>Back to account</span>
 				</a>
 			</div>
@@ -111,7 +112,7 @@
 										: 'border-slate-200 bg-white text-slate-700'
 								}`}
 							>
-								<span class="material-symbols-outlined text-base">{navIcon(section.id)}</span>
+								<AppIcon name={navIcon(section.id)} class="text-base" />
 								{section.label}
 							</a>
 						{/each}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AppIcon from '$components/AppIcon.svelte';
 	import { onMount } from 'svelte';
 	import * as m from '$lib/paraglide/messages';
 	import {
@@ -176,9 +177,10 @@
 							aria-pressed={item.selected !== false}
 							title={item.selected === false ? m.playlist_progress_select_video() : m.playlist_progress_deselect_video()}
 						>
-							<span class="material-symbols-outlined toggle-icon">
-								{item.selected !== false ? 'check' : 'add'}
-							</span>
+							<AppIcon
+								name={item.selected !== false ? 'check' : 'add'}
+								class="toggle-icon"
+							/>
 						</button>
 					{:else}
 						<span class="item-toggle-spacer"></span>
@@ -187,7 +189,7 @@
 						<img class="item-thumb" src={item.thumbnail} alt={item.title}/>
 					{:else}
 						<span class="item-thumb item-thumb-fallback">
-							<span class="material-symbols-outlined text-[18px]">movie</span>
+							<AppIcon name="movie" class="text-[18px]" />
 						</span>
 					{/if}
 					<div class="item-copy">
@@ -436,7 +438,7 @@
 		transition: transform 0.2s ease, filter 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 	}
 
-	.item-toggle .toggle-icon {
+	.item-toggle :global(.toggle-icon) {
 		font-size: 0.74rem;
 		font-weight: 700;
 		line-height: 1;

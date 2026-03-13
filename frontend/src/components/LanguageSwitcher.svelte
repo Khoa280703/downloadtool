@@ -2,6 +2,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import AppIcon from '$components/AppIcon.svelte';
 	import {
 		cookieDomain,
 		cookieMaxAge,
@@ -88,7 +89,7 @@
 		aria-label={m.header_language_aria()}
 		aria-expanded={open}
 	>
-		<span class="material-symbols-outlined text-base">language</span>
+		<AppIcon name="language" class="text-base" />
 		<span>{currentLocale}</span>
 	</button>
 
@@ -110,7 +111,7 @@
 				>
 					<span>{LANGUAGE_LABELS[locale] ?? locale}</span>
 					{#if locale === currentLocale}
-						<span class="material-symbols-outlined text-base">check</span>
+						<AppIcon name="check" class="text-base" />
 					{/if}
 				</button>
 			{/each}
