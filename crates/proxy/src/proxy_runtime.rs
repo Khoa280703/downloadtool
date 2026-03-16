@@ -14,7 +14,11 @@ const PROXY_SYNC_INTERVAL_SECS: u64 = 5;
 
 static GLOBAL_PROXY_POOL: OnceLock<Arc<ProxyPool>> = OnceLock::new();
 
-pub async fn init_global_proxy_pool(db_pool: PgPool, redis_url: &str) -> anyhow::Result<()> {
+pub async fn init_global_proxy_pool(
+    db_pool: PgPool,
+    redis_url: &str,
+    quarantine_ttl_secs: u64,
+) -> anyhow::Result<()> {
     if GLOBAL_PROXY_POOL.get().is_some() {
         return Ok(());
     }
@@ -45,6 +49,10 @@ pub async fn init_global_proxy_pool(db_pool: PgPool, redis_url: &str) -> anyhow:
         }
     }
 
+    inventory_store
+        .release_expired_quarantined(quarantine_ttl_secs)
+        .await?;
+
     let records = inventory_store.list_runtime_records().await?;
     let redis_store = ProxyHealthStore::new(redis_url)
         .context("failed to initialize shared redis proxy health store")?;
@@ -58,7 +66,7 @@ pub async fn init_global_proxy_pool(db_pool: PgPool, redis_url: &str) -> anyhow:
     pool.refresh_from_runtime().await?;
 
     if GLOBAL_PROXY_POOL.set(Arc::clone(&pool)).is_ok() {
-        spawn_background_sync(pool);
+        spawn_background_sync(pool, quarantine_ttl_secs);
     }
 
     Ok(())
@@ -68,13 +76,21 @@ pub fn global_proxy_pool() -> Option<Arc<ProxyPool>> {
     GLOBAL_PROXY_POOL.get().cloned()
 }
 
-fn spawn_background_sync(pool: Arc<ProxyPool>) {
+fn spawn_background_sync(pool: Arc<ProxyPool>, quarantine_ttl_secs: u64) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(PROXY_SYNC_INTERVAL_SECS));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let inventory_store = pool
+            .inventory_pool()
+            .map(ProxyInventoryStore::new);
 
         loop {
             interval.tick().await;
+            if let Some(store) = inventory_store.as_ref() {
+                if let Err(error) = store.release_expired_quarantined(quarantine_ttl_secs).await {
+                    warn!(err = %error, "Failed to release expired quarantined proxies");
+                }
+            }
             if let Err(error) = pool.refresh_from_runtime().await {
                 warn!(err = %error, "Failed to sync proxy runtime state");
             }

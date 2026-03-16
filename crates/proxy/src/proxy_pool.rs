@@ -319,6 +319,10 @@ impl ProxyPool {
         Ok(())
     }
 
+    pub fn inventory_pool(&self) -> Option<PgPool> {
+        self.inventory_pool.clone()
+    }
+
     pub fn len(&self) -> usize {
         self.proxies
             .read()

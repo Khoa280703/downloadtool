@@ -147,6 +147,53 @@ impl ProxyInventoryStore {
         Ok(true)
     }
 
+    pub async fn release_expired_quarantined(
+        &self,
+        quarantine_ttl_secs: u64,
+    ) -> anyhow::Result<u64> {
+        if quarantine_ttl_secs == 0 {
+            return Ok(0);
+        }
+
+        let rows = sqlx::query(
+            r#"
+            UPDATE proxies
+            SET status = 'active',
+                updated_at = NOW()
+            WHERE status = 'quarantined'
+              AND last_quarantined_at IS NOT NULL
+              AND last_quarantined_at <= NOW() - make_interval(secs => $1::double precision)
+            RETURNING id, proxy_url
+            "#,
+        )
+        .bind(quarantine_ttl_secs as f64)
+        .fetch_all(&self.pool)
+        .await
+        .context("failed to release expired quarantined proxies")?;
+
+        for row in &rows {
+            let proxy_id: String = row.get("id");
+            let proxy_url: String = row.get("proxy_url");
+            sqlx::query(
+                r#"
+                INSERT INTO proxy_health_events (proxy_id, event_type, reason, payload_json)
+                VALUES ($1, 'quarantine_expired', $2, $3::jsonb)
+                "#,
+            )
+            .bind(proxy_id)
+            .bind("quarantine ttl expired")
+            .bind(json!({
+                "proxy_url": proxy_url,
+                "source": "quarantine-ttl"
+            }))
+            .execute(&self.pool)
+            .await
+            .context("failed to record expired quarantine release event")?;
+        }
+
+        Ok(rows.len() as u64)
+    }
+
     pub async fn record_extract_result(
         &self,
         proxy_url: &str,

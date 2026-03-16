@@ -1,10 +1,22 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
+	import { onDestroy } from 'svelte';
 	import type { AdminProxyRow, ProxyStatus } from '$lib/admin/types';
 	import AdminStatusBadge from '$components/admin/AdminStatusBadge.svelte';
 
 	let { proxies }: { proxies: AdminProxyRow[] } = $props();
 
 	const nextStatuses: ProxyStatus[] = ['active', 'disabled', 'quarantined'];
+	let now = $state(Date.now());
+	const countdownTicker = browser
+		? setInterval(() => {
+				now = Date.now();
+			}, 1000)
+		: null;
+
+	onDestroy(() => {
+		if (countdownTicker) clearInterval(countdownTicker);
+	});
 
 	function formatPercent(numerator: number, denominator: number): string {
 		if (denominator <= 0) return '—';
@@ -21,6 +33,23 @@
 		if (score >= 55) return 'text-amber-600';
 		return 'text-red-600';
 	}
+
+	function formatCountdown(expiresAt: string | null): string {
+		if (!expiresAt) return '—';
+		const remainingMs = new Date(expiresAt).getTime() - now;
+		if (remainingMs <= 0) return 'Expired, waiting sync';
+
+		const totalSeconds = Math.floor(remainingMs / 1000);
+		const days = Math.floor(totalSeconds / 86400);
+		const hours = Math.floor((totalSeconds % 86400) / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+		if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+		if (minutes > 0) return `${minutes}m ${seconds}s`;
+		return `${seconds}s`;
+	}
 </script>
 
 <div class="overflow-x-auto">
@@ -36,7 +65,7 @@
 				<th class="px-4 py-2.5 font-semibold">360-only</th>
 				<th class="px-4 py-2.5 font-semibold">Timeout</th>
 				<th class="px-4 py-2.5 font-semibold">P95</th>
-				<th class="px-4 py-2.5 font-semibold">Last quarantine</th>
+				<th class="px-4 py-2.5 font-semibold">Quarantine</th>
 				<th class="px-4 py-2.5 font-semibold">Action</th>
 			</tr>
 		</thead>
@@ -94,9 +123,19 @@
 						<p class="text-[11px] text-gray-400">p95</p>
 					</td>
 					<td class="px-4 py-3">
-						<p class="tabular-nums text-gray-600">
-							{proxy.lastQuarantinedAt ? new Date(proxy.lastQuarantinedAt).toLocaleString() : '—'}
-						</p>
+						{#if proxy.lastQuarantinedAt}
+							<p class="tabular-nums text-gray-600">{new Date(proxy.lastQuarantinedAt).toLocaleString()}</p>
+							{#if proxy.status === 'quarantined'}
+								<p class="mt-0.5 text-[11px] font-medium text-amber-700">
+									Auto release in {formatCountdown(proxy.quarantineExpiresAt)}
+								</p>
+								<p class="text-[11px] text-gray-400">
+									Until {proxy.quarantineExpiresAt ? new Date(proxy.quarantineExpiresAt).toLocaleString() : '—'}
+								</p>
+							{/if}
+						{:else}
+							<p class="tabular-nums text-gray-600">—</p>
+						{/if}
 						<p class="mt-0.5 max-w-[14rem] text-[11px] text-red-600">{proxy.lastQuarantineReason ?? ''}</p>
 						{#if proxy.autoDisabledAt}
 							<p class="mt-1 text-[11px] text-gray-400">Disabled {new Date(proxy.autoDisabledAt).toLocaleString()}</p>

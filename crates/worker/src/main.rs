@@ -48,7 +48,12 @@ async fn main() -> Result<()> {
             .await?
     };
     proxy::ensure_proxy_schema(&proxy_db_pool).await?;
-    init_global_proxy_pool(proxy_db_pool, &config.proxy_redis_url).await?;
+    init_global_proxy_pool(
+        proxy_db_pool,
+        &config.proxy_redis_url,
+        config.proxy_quarantine_ttl_secs,
+    )
+    .await?;
 
     let repo = JobRepository::new(db_pool);
     let queue = Arc::new(RedisStreamsQueue::new(

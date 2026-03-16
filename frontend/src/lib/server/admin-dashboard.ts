@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { getDatabasePool, getProxyDatabasePool } from './auth-utils';
 import { maskProxyUrl } from './admin-proxy-management';
 import type { AdminActivityRow, AdminDashboardData, AdminJobRow, AdminOverview, AdminProxyRow } from '$lib/admin/types';
@@ -62,6 +63,11 @@ const proxiesQuery = `
 		p.auto_disabled_reason AS "autoDisabledReason",
 		p.last_quarantined_at AS "lastQuarantinedAt",
 		p.last_quarantine_reason AS "lastQuarantineReason",
+		CASE
+			WHEN p.status = 'quarantined' AND p.last_quarantined_at IS NOT NULL
+				THEN p.last_quarantined_at + make_interval(secs => $1::double precision)
+			ELSE NULL
+		END AS "quarantineExpiresAt",
 		p.updated_at AS "updatedAt",
 		COALESCE(meta.event_count_24h, 0)::int AS "eventCount24h",
 		meta.last_event_type AS "lastEventType",
@@ -124,6 +130,11 @@ const proxiesQuery = `
 	LIMIT 40
 `;
 
+function getProxyQuarantineTtlSecs(): number {
+	const parsed = Number(env.PROXY_QUARANTINE_TTL_SECS ?? '172800');
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 172800;
+}
+
 const jobActivityQuery = `
 	SELECT
 		e.id,
@@ -182,13 +193,14 @@ export async function loadAdminJobs(): Promise<AdminJobRow[]> {
 
 export async function loadAdminProxies(): Promise<AdminProxyRow[]> {
 	const pool = getProxyDatabasePool();
-	const proxiesResult = await pool.query<AdminProxyRow>(proxiesQuery);
+	const proxiesResult = await pool.query<AdminProxyRow>(proxiesQuery, [getProxyQuarantineTtlSecs()]);
 
 	return proxiesResult.rows.map((row) => ({
 		...row,
 		maskedProxyUrl: maskProxyUrl(row.maskedProxyUrl),
 		autoDisabledAt: normalizeDate(row.autoDisabledAt),
 		lastQuarantinedAt: normalizeDate(row.lastQuarantinedAt),
+		quarantineExpiresAt: normalizeDate(row.quarantineExpiresAt),
 		updatedAt: normalizeDate(row.updatedAt) ?? row.updatedAt,
 		lastEventAt: normalizeDate(row.lastEventAt)
 	}));

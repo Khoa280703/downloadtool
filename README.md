@@ -42,6 +42,7 @@ REDIS_URL=redis://127.0.0.1:6379
 ```text
 PROXY_DATABASE_URL=postgres://downloadtool_proxy:...@127.0.0.1:15432/downloadtool_proxy
 PROXY_REDIS_URL=redis://127.0.0.1:6381
+PROXY_QUARANTINE_TTL_SECS=172800
 ```
 - When `PROXY_DATABASE_URL` / `PROXY_REDIS_URL` are set, only proxy inventory + proxy health are shared.
   Users, subscriptions, jobs, artifacts still use local `DATABASE_URL` / `REDIS_URL`.

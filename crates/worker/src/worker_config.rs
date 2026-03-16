@@ -8,6 +8,7 @@ pub struct WorkerConfig {
     pub proxy_database_url: String,
     pub redis_url: String,
     pub proxy_redis_url: String,
+    pub proxy_quarantine_ttl_secs: u64,
     pub queue_stream: String,
     pub queue_group: String,
     pub worker_id: String,
@@ -212,11 +213,16 @@ impl WorkerConfig {
         let proxy_redis_url = Self::optional_env("PROXY_REDIS_URL")
             .map(|value| Self::resolve_local_redis_url(&value))
             .unwrap_or_else(|| redis_url.clone());
+        let proxy_quarantine_ttl_secs = env::var("PROXY_QUARANTINE_TTL_SECS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(172_800);
         Ok(Self {
             database_url,
             proxy_database_url,
             redis_url,
             proxy_redis_url,
+            proxy_quarantine_ttl_secs,
             queue_stream: Self::env_or_default("MUX_QUEUE_STREAM", || "mux_jobs".to_string()),
             queue_group: Self::env_or_default("MUX_QUEUE_GROUP", || "mux-workers".to_string()),
             worker_id: Self::env_or_default("MUX_WORKER_ID", || format!("{host}-{pid}")),

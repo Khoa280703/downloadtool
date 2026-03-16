@@ -41,6 +41,7 @@ export type AdminProxyRow = {
 	autoDisabledReason: string | null;
 	lastQuarantinedAt: string | null;
 	lastQuarantineReason: string | null;
+	quarantineExpiresAt: string | null;
 	updatedAt: string;
 	eventCount24h: number;
 	lastEventType: string | null;
