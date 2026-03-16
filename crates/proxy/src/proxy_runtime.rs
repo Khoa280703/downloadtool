@@ -7,7 +7,7 @@ use tracing::{info, warn};
 
 use crate::proxy_health_store::ProxyHealthStore;
 use crate::proxy_inventory_store::ProxyInventoryStore;
-use crate::proxy_pool::{parse_proxy_tokens, ProxyPool};
+use crate::proxy_pool::ProxyPool;
 use crate::proxy_quarantine::{load_quarantined_proxies, proxy_quarantine_file_from_env};
 
 const PROXY_SYNC_INTERVAL_SECS: u64 = 15;
@@ -21,17 +21,7 @@ pub async fn init_global_proxy_pool(db_pool: PgPool, redis_url: &str) -> anyhow:
 
     let inventory_store = ProxyInventoryStore::new(db_pool.clone());
     let proxy_count_before_seed = inventory_store.count_all().await.unwrap_or_default();
-    let env_urls = std::env::var("PROXY_LIST")
-        .ok()
-        .map(|raw| parse_proxy_tokens(&raw))
-        .unwrap_or_default();
-
-    if !env_urls.is_empty() {
-        let changed = inventory_store.sync_env_inventory(&env_urls).await?;
-        if changed > 0 {
-            info!(changed, "Synchronized proxy inventory from PROXY_LIST");
-        }
-    }
+    info!("Initializing proxy runtime from database inventory");
 
     let quarantine_file = proxy_quarantine_file_from_env();
     if proxy_count_before_seed == 0 {

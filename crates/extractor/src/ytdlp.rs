@@ -69,16 +69,7 @@ fn resolve_ytdlp_binary() -> String {
 }
 
 fn get_proxy_pool() -> Option<&'static Arc<ProxyPool>> {
-    YTDLP_PROXY_POOL
-        .get_or_init(ProxyPool::global_or_env)
-        .as_ref()
-}
-
-fn fixed_proxy_from_env() -> Option<String> {
-    std::env::var("SOCKS5_PROXY_URL")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
+    YTDLP_PROXY_POOL.get_or_init(proxy::proxy_runtime::global_proxy_pool).as_ref()
 }
 
 #[derive(Debug, Clone)]
@@ -88,13 +79,6 @@ struct SelectedProxy {
 }
 
 fn select_proxy() -> Option<SelectedProxy> {
-    if let Some(url) = fixed_proxy_from_env() {
-        return Some(SelectedProxy {
-            url,
-            from_pool: false,
-        });
-    }
-
     get_proxy_pool()
         .and_then(|pool| pool.next_owned())
         .map(|url| SelectedProxy {
@@ -274,7 +258,7 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
         ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
     })?;
 
-    let pool_rotation_enabled = fixed_proxy_from_env().is_none() && get_proxy_pool().is_some();
+    let pool_rotation_enabled = get_proxy_pool().is_some();
     let max_attempts = if pool_rotation_enabled {
         MAX_PROXY_ROTATION_ATTEMPTS
     } else {

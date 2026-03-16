@@ -6,6 +6,7 @@
 use crate::header_builder::HeaderBuilder;
 use crate::platform::Platform;
 use crate::proxy_pool::ProxyPool;
+use crate::proxy_runtime::global_proxy_pool;
 use crate::throttle::DomainThrottle;
 use bytes::Bytes;
 use futures::Stream;
@@ -76,7 +77,7 @@ impl AntiBotClient {
 
     /// Create a new anti-bot client for the given platform
     pub fn new(platform: Platform) -> Result<Self, AntiBotError> {
-        let proxy_pool = ProxyPool::global_or_env().unwrap_or_default();
+        let proxy_pool = global_proxy_pool().unwrap_or_default();
         Self::build_for_platform(platform, proxy_pool, None)
     }
 
@@ -87,7 +88,7 @@ impl AntiBotClient {
         platform: Platform,
         forced_proxy: Option<String>,
     ) -> Result<Self, AntiBotError> {
-        let proxy_pool = ProxyPool::global_or_env().unwrap_or_default();
+        let proxy_pool = global_proxy_pool().unwrap_or_default();
         Self::build_for_platform(platform, proxy_pool, forced_proxy)
     }
 

@@ -15,10 +15,7 @@ use tracing::{debug, warn};
 
 use crate::proxy_health_store::{ProxyHealthStore, ProxyRuntimeHealth};
 use crate::proxy_inventory_store::{ProxyInventoryRecord, ProxyInventoryStore};
-use crate::proxy_quarantine::{
-    append_quarantine_record, load_quarantined_proxies, proxy_quarantine_file_from_env,
-};
-use crate::proxy_runtime::global_proxy_pool;
+use crate::proxy_quarantine::append_quarantine_record;
 
 /// Maximum consecutive failures before marking proxy as unhealthy.
 pub const MAX_FAILURES: usize = 3;
@@ -171,56 +168,6 @@ impl ProxyPool {
             inventory_pool,
             health_store,
         }
-    }
-
-    /// Create a pool from raw proxy records (`host:port:user:pass`), one per line.
-    pub fn from_raw_list(raw_list: &str) -> Self {
-        Self::new(parse_proxy_tokens(raw_list))
-    }
-
-    /// Create a proxy pool from environment variable `PROXY_LIST`.
-    pub fn from_env() -> Option<Self> {
-        let raw = std::env::var("PROXY_LIST").ok()?;
-        let urls = parse_proxy_tokens(&raw);
-        if urls.is_empty() {
-            return None;
-        }
-
-        let quarantine_file = proxy_quarantine_file_from_env();
-        let quarantined_urls = quarantine_file
-            .as_ref()
-            .map(|path| load_quarantined_proxies(path))
-            .unwrap_or_default();
-        let quarantined_count = urls
-            .iter()
-            .filter(|url| quarantined_urls.contains(*url))
-            .count();
-
-        debug!(
-            "Loaded {} proxies from PROXY_LIST ({} quarantined)",
-            urls.len(),
-            quarantined_count
-        );
-
-        Some(Self::new_with_runtime(
-            urls.into_iter()
-                .map(|proxy_url| ProxyInventoryRecord {
-                    status: if quarantined_urls.contains(&proxy_url) {
-                        "quarantined".to_string()
-                    } else {
-                        "active".to_string()
-                    },
-                    proxy_url,
-                })
-                .collect(),
-            quarantine_file,
-            None,
-            None,
-        ))
-    }
-
-    pub fn global_or_env() -> Option<Arc<Self>> {
-        global_proxy_pool().or_else(|| Self::from_env().map(Arc::new))
     }
 
     /// Get next healthy proxy by round-robin.

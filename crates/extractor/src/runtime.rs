@@ -5,7 +5,6 @@
 
 use crate::types::ExtractionError;
 use deno_core::{op2, JsRuntime, PollEventLoopOptions, RuntimeOptions};
-use proxy::ProxyPool;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -192,11 +191,7 @@ fn validate_url(url: &str) -> Result<(), anyhow::Error> {
 }
 
 fn select_proxy_url() -> Option<String> {
-    std::env::var("SOCKS5_PROXY_URL")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .or_else(|| ProxyPool::global_or_env().and_then(|pool| pool.next_owned()))
+    proxy::proxy_runtime::global_proxy_pool().and_then(|pool| pool.next_owned())
 }
 
 /// Build a reqwest client that is always pinned to a proxy.
