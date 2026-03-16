@@ -274,7 +274,7 @@ async function handleAuthSuccess(target: string): Promise<void> {
 			onOpenAuthModal={openAuthModal}
 			homeHref="/#home"
 			howItWorksHref="/#how-it-works"
-			toolsHref="/#tools"
+			toolsHref="/#download-options"
 		/>
 	{/if}
 

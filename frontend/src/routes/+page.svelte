@@ -783,7 +783,7 @@
 			background: rgba(99, 102, 241, 0.12) !important;
 		}
 
-		.page-root.theme-dark #tools {
+		.page-root.theme-dark #download-options {
 			border-top-color: transparent !important;
 			border-bottom-color: transparent !important;
 		}
@@ -1052,7 +1052,7 @@
 		onOpenAuthModal={openAuthModal}
 		homeHref="#home"
 		howItWorksHref="#how-it-works"
-		toolsHref="#tools"
+		toolsHref="#download-options"
 	/>
 
 	<main class="flex-1 w-full">
@@ -1101,7 +1101,11 @@
 						</button>
 					</div>
 
-					<form class="relative mx-auto mb-9 w-full max-w-[700px] group lg:mb-5" onsubmit={handlePrimarySubmit}>
+					<form
+						id="download-options"
+						class="relative mx-auto mb-9 w-full max-w-[700px] group lg:mb-5"
+						onsubmit={handlePrimarySubmit}
+					>
 						<div class="absolute -inset-1 rounded-full bg-gradient-to-r from-primary to-secondary blur opacity-25 transition duration-500 group-hover:opacity-50"></div>
 						<div class="relative flex h-[64px] items-center rounded-full bg-white p-2 shadow-float transition-all duration-300 group-focus-within:ring-4 group-focus-within:ring-primary/20">
 							<div class="pl-6 text-plum/30">
@@ -1310,7 +1314,7 @@
 		</section>
 
 		{#if isExtracting}
-			<section class="py-6 lg:py-4 px-6 lg:px-20 lg:-mt-4" id="download-options">
+			<section class="py-6 lg:py-4 px-6 lg:px-20 lg:-mt-4" id="download-results">
 				<div class="max-w-7xl mx-auto">
 					<div class="bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row animate-pulse">
 						<div class="w-full lg:w-[42%] p-6 md:p-8 flex flex-col gap-5 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
@@ -1357,7 +1361,7 @@
 				</div>
 			</section>
 		{:else if extractResult}
-			<section class="py-5 lg:py-3 px-6 lg:px-20 lg:-mt-5" id="download-options">
+			<section class="py-5 lg:py-3 px-6 lg:px-20 lg:-mt-5" id="download-results">
 				<div class="max-w-7xl mx-auto">
 					<div class="download-result-card bg-white rounded-[2rem] shadow-card border border-indigo-50 overflow-hidden flex flex-col lg:flex-row">
 						<div class="download-result-meta w-full lg:w-[42%] p-6 md:p-7 flex flex-col gap-4 bg-gradient-to-b from-indigo-50/50 to-white lg:border-r border-indigo-50">
