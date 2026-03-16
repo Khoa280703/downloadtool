@@ -14,7 +14,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::sync::Semaphore;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 const MAX_CONCURRENT_YTDLP: usize = 10;
 const EXTRACT_CACHE_MAX_CAPACITY: u64 = 500;
@@ -348,6 +348,13 @@ async fn run_ytdlp_command(
 }
 
 fn parse_ytdlp_success(stdout: &[u8], url: &str) -> Result<VideoInfo, ExtractionError> {
+    let raw_payload = String::from_utf8_lossy(stdout);
+    info!(
+        original_url = %url,
+        raw_ytdlp_payload = %raw_payload,
+        "yt-dlp raw upstream payload"
+    );
+
     let json: Value = serde_json::from_slice(stdout).map_err(|error| {
         ExtractionError::ScriptExecutionFailed(format!("yt-dlp JSON parse error: {error}"))
     })?;
