@@ -1,6 +1,6 @@
 # Code Standards & Codebase Structure
 
-**Last Updated:** 2026-03-06
+**Last Updated:** 2026-03-16
 
 ## Directory Structure
 
@@ -37,10 +37,43 @@ downloadtool/
 │   │   │   ├── engine.rs            # Core orchestrator
 │   │   │   ├── runtime.rs           # Deno runtime management
 │   │   │   ├── pool.rs              # Connection pooling
-│   │   │   ├── ytdlp.rs             # yt-dlp subprocess extractor [NEW 2026-02-28]
+│   │   │   ├── ytdlp.rs             # yt-dlp subprocess extractor [2026-02-28]
 │   │   │   ├── hot_reload.rs        # Script hot-reload
 │   │   │   └── types.rs             # Shared types
 │   │   ├── build.rs                 # Build script for Deno
+│   │   ├── Cargo.toml
+│   │   └── README.md
+│   │
+│   ├── job-system/                  # Job repository & orchestration [NEW 2026-03-16]
+│   │   ├── src/
+│   │   │   ├── lib.rs               # Module exports
+│   │   │   ├── job_progress.rs      # 7-phase progress tracking + Redis pub/sub
+│   │   │   └── ...
+│   │   ├── Cargo.toml
+│   │   └── README.md
+│   │
+│   ├── queue/                       # Redis Streams abstraction [NEW 2026-03-16]
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   └── ...
+│   │   ├── Cargo.toml
+│   │   └── README.md
+│   │
+│   ├── object-store/                # Storage abstraction [NEW 2026-03-16]
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── localfs.rs           # LocalFs backend
+│   │   │   ├── s3_multipart_upload.rs  # S3 multipart [NEW 2026-03-16]
+│   │   │   └── ...
+│   │   ├── Cargo.toml
+│   │   └── README.md
+│   │
+│   ├── worker/                      # Standalone mux worker [NEW 2026-03-16]
+│   │   ├── src/
+│   │   │   ├── main.rs              # Worker entry point
+│   │   │   ├── lib.rs
+│   │   │   ├── job_progress_publisher.rs  # Progress streaming
+│   │   │   └── ...
 │   │   ├── Cargo.toml
 │   │   └── README.md
 │   │
@@ -76,7 +109,8 @@ downloadtool/
 │   │   │   ├── fragment_stream.rs   # Fragment streaming (273 LOC)
 │   │   │   ├── stream_fetcher.rs    # Fetch & buffer (264 LOC)
 │   │   │   ├── mux_router.rs        # Route streams (255 LOC)
-│   │   │   └── codec.rs             # Codec config (189 LOC)
+│   │   │   ├── codec.rs             # Codec config (189 LOC)
+│   │   │   └── init_segment_normalizer.rs  # FMP4 moov patch [NEW 2026-03-16]
 │   │   ├── Cargo.toml
 │   │   └── README.md
 │   │
@@ -113,9 +147,9 @@ downloadtool/
 │   │   │       └── +page.svelte
 │   │   ├── components/              # Reusable components
 │   │   │   ├── UrlInput.svelte      # URL input field
-│   │   │   ├── DownloadBtn.svelte   # Download button [UPDATED 2026-02-23]
-│   │   │   ├── BatchInput.svelte    # Batch input [UPDATED 2026-02-23]
-│   │   │   ├── BatchProgress.svelte # Progress display
+│   │   │   ├── DownloadBtn.svelte   # Download button [UPDATED 2026-03-16]
+│   │   │   ├── AppIcon.svelte       # SVG icons + badges [NEW 2026-03-16]
+│   │   │   ├── BatchProgress.svelte # Real-time SSE progress
 │   │   │   ├── FormatPicker.svelte  # Quality selector
 │   │   │   ├── CookieConsent.svelte # Privacy banner
 │   │   │   ├── AdBanner.svelte      # Ad display
@@ -743,22 +777,31 @@ pub fn function(param: Type) -> Result<Output, Error> {
 export async function extract(url: string): Promise<ExtractionResult>
 ```
 
-## Internationalization (i18n) Standards [Phase 10 - In Progress]
+## Internationalization (i18n) Standards [Phase 10 - COMPLETE ✅]
 
-**Framework:** Paraglide JS + Claude API → 34 languages
+**Framework:** Paraglide JS with 24+ languages
 
 **Message Key Pattern:** `page_section_element` (snake_case)
-- `homepage_hero_title`, `download_button_label`, `common_error_invalid_url`
+- `home_*`, `download_btn_*`, `mux_job_*`, `format_picker_*`, `playlist_progress_*`, `auth_modal_*`, `privacy_*`
+- Total: 384 keys in `messages/en.json`
 
-**File Location:** `frontend/src/lib/paraglide/messages/en.json`
+**File Location:** `frontend/messages/` (24+ JSON files)
 
-**Workflow:**
-1. Extract ~180 strings from Svelte → `messages/en.json` (task #13, blocked by #12)
-2. Claude API translation script → 34 language files (task #14, blocked by #13)
-3. LanguageSwitcher component + hreflang/sitemap.xml (tasks #15-16, blocked by #14)
-4. Test & deploy (task #17, blocked by #15+#16)
+**Supported Languages:**
+ar, bg, cs, da, de, el, en, es, et, fi, fr, hu, id, it, ja, ko, lt, lv, nb, nl, pl, pt, pt-BR, ro, ru, sk, sl, sv, tr, uk, vi, zh, zh-TW
 
-**Status:** Phase 1 (Paraglide setup) pending task #12
+**URL Structure:**
+- `/en/` (default, no prefix in URL)
+- `/vi/`, `/de/`, `/fr/`, etc.
+
+**Implementation:**
+- Paraglide JS integration → type-safe i18n
+- hreflang tags for all variants
+- Multilingual sitemap.xml
+- LanguageSwitcher component
+- Auto locale detection from browser
+
+**Status:** Complete (deployed 2026-03-16)
 
 ---
 
@@ -818,5 +861,5 @@ cargo audit
 
 ---
 
-**Version:** 1.4
-**Last Updated:** 2026-03-06 (Added runtime config section, i18n status update)
+**Version:** 1.5
+**Last Updated:** 2026-03-16 (Added job-system, worker, queue, object-store crates; i18n COMPLETE; mux job components; init_segment_normalizer)

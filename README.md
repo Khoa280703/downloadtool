@@ -102,11 +102,20 @@ pnpm dev:down  # stop docker compose services
 - `frontend.batch_max_reconnect_attempts`: Số lần reconnect tối đa cho batch stream. `null` = không giới hạn.
 - `frontend.batch_reconnect_base_delay_ms`: Delay reconnect cơ sở (ms). `null` = fallback mặc định trong code.
 - `frontend.batch_reconnect_max_delay_ms`: Delay reconnect tối đa (ms). `null` = fallback mặc định trong code.
-- `frontend.mux_job_poll_interval_ms`: Chu kỳ poll trạng thái mux job (ms). `null` = fallback mặc định trong code.
+- `frontend.mux_job_poll_interval_ms`: Chu kỳ poll trạng thái mux job (ms). `null` = fallback mặc định trong code. (Lưu ý: Giờ dùng SSE `/api/proxy/jobs/{id}/events` thay vì polling)
 - `frontend.mux_job_max_wait_ms`: Tổng thời gian poll mux job (ms). `null` = không giới hạn.
 - `frontend.playlist_worker_max_concurrent`: Số worker playlist đồng thời. `null` = không giới hạn.
 - `frontend.playlist_worker_ready_queue_max`: Độ dài ready queue playlist worker. `null` = không giới hạn.
 - `frontend.playlist_worker_extract_jitter_min_ms`: Jitter tối thiểu trước mỗi lần extract (ms). `null` = 0.
 - `frontend.playlist_worker_extract_jitter_range_ms`: Jitter random bổ sung (ms). `null` = 0.
 - `frontend.playlist_worker_circuit_cooldown_ms`: Cooldown circuit breaker (ms). `null` = 0.
+
+## Recent Changes (2026-03-16)
+
+- **i18n Complete:** 24+ languages active via Paraglide JS
+- **Dual Download Flow:** Direct browser + background mux job with SSE progress
+- **New Job System:** Durable job pipeline (PostgreSQL + Redis + Worker)
+- **Real-Time Progress:** SSE endpoint `/api/proxy/jobs/{id}/events` for 7-phase progress tracking
+- **New Components:** DownloadBtn (unified), AppIcon (SVG icons + quality badges)
+- **S3 Support:** S3 multipart upload for artifact storage
 - For SEO audits: disable Cloudflare "Managed robots/content signals" for `robots.txt`, otherwise Cloudflare injects `Content-Signal` lines that Lighthouse flags as invalid robots directives.

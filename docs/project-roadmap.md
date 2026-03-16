@@ -1,6 +1,6 @@
 # Project Roadmap
 
-**Last Updated:** 2026-03-06
+**Last Updated:** 2026-03-16
 **Project Status:** Actively Developed
 
 ## Overview
@@ -185,37 +185,63 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-## Phase 5: Internationalization (i18n) (In Progress)
+## Phase 5: Internationalization (i18n) (Complete)
 
-**Status:** 🔄 In Progress | **Target:** Q1 2026 (March, currently active)
+**Status:** ✅ Complete | **Completion Date:** 2026-03-16
 
-### Objectives
-- Paraglide JS integration for type-safe i18n
-- Claude API-powered translation to 34 languages
-- SEO support: hreflang tags + multilingual sitemap.xml
-- Language switcher component
-- Locale persistence (localStorage + URL)
+### Objectives ✅
+- Paraglide JS integration for type-safe i18n ✅
+- Translation to 24+ languages ✅
+- SEO support: hreflang tags + multilingual sitemap.xml ✅
+- Language switcher component ✅
+- Locale persistence (localStorage + URL) ✅
 
-### Planned Deliverables
-- `messages/en.json` extraction (~180 strings)
-- 34 language translation files (automated via Claude API)
-- LanguageSwitcher component with locale detection
-- hreflang implementation for SEO crawlers
-- Multilingual sitemap.xml generation
+### Deliverables ✅
+- `messages/en.json` with 384 keys ✅
+- 24+ language translation files ✅
+- LanguageSwitcher component with locale detection ✅
+- hreflang implementation for all pages ✅
+- Multilingual sitemap.xml generation ✅
 
-### Success Metrics
-- All 34 languages generated and tested
-- hreflang tags on all language variants
-- Locale switching < 200ms UX impact
-- SEO: Proper canonical/hreflang for all pages
+### Completed Metrics
+- 24+ languages: ar, bg, cs, da, de, el, en, es, et, fi, fr, hu, id, it, ja, ko, lt, lv, nb, nl, pl, pt, pt-BR, ro, ru, sk, sl, sv, tr, uk, vi, zh, zh-TW
+- hreflang tags on all language variants ✅
+- Locale switching < 200ms UX ✅
+- SEO: Proper canonical/hreflang for all pages ✅
 
-### Current Phase Progress
-- Task #12: Install & configure Paraglide JS (pending)
-- Task #13: Extract strings → messages/en.json (blocked by #12)
-- Task #14: Claude API translation script (blocked by #13)
-- Task #15: hreflang + sitemap (blocked by #14)
-- Task #16: LanguageSwitcher component (blocked by #14)
-- Task #17: Test & deploy (blocked by #15, #16)
+---
+
+## Phase 5.1: Dual Download Flow & Job System (Complete)
+
+**Status:** ✅ Complete | **Completion Date:** 2026-03-16
+
+### Milestones
+- [x] Dual download flow: Direct browser + background mux job
+- [x] Job progress tracking with 7-phase pipeline
+- [x] Real-time SSE progress streaming to frontend
+- [x] Job control plane with durable storage (PostgreSQL + Redis)
+- [x] Standalone worker process for muxing
+- [x] S3 multipart upload support
+
+### Key Deliverables
+- `DownloadBtn.svelte` - Unified download component (direct + mux paths)
+- `AppIcon.svelte` - SVG icon system (60+ Lucide icons + quality badges)
+- `/api/proxy/jobs/[jobId]/events` - SSE endpoint for real-time progress
+- `crates/job-system/` - Durable job repository
+- `crates/worker/` - Standalone mux worker
+- `crates/queue/` - Redis Streams abstraction
+- `crates/object-store/` - Storage abstraction (LocalFs + S3)
+- `crates/muxer/src/init_segment_normalizer.rs` - FMP4 moov patching
+- `/download/mux-job` - Progress tracking page
+
+### Job Phases
+1. Starting → 2. FetchingStreams → 3. MuxingUploading → 4. CompletingUpload → 5. Ready
+
+### Testing Status
+- Dual download flows tested (direct + mux)
+- Job progress SSE confirmed working
+- S3 multipart upload validated
+- Worker lease + heartbeat functioning
 
 ---
 
@@ -320,9 +346,10 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 | Muxer | 1.1.0 | ✅ Released | 2026-02-15 |
 | Omnichannel | 1.2.0 | ✅ Released | 2026-02-24 |
 | Runtime Config | 1.2.1 | ✅ Released | 2026-03-06 |
-| GPU Acceleration | 1.3.0 | 🔄 In Progress | Q2 2026 |
-| i18n Integration | 1.4.0 | 🔄 In Progress | Q1 2026 (March) |
-| Batch & Scheduling | 2.0.0 | 📋 Planned | Q3 2026 |
+| i18n Integration | 1.4.0 | ✅ Released | 2026-03-16 |
+| Mux Job Flow & Job System | 1.5.0 | ✅ Released | 2026-03-16 |
+| GPU Acceleration | 2.0.0 | 🔄 In Progress | Q2 2026 |
+| Batch & Scheduling | 2.1.0 | 📋 Planned | Q3 2026 |
 
 ---
 
@@ -391,5 +418,5 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-**Last Reviewed:** 2026-03-06
-**Next Review Date:** 2026-04-06
+**Last Reviewed:** 2026-03-16
+**Next Review Date:** 2026-04-16

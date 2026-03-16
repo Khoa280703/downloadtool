@@ -1,14 +1,14 @@
 # Project Overview & Product Development Requirements (PDR)
 
-**Version:** 2.4
-**Last Updated:** 2026-03-06
-**Status:** Phase 9.1 Complete ✅ | Phase 10 i18n In Progress 🔄
+**Version:** 2.5
+**Last Updated:** 2026-03-16
+**Status:** Phase 9.1 Complete ✅ | Phase 10 i18n Complete ✅ | Phase 11 Mux Job Flow Complete ✅
 
 ## Executive Summary
 
 A high-performance, self-hosted video downloader platform enabling users to download content from YouTube with anti-bot protection, GPU-accelerated transcoding, and full-speed CDN downloads via YouTube n-parameter transformation.
 
-**Key Achievements (as of 2026-03-06):**
+**Key Achievements (as of 2026-03-16):**
 - Complete end-to-end video download pipeline
 - YouTube extraction via yt-dlp subprocess (auto handles PO Token, signature decryption)
 - YouTube throttle bypass via n-parameter transform
@@ -28,6 +28,9 @@ A high-performance, self-hosted video downloader platform enabling users to down
 - Runtime limits configuration: Centralized JSON config for all backend/frontend limits
 - API access tracing: All requests logged with user context
 - Proxy quarantine: Bad proxies automatically blocked and persisted
+- Internationalization (i18n): 24+ languages via Paraglide JS (COMPLETE)
+- Dual download flow: Direct browser download + background mux job with SSE progress
+- Job progress tracking: Redis pub/sub → SSE → real-time frontend progress
 
 ## Product Vision
 
@@ -385,12 +388,38 @@ Enable creators and power users to reliably download video content at maximum sp
 
 **Impact:** Better observability, easier debugging
 
-### 4. Internationalization (i18n) Transitioned to In Progress 🔄
-**Plan:** `plans/260301-1326-i18n-paraglide-claude-api/`
+### 4. Internationalization (i18n) Complete ✅
+**Status:** All 24+ languages active (2026-03-16)
 
-**Current Phase:** 1-5 active (Paraglide setup, string extraction, Claude translation)
+**Deliverables:**
+- Paraglide JS integrated (frontend/messages/)
+- 24+ language files: ar, bg, cs, da, de, el, en, es, et, fi, fr, hu, id, it, ja, ko, lt, lv, nb, nl, pl, pt, pt-BR, ro, ru, sk, sl, sv, tr, uk, vi, zh, zh-TW
+- 384 translation keys in messages/en.json
+- LanguageSwitcher component implemented
+- URL-based locale prefixes (en = no prefix, others get /vi/, /de/ etc.)
+- hreflang tags + multilingual sitemap.xml (SEO-ready)
 
-**Next Deliverable:** Phase 5 - LanguageSwitcher component
+**Impact:** Accessible to global audience, improved SEO, better user experience
+
+---
+
+### 5. Dual Download Flow & Job System Complete ✅
+**Status:** Full dual-path download pipeline active (2026-03-16)
+
+**Flows:**
+1. **Direct Browser Download:** Video + Audio combined → instant browser download
+2. **Background Mux Job:** Video-only + Audio-only → POST /api/jobs/mux → 7-phase progress → auto-download
+
+**New Components:**
+- `DownloadBtn.svelte`: Unified download component
+- `AppIcon.svelte`: SVG icon system (60+ Lucide icons + quality badges)
+- `/api/proxy/jobs/[jobId]/events`: SSE endpoint for real-time progress
+- `crates/job-system/src/job_progress.rs`: Job progress phases (7 states)
+- `crates/worker/src/job_progress_publisher.rs`: Progress publisher
+
+**Job Phases:** Starting → FetchingStreams → MuxingUploading → CompletingUpload → Ready
+
+**Impact:** Better user experience, real-time feedback, background processing
 
 ---
 
@@ -718,11 +747,20 @@ docker-compose -f docker/docker-compose.server.yml up -d
 
 ## Appendix: Version History
 
+### v2.5 (2026-03-16)
+- Internationalization (i18n) marked COMPLETE — 24+ languages active
+- Dual download flow implemented: direct browser + background mux job
+- Job progress tracking: 7-phase pipeline with SSE real-time updates
+- New DownloadBtn & AppIcon components
+- AppIcon replaced Material Symbols font (SVG-based)
+- Frontend messages system with 384 translation keys
+- hreflang + multilingual sitemap.xml for SEO
+
 ### v2.4 (2026-03-06)
 - Runtime limits configuration now active (config/runtime-limit-profiles.json)
 - Proxy quarantine system stabilized and documented
 - API access tracing enabled for observability
-- i18n status updated: Planned → In Progress
+- i18n status updated: Planned → In Progress (now COMPLETE)
 - Deprecated/removed features documented (cookie extraction, yt-dlp profile fallback, preflight checks)
 
 ### v2.3 (2026-03-01)

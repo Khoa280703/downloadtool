@@ -1,10 +1,10 @@
 # System Architecture
 
-**Last Updated:** 2026-03-06
+**Last Updated:** 2026-03-16
 
 ## High-Level Architecture
 
-### Job Control Plane / Worker Pipeline (2026-03-06)
+### Job Control Plane / Worker Pipeline (2026-03-16 — ENHANCED)
 
 ```
 Browser (SvelteKit)
@@ -19,6 +19,9 @@ Browser (SvelteKit)
    ├─► Poll /api/proxy/jobs/{id}
    │    └─► Postgres-backed status read
    │
+   ├─► SSE GET /api/proxy/jobs/{id}/events
+   │    └─► Real-time 7-phase progress (Starting → FetchingStreams → MuxingUploading → CompletingUpload → Ready)
+   │
    └─► GET /api/proxy/jobs/{id}/file-ticket
         ├─► LocalFs backend: app proxy /api/jobs/{id}/file
         └─► S3/MinIO/R2 backend: pre-signed URL direct to object storage
@@ -26,9 +29,10 @@ Browser (SvelteKit)
 Redis Streams (`mux_jobs`)
    │
    ▼
-Rust Worker (`crates/worker`)
+Rust Worker (`crates/worker`, **NEW 2026-03-16**)
    • Claim lease in Postgres
    • Heartbeat lease while mux/upload runs
+   • Publish job progress via Redis pub/sub (7 phases)
    • Reuse ready artifact by dedupe key when possible
    • Stream muxed bytes into LocalFs or S3 multipart upload
    • Mark artifact/job ready or failed
@@ -565,6 +569,76 @@ enum Platform {
 | **Retry** | Exponential backoff | 200ms delays, max 3 retries |
 | **N-Parameter** | Anti-throttle | Extracted from player.js, cached |
 
+## Recent Changes (2026-03-16 — i18n Complete + Mux Job Flow + SSE Progress)
+
+### 1. **Real-Time Job Progress via SSE** ✅
+**New Endpoint:** `GET /api/proxy/jobs/[jobId]/events`
+
+**Architecture:**
+- Server-Sent Events (SSE) stream for long-lived progress updates
+- Publishes 7-phase progress: Starting → FetchingStreams → MuxingUploading → CompletingUpload → Ready
+- Worker publishes progress via Redis pub/sub
+- API proxies Redis stream to browser SSE
+- Frontend renders progress bar + phase description
+
+**Example Flow:**
+```
+Browser SSE connect → /api/proxy/jobs/{id}/events
+                        ↓
+                    Server listens to Redis pub/sub
+                        ↓
+                    Worker publishes: {"phase": "MuxingUploading", "progress": 45}
+                        ↓
+                    SSE sends to browser (no polling)
+                        ↓
+                    Frontend updates UI in real-time
+```
+
+**Components:**
+- `crates/job-system/src/job_progress.rs` (172 LOC) - JobProgressPhase enum, Redis pub/sub
+- `crates/worker/src/job_progress_publisher.rs` (155 LOC) - Progress publishing
+
+### 2. **Mux Job Frontend Components** ✅
+**New Components:**
+- `DownloadBtn.svelte` - Unified download button supporting both direct + mux paths
+- `AppIcon.svelte` - SVG icon system (60+ Lucide icons) + quality badges (HD, 2K, 4K)
+
+**New Route:**
+- `/download/mux-job` - Dedicated page showing 7-phase progress, auto-redirects to file when complete
+
+### 3. **i18n Frontend System** ✅
+**System:** Paraglide JS with 24+ languages
+
+**Message Keys:**
+- `home_*`, `download_btn_*`, `mux_job_*`, `format_picker_*`, `playlist_progress_*`, `auth_modal_*`, `privacy_*`
+- Total: 384 keys in `messages/en.json`
+
+**Languages:** ar, bg, cs, da, de, el, en, es, et, fi, fr, hu, id, it, ja, ko, lt, lv, nb, nl, pl, pt, pt-BR, ro, ru, sk, sl, sv, tr, uk, vi, zh, zh-TW
+
+**URL Structure:**
+- `/en/` (default, no prefix in URL)
+- `/vi/`, `/de/`, `/fr/`, etc. for other languages
+
+**SEO:**
+- hreflang tags for all language variants
+- Multilingual sitemap.xml
+- Proper canonical URLs
+
+### 4. **Backend Enhancements** ✅
+**New Crates:**
+- `crates/job-system/` - Durable job/artifact repository
+- `crates/worker/` - Standalone mux worker
+- `crates/queue/` - Redis Streams abstraction
+
+**New Modules:**
+- `crates/muxer/src/init_segment_normalizer.rs` (158 LOC) - FMP4 moov patching
+- `crates/object-store/src/s3_multipart_upload.rs` (74 LOC) - S3 multipart support
+
+**Removed:**
+- `crates/proxy/src/proxy_inventory_store.rs` - Moved to admin PostgreSQL DB
+
+---
+
 ## Recent Changes (2026-03-06 — Runtime Config & Proxy Quarantine)
 
 ### 1. Runtime Limits Configuration Activated
@@ -699,4 +773,4 @@ hooks.server.ts runs (check better-auth cookie)
 
 ---
 
-**Version:** 2.3 (Updated with runtime config, proxy quarantine, API tracing, performance metrics)
+**Version:** 2.4 (Updated 2026-03-16 with i18n, mux job flow, SSE progress, job system)

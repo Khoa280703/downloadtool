@@ -1,7 +1,7 @@
 # Codebase Summary
 
-**Generated:** 2026-03-06
-**Total Files:** 110 | **Total Tokens:** ~160,000
+**Generated:** 2026-03-16
+**Total Files:** 404 | **Total Tokens:** ~810,000 (repomix)
 
 ## Project Overview
 
@@ -47,15 +47,16 @@ A high-performance video downloader platform supporting YouTube and other platfo
 
 ### 1. **Frontend** (`/frontend`)
 - **Framework:** SvelteKit with Svelte components
+- **i18n System:** Paraglide JS (24+ languages, 384 keys, `frontend/messages/`)
 - **Key Components:**
   - `UrlInput.svelte` - URL input handling
-  - `BatchInput.svelte` - Batch download processing
-  - `DownloadBtn.svelte` - Download initiation
+  - `DownloadBtn.svelte` - Unified download (direct + mux job, **NEW 2026-03-16**)
+  - `AppIcon.svelte` - SVG icon system (60+ Lucide icons, quality badges, **NEW 2026-03-16**)
+  - `BatchProgress.svelte` - Real-time SSE progress tracking
   - `FormatPicker.svelte` - Stream quality/format selection
-  - `BatchProgress.svelte` - Download progress tracking
   - `CookieConsent.svelte` - Privacy compliance
   - `AdBanner.svelte` & `InterstitialAd.svelte` - Ad integration
-- **Features:** Responsive design, real-time progress, ad monetization
+- **Features:** Responsive design, i18n support, real-time progress, ad monetization
 
 ### 2. **API Layer** (`crates/api`)
 - **Entry Point:** `main.rs` - HTTP server (Tokio-based), PostgreSQL pool setup
@@ -123,18 +124,21 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `stream_fetcher.rs` - Fetch & buffer streams (264 LOC)
   - `mux_router.rs` - Route streams to appropriate muxer (255 LOC)
   - `codec.rs` - Codec identification/classification (189 LOC)
+  - **NEW:** `init_segment_normalizer.rs` (158 LOC, **2026-03-16**) - Patch MP4 moov for FMP4 streaming
 
 ### 6.1 **Job System & Worker Runtime** (`crates/job-system`, `crates/queue`, `crates/object-store`, `crates/worker`)
-- `crates/job-system/`
+- `crates/job-system/` (**NEW 2026-03-16**)
   - Owns durable job/artifact/event repository logic on PostgreSQL
   - Handles request reuse, dedupe lock, worker lease claim/reclaim, artifact ready/fail transitions
-- `crates/queue/`
+- `crates/queue/` (**NEW 2026-03-16**)
   - Redis Streams publisher/consumer abstraction for `mux_jobs`
-- `crates/object-store/`
+- `crates/object-store/` (**NEW 2026-03-16**)
   - Shared storage trait with `LocalFs` and S3-compatible multipart implementations
-- `crates/worker/`
+  - **NEW:** `s3_multipart_upload.rs` for S3/MinIO/R2 support
+- `crates/worker/` (**NEW 2026-03-16**)
   - Standalone mux worker process
-  - Claims jobs, heartbeats leases, uploads artifacts, and deletes expired storage objects
+  - Claims jobs, heartbeats leases, uploads artifacts, deletes expired storage objects
+  - **NEW:** `job_progress_publisher.rs` for 7-phase progress streaming
 
 ### 7. **GPU Worker** (`crates/gpu-worker`)
 - **Purpose:** Standalone process for GPU transcoding
@@ -214,6 +218,61 @@ The platform now reaches users via 4 independent channels:
 - `GET /bm.js`: Serves bookmarklet (compile-time embed via `include_str!`)
 - `GET /userscript`: Serves userscript (compile-time embed via `include_str!`)
 - External clients use `POST /api/extract` plus app-domain launcher `/download/mux-job`, which then drives durable `/api/jobs/*`
+
+## Recent Changes (2026-03-16 — i18n Complete + Mux Job Flow + Job System)
+
+### 1. **Internationalization (i18n) Complete** ✅
+**Files:** `frontend/messages/` (24+ language files)
+
+**Features:**
+- Paraglide JS integration (fully typed i18n system)
+- 384 translation keys in `messages/en.json`
+- 24+ supported languages: ar, bg, cs, da, de, el, en, es, et, fi, fr, hu, id, it, ja, ko, lt, lv, nb, nl, pl, pt, pt-BR, ro, ru, sk, sl, sv, tr, uk, vi, zh, zh-TW
+- URL-based locale prefixes: `/en/` (default, no prefix), `/vi/`, `/de/`, etc.
+- hreflang tags for SEO crawlers
+- Multilingual sitemap.xml
+
+**Impact:** Global reach, better SEO, 30+ language support
+
+### 2. **Dual Download Flow Implemented** ✅
+**Files:** `DownloadBtn.svelte`, `AppIcon.svelte`, `/api/proxy/jobs/[jobId]/events`
+
+**New Components:**
+- `DownloadBtn.svelte` - Unified component supporting both download paths
+- `AppIcon.svelte` - SVG-based icons (60+ Lucide icons + quality badges)
+
+**Two Download Paths:**
+1. **Direct:** Video + Audio combined → instant browser download
+2. **Mux Job:** Video-only + Audio-only → background job → 7-phase progress → auto-download
+
+**Job Phases:**
+- Starting → FetchingStreams → MuxingUploading → CompletingUpload → Ready
+
+**Impact:** Better UX, background processing, real-time progress feedback
+
+### 3. **Job System & Worker Infrastructure** ✅
+**New Crates:**
+- `crates/job-system/` - Durable job/artifact repository (PostgreSQL-backed)
+- `crates/worker/` - Standalone mux worker process
+- `crates/queue/` - Redis Streams pub/sub for job distribution
+
+**New Modules:**
+- `crates/job-system/src/job_progress.rs` (172 LOC) - JobProgressPhase (7 states), Redis pub/sub progress
+- `crates/worker/src/job_progress_publisher.rs` (155 LOC) - Stream job progress updates
+- `crates/muxer/src/init_segment_normalizer.rs` (158 LOC) - FMP4 moov box patching
+- `crates/object-store/src/s3_multipart_upload.rs` (74 LOC) - S3 multipart upload support
+
+**New API Endpoint:**
+- `GET /api/proxy/jobs/[jobId]/events` - SSE stream for real-time job progress
+
+**Impact:** Durable job pipeline, scalable worker architecture, real-time progress tracking
+
+### 4. **Admin DB Proxy Inventory** ✅
+**Removed:** `crates/proxy/src/proxy_inventory_store.rs` (moved to admin PostgreSQL DB)
+
+**Impact:** Persistent proxy inventory management, reduced memory footprint
+
+---
 
 ## Recent Changes (2026-03-06 — Runtime Config & Proxy Quarantine)
 
@@ -486,5 +545,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-03-06
-**Status:** Complete & Operational (Runtime Config ✅ | Frontend Auth Modal ✅ | Performance Optimizations ✅)
+**Last Updated:** 2026-03-16
+**Status:** Complete & Operational (i18n ✅ | Mux Job Flow ✅ | Job System ✅ | Runtime Config ✅ | Frontend Auth Modal ✅)

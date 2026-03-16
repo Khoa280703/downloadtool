@@ -35,6 +35,7 @@ infra/wireguard/private/
 extractors/**/*.js
 extractors/**/*.map
 node_modules/
+.svelte-kit/
 
 # Logs
 *.log
