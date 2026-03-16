@@ -94,6 +94,40 @@ impl ProxyHealthStore {
 
         Ok(())
     }
+
+    /// Immediately put a proxy into cooldown without waiting for MAX_FAILURES.
+    /// Use for hard transport failures (timeout, connection reset) where a single
+    /// failure is enough to know the proxy is dead.
+    pub async fn cooldown_now(
+        &self,
+        proxy_url: &str,
+        reason: &str,
+        ttl_secs: u64,
+    ) -> anyhow::Result<()> {
+        let mut conn = self.connection().await?;
+        let cooldown_key = cooldown_key(proxy_url);
+        let fail_key = fail_count_key(proxy_url);
+        let last_error_key = last_error_key(proxy_url);
+
+        let _: () = conn
+            .set_ex(&cooldown_key, "1", ttl_secs)
+            .await
+            .with_context(|| format!("failed to write redis cooldown key {cooldown_key}"))?;
+        let _: () = conn
+            .set(&fail_key, MAX_FAILURES)
+            .await
+            .with_context(|| format!("failed to write redis fail count key {fail_key}"))?;
+        let _: bool = conn
+            .expire(&fail_key, ttl_secs as i64)
+            .await
+            .with_context(|| format!("failed to expire redis key {fail_key}"))?;
+        let _: () = conn
+            .set_ex(&last_error_key, reason, ttl_secs * 2)
+            .await
+            .with_context(|| format!("failed to write redis key {last_error_key}"))?;
+
+        Ok(())
+    }
 }
 
 fn proxy_key_suffix(proxy_url: &str) -> String {

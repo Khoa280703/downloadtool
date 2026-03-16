@@ -56,12 +56,23 @@ const proxiesQuery = `
 		p.status,
 		p.source,
 		p.notes,
+		p.health_score::int AS "healthScore",
+		p.auto_disabled_at AS "autoDisabledAt",
+		p.auto_disabled_reason AS "autoDisabledReason",
 		p.last_quarantined_at AS "lastQuarantinedAt",
 		p.last_quarantine_reason AS "lastQuarantineReason",
 		p.updated_at AS "updatedAt",
 		COALESCE(meta.event_count_24h, 0)::int AS "eventCount24h",
 		meta.last_event_type AS "lastEventType",
-		meta.last_event_at AS "lastEventAt"
+		meta.last_event_at AS "lastEventAt",
+		COALESCE(metrics.extract_attempts_24h, 0)::int AS "extractAttempts24h",
+		COALESCE(metrics.proxy_relevant_attempts_24h, 0)::int AS "proxyRelevantAttempts24h",
+		COALESCE(metrics.extract_successes_24h, 0)::int AS "extractSuccesses24h",
+		COALESCE(metrics.full_format_hits_24h, 0)::int AS "fullFormatHits24h",
+		COALESCE(metrics.combined_360_only_hits_24h, 0)::int AS "combined360OnlyHits24h",
+		COALESCE(metrics.timeout_hits_24h, 0)::int AS "timeoutHits24h",
+		metrics.p95_extract_latency_ms::double precision AS "p95ExtractLatencyMs",
+		metrics.last_extract_outcome AS "lastExtractOutcome"
 	FROM proxies p
 	LEFT JOIN LATERAL (
 		SELECT
@@ -71,12 +82,43 @@ const proxiesQuery = `
 		FROM proxy_health_events
 		WHERE proxy_id = p.id
 	) meta ON TRUE
+	LEFT JOIN LATERAL (
+		SELECT
+			COUNT(*)::bigint AS extract_attempts_24h,
+			COUNT(*) FILTER (
+				WHERE COALESCE((payload_json->>'success')::boolean, false)
+				   OR COALESCE(payload_json->>'failure_kind', '') <> 'not_proxy_related'
+			)::bigint AS proxy_relevant_attempts_24h,
+			COUNT(*) FILTER (
+				WHERE COALESCE((payload_json->>'success')::boolean, false)
+			)::bigint AS extract_successes_24h,
+			COUNT(*) FILTER (
+				WHERE COALESCE((payload_json->>'full_format_available')::boolean, false)
+			)::bigint AS full_format_hits_24h,
+			COUNT(*) FILTER (
+				WHERE COALESCE((payload_json->>'combined_360_only')::boolean, false)
+			)::bigint AS combined_360_only_hits_24h,
+			COUNT(*) FILTER (
+				WHERE COALESCE(payload_json->>'failure_kind', '') IN ('transport_dead', 'subprocess_timeout')
+			)::bigint AS timeout_hits_24h,
+			percentile_cont(0.95) WITHIN GROUP (
+				ORDER BY (payload_json->>'elapsed_ms')::double precision
+			) FILTER (
+				WHERE payload_json ? 'elapsed_ms'
+			) AS p95_extract_latency_ms,
+			(ARRAY_AGG(payload_json->>'outcome' ORDER BY created_at DESC))[1] AS last_extract_outcome
+		FROM proxy_health_events
+		WHERE proxy_id = p.id
+		  AND event_type = 'extract_result'
+		  AND created_at >= NOW() - INTERVAL '24 hours'
+	) metrics ON TRUE
 	ORDER BY
 		CASE p.status
 			WHEN 'quarantined' THEN 0
-			WHEN 'active' THEN 1
+			WHEN 'disabled' THEN 1
 			ELSE 2
 		END,
+		p.health_score ASC,
 		p.updated_at DESC
 	LIMIT 40
 `;
@@ -131,6 +173,7 @@ export async function loadAdminProxies(): Promise<AdminProxyRow[]> {
 	return proxiesResult.rows.map((row) => ({
 		...row,
 		maskedProxyUrl: maskProxyUrl(row.maskedProxyUrl),
+		autoDisabledAt: normalizeDate(row.autoDisabledAt),
 		lastQuarantinedAt: normalizeDate(row.lastQuarantinedAt),
 		updatedAt: normalizeDate(row.updatedAt) ?? row.updatedAt,
 		lastEventAt: normalizeDate(row.lastEventAt)

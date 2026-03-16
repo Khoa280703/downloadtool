@@ -44,7 +44,8 @@ impl JobRepository {
                 lease_expires_at_ms = NULL,
                 last_error = NULL,
                 updated_at_ms = $3,
-                completed_at = NOW()
+                completed_at = NOW(),
+                delete_after_at = (SELECT expires_at FROM mux_artifacts WHERE id = $2)
             WHERE id = $1
             "#,
         )

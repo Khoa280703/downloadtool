@@ -10,7 +10,7 @@ use crate::proxy_inventory_store::ProxyInventoryStore;
 use crate::proxy_pool::ProxyPool;
 use crate::proxy_quarantine::{load_quarantined_proxies, proxy_quarantine_file_from_env};
 
-const PROXY_SYNC_INTERVAL_SECS: u64 = 15;
+const PROXY_SYNC_INTERVAL_SECS: u64 = 5;
 
 static GLOBAL_PROXY_POOL: OnceLock<Arc<ProxyPool>> = OnceLock::new();
 

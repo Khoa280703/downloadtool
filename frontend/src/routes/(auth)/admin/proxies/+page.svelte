@@ -4,6 +4,14 @@
 	import AdminProxyTable from '$components/admin/AdminProxyTable.svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	const riskyProxies = $derived(data.proxies.filter((proxy) => proxy.healthScore < 55).length);
+	const strongProxies = $derived(data.proxies.filter((proxy) => proxy.healthScore >= 80).length);
+	const avgHealthScore = $derived(
+		data.proxies.length
+			? Math.round(data.proxies.reduce((sum, proxy) => sum + proxy.healthScore, 0) / data.proxies.length)
+			: 0
+	);
 </script>
 
 <svelte:head>
@@ -49,6 +57,7 @@
 				<tr><td class="px-6 py-4 font-semibold text-slate-900">Active</td><td class="px-6 py-4">{data.overview.activeProxies}</td><td class="px-6 py-4 text-slate-500">Có thể phục vụ extract/download.</td></tr>
 				<tr><td class="px-6 py-4 font-semibold text-slate-900">Quarantined</td><td class="px-6 py-4">{data.overview.quarantinedProxies}</td><td class="px-6 py-4 text-slate-500">Tạm loại do gặp issue upstream.</td></tr>
 				<tr><td class="px-6 py-4 font-semibold text-slate-900">Disabled</td><td class="px-6 py-4">{data.overview.disabledProxies}</td><td class="px-6 py-4 text-slate-500">Tắt thủ công, không đưa vào vòng xoay.</td></tr>
+				<tr><td class="px-6 py-4 font-semibold text-slate-900">Avg. health score</td><td class="px-6 py-4">{avgHealthScore}</td><td class="px-6 py-4 text-slate-500">{strongProxies} proxy mạnh, {riskyProxies} proxy rủi ro.</td></tr>
 			</tbody>
 		</table>
 	</div>

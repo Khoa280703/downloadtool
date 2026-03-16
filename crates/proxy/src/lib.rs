@@ -24,6 +24,7 @@ pub use anti_bot::{AntiBotClient, AntiBotError, AntiBotGuard};
 pub use client::ProxyClient;
 pub use header_builder::HeaderBuilder;
 pub use platform::Platform;
+pub use proxy_inventory_store::ProxyExtractEvent;
 pub use proxy_pool::ProxyPool;
 pub use proxy_runtime::{global_proxy_pool, init_global_proxy_pool};
 pub use stream::StreamProxy;

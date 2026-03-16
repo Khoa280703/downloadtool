@@ -87,6 +87,8 @@ export async function updateProxyStatus(input: ProxyMutationInput): Promise<Prox
 			`
 				UPDATE proxies
 				SET status = $2,
+					auto_disabled_at = NULL,
+					auto_disabled_reason = NULL,
 					last_quarantined_at = CASE WHEN $2 = 'quarantined' THEN NOW() ELSE last_quarantined_at END,
 					last_quarantine_reason = CASE WHEN $2 = 'quarantined' THEN $3 ELSE last_quarantine_reason END,
 					updated_at = NOW()

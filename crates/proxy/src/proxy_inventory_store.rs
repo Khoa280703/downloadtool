@@ -2,10 +2,51 @@ use anyhow::Context;
 use serde_json::json;
 use sqlx::{PgPool, Row};
 
+const DEFAULT_PROXY_HEALTH_SCORE: i32 = 100;
+const AUTO_DISABLE_MIN_RELEVANT_ATTEMPTS: i64 = 20;
+const AUTO_DISABLE_MAX_SCORE: i32 = 24;
+const AUTO_DISABLE_MAX_FULL_FORMAT_RATE: f64 = 0.20;
+const AUTO_DISABLE_MIN_DEGRADED_RATE: f64 = 0.60;
+const AUTO_DISABLE_MIN_TIMEOUT_RATE: f64 = 0.45;
+
+#[derive(Clone, Debug)]
+pub struct ProxyExtractEvent {
+    pub outcome: String,
+    pub success: bool,
+    pub elapsed_ms: u64,
+    pub failure_kind: Option<String>,
+    pub usable_format_count: u32,
+    pub combined_stream_count: u32,
+    pub video_only_count: u32,
+    pub audio_only_count: u32,
+    pub combined_360_only: bool,
+    pub full_format_available: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+struct ProxyQualitySnapshot {
+    extract_attempts_24h: i64,
+    proxy_relevant_attempts_24h: i64,
+    extract_successes_24h: i64,
+    full_format_hits_24h: i64,
+    combined_360_only_hits_24h: i64,
+    timeout_hits_24h: i64,
+    rate_limit_hits_24h: i64,
+    bot_check_hits_24h: i64,
+    p95_extract_latency_ms: Option<f64>,
+}
+
+#[derive(Clone, Debug)]
+struct ProxyQualityEvaluation {
+    score: i32,
+    auto_disable_reason: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProxyInventoryRecord {
     pub proxy_url: String,
     pub status: String,
+    pub health_score: i32,
 }
 
 #[derive(Clone)]
@@ -29,7 +70,7 @@ impl ProxyInventoryStore {
     pub async fn list_runtime_records(&self) -> anyhow::Result<Vec<ProxyInventoryRecord>> {
         let rows = sqlx::query(
             r#"
-            SELECT proxy_url, status
+            SELECT proxy_url, status, health_score
             FROM proxies
             WHERE status IN ('active', 'quarantined')
             ORDER BY created_at ASC, proxy_url ASC
@@ -44,6 +85,9 @@ impl ProxyInventoryStore {
             .map(|row| ProxyInventoryRecord {
                 proxy_url: row.get("proxy_url"),
                 status: row.get("status"),
+                health_score: row
+                    .get::<Option<i32>, _>("health_score")
+                    .unwrap_or(DEFAULT_PROXY_HEALTH_SCORE),
             })
             .collect())
     }
@@ -101,5 +145,321 @@ impl ProxyInventoryStore {
         .with_context(|| format!("failed to record quarantine event for {proxy_url}"))?;
 
         Ok(true)
+    }
+
+    pub async fn record_extract_result(
+        &self,
+        proxy_url: &str,
+        event: ProxyExtractEvent,
+    ) -> anyhow::Result<()> {
+        let mut client = self
+            .pool
+            .acquire()
+            .await
+            .context("failed to acquire postgres connection")?;
+        let maybe_proxy = sqlx::query(
+            r#"
+            SELECT id, status
+            FROM proxies
+            WHERE proxy_url = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(proxy_url)
+        .fetch_optional(&mut *client)
+        .await
+        .with_context(|| format!("failed to load proxy row for {proxy_url}"))?;
+
+        let Some(proxy_row) = maybe_proxy else {
+            return Ok(());
+        };
+
+        let proxy_id: String = proxy_row.get("id");
+        let status: String = proxy_row.get("status");
+
+        sqlx::query(
+            r#"
+            INSERT INTO proxy_health_events (proxy_id, event_type, reason, payload_json)
+            VALUES ($1, 'extract_result', $2, $3::jsonb)
+            "#,
+        )
+        .bind(&proxy_id)
+        .bind(&event.outcome)
+        .bind(json!({
+            "outcome": event.outcome,
+            "success": event.success,
+            "elapsed_ms": event.elapsed_ms,
+            "failure_kind": event.failure_kind,
+            "usable_format_count": event.usable_format_count,
+            "combined_stream_count": event.combined_stream_count,
+            "video_only_count": event.video_only_count,
+            "audio_only_count": event.audio_only_count,
+            "combined_360_only": event.combined_360_only,
+            "full_format_available": event.full_format_available,
+        }))
+        .execute(&mut *client)
+        .await
+        .with_context(|| format!("failed to record extract-result event for {proxy_url}"))?;
+
+        let snapshot = self
+            .load_quality_snapshot_with_conn(&mut client, &proxy_id)
+            .await?;
+        let evaluation = evaluate_proxy_quality(&snapshot);
+
+        let auto_disabled = status == "active" && evaluation.auto_disable_reason.is_some();
+        sqlx::query(
+            r#"
+            UPDATE proxies
+            SET health_score = $2,
+                auto_disabled_at = CASE
+                    WHEN $3 THEN NOW()
+                    ELSE auto_disabled_at
+                END,
+                auto_disabled_reason = CASE
+                    WHEN $3 THEN $4
+                    ELSE auto_disabled_reason
+                END,
+                status = CASE
+                    WHEN $3 THEN 'disabled'
+                    ELSE status
+                END,
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+        )
+        .bind(&proxy_id)
+        .bind(evaluation.score)
+        .bind(auto_disabled)
+        .bind(evaluation.auto_disable_reason.as_deref())
+        .execute(&mut *client)
+        .await
+        .with_context(|| format!("failed to refresh proxy quality score for {proxy_url}"))?;
+
+        if auto_disabled {
+            let reason = evaluation
+                .auto_disable_reason
+                .clone()
+                .unwrap_or_else(|| "auto-disabled by proxy quality policy".to_string());
+            sqlx::query(
+                r#"
+                INSERT INTO proxy_health_events (proxy_id, event_type, reason, payload_json)
+                VALUES ($1, 'auto_disabled', $2, $3::jsonb)
+                "#,
+            )
+            .bind(&proxy_id)
+            .bind(&reason)
+            .bind(json!({
+                "reason": reason,
+                "health_score": evaluation.score,
+                "extract_attempts_24h": snapshot.extract_attempts_24h,
+                "proxy_relevant_attempts_24h": snapshot.proxy_relevant_attempts_24h,
+                "extract_successes_24h": snapshot.extract_successes_24h,
+                "full_format_hits_24h": snapshot.full_format_hits_24h,
+                "combined_360_only_hits_24h": snapshot.combined_360_only_hits_24h,
+                "timeout_hits_24h": snapshot.timeout_hits_24h,
+                "rate_limit_hits_24h": snapshot.rate_limit_hits_24h,
+                "bot_check_hits_24h": snapshot.bot_check_hits_24h,
+                "p95_extract_latency_ms": snapshot.p95_extract_latency_ms,
+                "source": "auto-quality-policy"
+            }))
+            .execute(&mut *client)
+            .await
+            .with_context(|| format!("failed to record auto-disabled event for {proxy_url}"))?;
+        }
+
+        Ok(())
+    }
+
+    async fn load_quality_snapshot_with_conn(
+        &self,
+        conn: &mut sqlx::pool::PoolConnection<sqlx::Postgres>,
+        proxy_id: &str,
+    ) -> anyhow::Result<ProxyQualitySnapshot> {
+        let row = sqlx::query(
+            r#"
+            SELECT
+                COUNT(*)::bigint AS extract_attempts_24h,
+                COUNT(*) FILTER (
+                    WHERE COALESCE((payload_json->>'success')::boolean, false)
+                       OR COALESCE(payload_json->>'failure_kind', '') <> 'not_proxy_related'
+                )::bigint AS proxy_relevant_attempts_24h,
+                COUNT(*) FILTER (
+                    WHERE COALESCE((payload_json->>'success')::boolean, false)
+                )::bigint AS extract_successes_24h,
+                COUNT(*) FILTER (
+                    WHERE COALESCE((payload_json->>'full_format_available')::boolean, false)
+                )::bigint AS full_format_hits_24h,
+                COUNT(*) FILTER (
+                    WHERE COALESCE((payload_json->>'combined_360_only')::boolean, false)
+                )::bigint AS combined_360_only_hits_24h,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(payload_json->>'failure_kind', '') IN ('transport_dead', 'subprocess_timeout')
+                )::bigint AS timeout_hits_24h,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(payload_json->>'failure_kind', '') = 'rate_limit'
+                )::bigint AS rate_limit_hits_24h,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(payload_json->>'failure_kind', '') = 'bot_check'
+                )::bigint AS bot_check_hits_24h,
+                percentile_cont(0.95) WITHIN GROUP (
+                    ORDER BY (payload_json->>'elapsed_ms')::double precision
+                ) FILTER (
+                    WHERE payload_json ? 'elapsed_ms'
+                ) AS p95_extract_latency_ms
+            FROM proxy_health_events
+            WHERE proxy_id = $1
+              AND event_type = 'extract_result'
+              AND created_at >= NOW() - INTERVAL '24 hours'
+            "#,
+        )
+        .bind(proxy_id)
+        .fetch_one(conn.as_mut())
+        .await
+        .with_context(|| format!("failed to load proxy-quality snapshot for proxy {proxy_id}"))?;
+
+        Ok(ProxyQualitySnapshot {
+            extract_attempts_24h: row.get::<i64, _>("extract_attempts_24h"),
+            proxy_relevant_attempts_24h: row.get::<i64, _>("proxy_relevant_attempts_24h"),
+            extract_successes_24h: row.get::<i64, _>("extract_successes_24h"),
+            full_format_hits_24h: row.get::<i64, _>("full_format_hits_24h"),
+            combined_360_only_hits_24h: row.get::<i64, _>("combined_360_only_hits_24h"),
+            timeout_hits_24h: row.get::<i64, _>("timeout_hits_24h"),
+            rate_limit_hits_24h: row.get::<i64, _>("rate_limit_hits_24h"),
+            bot_check_hits_24h: row.get::<i64, _>("bot_check_hits_24h"),
+            p95_extract_latency_ms: row.get::<Option<f64>, _>("p95_extract_latency_ms"),
+        })
+    }
+}
+
+fn evaluate_proxy_quality(snapshot: &ProxyQualitySnapshot) -> ProxyQualityEvaluation {
+    let relevant_attempts = snapshot.proxy_relevant_attempts_24h.max(0) as f64;
+    if relevant_attempts <= 0.0 {
+        return ProxyQualityEvaluation {
+            score: DEFAULT_PROXY_HEALTH_SCORE,
+            auto_disable_reason: None,
+        };
+    }
+
+    let success_rate = snapshot.extract_successes_24h as f64 / relevant_attempts;
+    let full_format_rate = snapshot.full_format_hits_24h as f64 / relevant_attempts;
+    let degraded_rate = snapshot.combined_360_only_hits_24h as f64 / relevant_attempts;
+    let timeout_rate = snapshot.timeout_hits_24h as f64 / relevant_attempts;
+    let rate_limit_rate = snapshot.rate_limit_hits_24h as f64 / relevant_attempts;
+    let bot_check_rate = snapshot.bot_check_hits_24h as f64 / relevant_attempts;
+
+    let mut score = 100.0;
+    score -= (1.0 - success_rate) * 30.0;
+    score -= (1.0 - full_format_rate) * 18.0;
+    score -= degraded_rate * 40.0;
+    score -= timeout_rate * 32.0;
+    score -= rate_limit_rate * 14.0;
+    score -= bot_check_rate * 36.0;
+
+    if let Some(p95_latency_ms) = snapshot.p95_extract_latency_ms {
+        score -= if p95_latency_ms >= 6500.0 {
+            18.0
+        } else if p95_latency_ms >= 5000.0 {
+            12.0
+        } else if p95_latency_ms >= 3500.0 {
+            6.0
+        } else {
+            0.0
+        };
+    }
+
+    let clamped_score = score.round().clamp(0.0, 100.0) as i32;
+    let should_auto_disable = snapshot.proxy_relevant_attempts_24h
+        >= AUTO_DISABLE_MIN_RELEVANT_ATTEMPTS
+        && (clamped_score <= AUTO_DISABLE_MAX_SCORE
+            || timeout_rate >= AUTO_DISABLE_MIN_TIMEOUT_RATE
+            || (degraded_rate >= AUTO_DISABLE_MIN_DEGRADED_RATE
+                && full_format_rate <= AUTO_DISABLE_MAX_FULL_FORMAT_RATE));
+
+    let auto_disable_reason = should_auto_disable.then(|| {
+        if timeout_rate >= AUTO_DISABLE_MIN_TIMEOUT_RATE {
+            format!(
+                "Auto-disabled: timeout rate {:.0}% over {} relevant extract attempts / 24h",
+                timeout_rate * 100.0,
+                snapshot.proxy_relevant_attempts_24h
+            )
+        } else if degraded_rate >= AUTO_DISABLE_MIN_DEGRADED_RATE
+            && full_format_rate <= AUTO_DISABLE_MAX_FULL_FORMAT_RATE
+        {
+            format!(
+                "Auto-disabled: 360-only rate {:.0}% and full-format rate {:.0}% over {} relevant extract attempts / 24h",
+                degraded_rate * 100.0,
+                full_format_rate * 100.0,
+                snapshot.proxy_relevant_attempts_24h
+            )
+        } else {
+            format!(
+                "Auto-disabled: health score {} after {} relevant extract attempts / 24h",
+                clamped_score,
+                snapshot.proxy_relevant_attempts_24h
+            )
+        }
+    });
+
+    ProxyQualityEvaluation {
+        score: clamped_score,
+        auto_disable_reason,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proxy_quality_keeps_neutral_score_without_relevant_samples() {
+        let evaluation = evaluate_proxy_quality(&ProxyQualitySnapshot::default());
+        assert_eq!(evaluation.score, DEFAULT_PROXY_HEALTH_SCORE);
+        assert!(evaluation.auto_disable_reason.is_none());
+    }
+
+    #[test]
+    fn proxy_quality_penalizes_timeout_heavy_proxy() {
+        let evaluation = evaluate_proxy_quality(&ProxyQualitySnapshot {
+            extract_attempts_24h: 24,
+            proxy_relevant_attempts_24h: 24,
+            extract_successes_24h: 8,
+            full_format_hits_24h: 6,
+            combined_360_only_hits_24h: 3,
+            timeout_hits_24h: 12,
+            rate_limit_hits_24h: 2,
+            bot_check_hits_24h: 0,
+            p95_extract_latency_ms: Some(7100.0),
+        });
+
+        assert!(evaluation.score <= 40);
+        assert!(evaluation.auto_disable_reason.is_some());
+        assert!(evaluation
+            .auto_disable_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("timeout rate"));
+    }
+
+    #[test]
+    fn proxy_quality_penalizes_360_only_proxy() {
+        let evaluation = evaluate_proxy_quality(&ProxyQualitySnapshot {
+            extract_attempts_24h: 30,
+            proxy_relevant_attempts_24h: 30,
+            extract_successes_24h: 25,
+            full_format_hits_24h: 4,
+            combined_360_only_hits_24h: 20,
+            timeout_hits_24h: 1,
+            rate_limit_hits_24h: 0,
+            bot_check_hits_24h: 0,
+            p95_extract_latency_ms: Some(2200.0),
+        });
+
+        assert!(evaluation.score < 55);
+        assert!(evaluation.auto_disable_reason.is_some());
+        assert!(evaluation
+            .auto_disable_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("360-only rate"));
     }
 }

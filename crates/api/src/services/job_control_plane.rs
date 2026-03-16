@@ -62,6 +62,9 @@ impl JobControlPlaneService {
         request: MuxJobRequest,
     ) -> anyhow::Result<JobCreationResult> {
         let identity = derive_job_identity(owner, &request);
+
+        // 1. First: check if this owner already has a reusable job (same owner + request_hash).
+        //    This preserves the original semantics: same user clicking again reuses their existing job.
         let created = self
             .durable_repository
             .create_or_reuse_job(
@@ -74,7 +77,53 @@ impl JobControlPlaneService {
             )
             .await?;
 
+        if created.reused_existing {
+            return Ok(JobCreationResult {
+                job_id: created.job.id,
+                status: created.job.status,
+                reused_existing: true,
+            });
+        }
+
+        // 2. New job was created (status=queued). Before publishing to queue,
+        //    check if a ready artifact already exists by global dedupe_key.
+        //    If so, attach it immediately and skip the queue.
         if created.job.status == JobStatus::Queued {
+            if let Some(artifact) = self
+                .durable_repository
+                .find_ready_artifact_by_dedupe_key(&identity.dedupe_key)
+                .await?
+            {
+                self.durable_repository
+                    .attach_ready_artifact(&created.job.id, &artifact.id)
+                    .await?;
+                self.durable_repository
+                    .record_event(
+                        &created.job.id,
+                        "artifact_reused_at_create",
+                        serde_json::json!({
+                            "artifact_id": artifact.id,
+                            "dedupe_key": identity.dedupe_key,
+                            "reason": "dedupe_key_artifact_hit"
+                        }),
+                    )
+                    .await?;
+
+                tracing::info!(
+                    job_id = created.job.id,
+                    artifact_id = artifact.id,
+                    dedupe_key = identity.dedupe_key,
+                    "Artifact reused at create — skipped queue"
+                );
+
+                return Ok(JobCreationResult {
+                    job_id: created.job.id,
+                    status: JobStatus::Ready,
+                    reused_existing: true,
+                });
+            }
+
+            // 3. No artifact cache hit — publish to queue for worker processing.
             self.publish_job(&created.job.id, &created.job.dedupe_key)
                 .await?;
         }

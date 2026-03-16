@@ -6,12 +6,12 @@
 use crate::runtime_limit_profiles::extractor_limit_profile;
 use crate::types::{ExtractionError, VideoFormat, VideoInfo};
 use moka::future::Cache;
-use proxy::ProxyPool;
+use proxy::{ProxyExtractEvent, ProxyPool};
 use serde_json::Value;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::sync::Semaphore;
 use tracing::{debug, info, warn};
@@ -69,13 +69,25 @@ fn resolve_ytdlp_binary() -> String {
 }
 
 fn get_proxy_pool() -> Option<&'static Arc<ProxyPool>> {
-    YTDLP_PROXY_POOL.get_or_init(proxy::proxy_runtime::global_proxy_pool).as_ref()
+    YTDLP_PROXY_POOL
+        .get_or_init(proxy::proxy_runtime::global_proxy_pool)
+        .as_ref()
 }
 
 #[derive(Debug, Clone)]
 struct SelectedProxy {
     url: String,
     from_pool: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ExtractCatalogStats {
+    usable_format_count: u32,
+    combined_stream_count: u32,
+    video_only_count: u32,
+    audio_only_count: u32,
+    combined_360_only: bool,
+    full_format_available: bool,
 }
 
 fn select_proxy() -> Option<SelectedProxy> {
@@ -95,21 +107,64 @@ fn require_proxy() -> Result<SelectedProxy, ExtractionError> {
     })
 }
 
-fn should_mark_proxy_failed(stderr: &str) -> bool {
-    let normalized = stderr.to_ascii_lowercase();
-    normalized.contains("sign in to confirm")
-        || normalized.contains("not a bot")
-        || normalized.contains("429")
-        || normalized.contains("too many requests")
-        || normalized.contains("403")
-        || normalized.contains("timed out")
-        || normalized.contains("connection reset")
-        || normalized.contains("unable to download")
+/// How a proxy failure should be handled.
+#[derive(Debug, Clone, Copy)]
+enum ProxyFailureKind {
+    /// Hard transport failure: timeout, connection reset, DNS failure.
+    /// Proxy should be cooled down immediately (1 fail = cooldown).
+    TransportDead,
+    /// Bot check detected: "sign in to confirm", "not a bot".
+    /// Proxy should be quarantined permanently.
+    BotCheck,
+    /// Rate limit or soft block: 429, 403, too many requests.
+    /// Use normal mark_failed() (needs MAX_FAILURES to cooldown).
+    RateLimit,
+    /// Error not related to proxy health: video private/deleted/geo-blocked,
+    /// parse errors, upstream errors. Proxy should NOT be penalized.
+    NotProxyRelated,
 }
 
-fn should_quarantine_proxy(stderr: &str) -> bool {
+impl ProxyFailureKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::TransportDead => "transport_dead",
+            Self::BotCheck => "bot_check",
+            Self::RateLimit => "rate_limit",
+            Self::NotProxyRelated => "not_proxy_related",
+        }
+    }
+}
+
+fn classify_failure_kind(stderr: &str) -> ProxyFailureKind {
     let normalized = stderr.to_ascii_lowercase();
-    normalized.contains("sign in to confirm") || normalized.contains("not a bot")
+
+    // Bot check / sign-in wall — quarantine proxy
+    if normalized.contains("sign in to confirm") || normalized.contains("not a bot") {
+        return ProxyFailureKind::BotCheck;
+    }
+
+    // Hard transport failures — cooldown proxy immediately
+    if normalized.contains("timed out")
+        || normalized.contains("connection reset")
+        || normalized.contains("connection refused")
+        || normalized.contains("network is unreachable")
+        || normalized.contains("name or service not known")
+        || normalized.contains("no route to host")
+    {
+        return ProxyFailureKind::TransportDead;
+    }
+
+    // Rate limit / soft block — mark_failed (needs MAX_FAILURES)
+    if normalized.contains("429")
+        || normalized.contains("too many requests")
+        || normalized.contains("403")
+    {
+        return ProxyFailureKind::RateLimit;
+    }
+
+    // Everything else: video private, deleted, geo-blocked, parse error, etc.
+    // Do NOT penalize proxy for these.
+    ProxyFailureKind::NotProxyRelated
 }
 
 /// Resolve pinned proxy URL for a previously extracted stream URL.
@@ -253,6 +308,86 @@ fn is_single_combined_360p_fallback(video_info: &VideoInfo) -> bool {
         && format.height == Some(360)
 }
 
+fn summarize_catalog_stats(video_info: &VideoInfo) -> ExtractCatalogStats {
+    let mut combined_stream_count = 0u32;
+    let mut video_only_count = 0u32;
+    let mut audio_only_count = 0u32;
+    let mut has_hd_combined = false;
+
+    for format in &video_info.formats {
+        if format.is_audio_only {
+            audio_only_count += 1;
+            continue;
+        }
+
+        if format.has_audio {
+            combined_stream_count += 1;
+            if format.height.unwrap_or_default() > 360 {
+                has_hd_combined = true;
+            }
+            continue;
+        }
+
+        video_only_count += 1;
+    }
+
+    let combined_360_only = is_single_combined_360p_fallback(video_info);
+    let full_format_available =
+        !combined_360_only && ((video_only_count > 0 && audio_only_count > 0) || has_hd_combined);
+
+    ExtractCatalogStats {
+        usable_format_count: video_info.formats.len() as u32,
+        combined_stream_count,
+        video_only_count,
+        audio_only_count,
+        combined_360_only,
+        full_format_available,
+    }
+}
+
+fn build_success_extract_event(video_info: &VideoInfo, elapsed_ms: u64) -> ProxyExtractEvent {
+    let stats = summarize_catalog_stats(video_info);
+    let outcome = if stats.combined_360_only {
+        "success_360_only"
+    } else if stats.full_format_available {
+        "success_full_format"
+    } else {
+        "success_limited_catalog"
+    };
+
+    ProxyExtractEvent {
+        outcome: outcome.to_string(),
+        success: true,
+        elapsed_ms,
+        failure_kind: None,
+        usable_format_count: stats.usable_format_count,
+        combined_stream_count: stats.combined_stream_count,
+        video_only_count: stats.video_only_count,
+        audio_only_count: stats.audio_only_count,
+        combined_360_only: stats.combined_360_only,
+        full_format_available: stats.full_format_available,
+    }
+}
+
+fn build_failed_extract_event(failure_kind: &str, elapsed_ms: u64) -> ProxyExtractEvent {
+    ProxyExtractEvent {
+        outcome: format!("failure_{failure_kind}"),
+        success: false,
+        elapsed_ms,
+        failure_kind: Some(failure_kind.to_string()),
+        usable_format_count: 0,
+        combined_stream_count: 0,
+        video_only_count: 0,
+        audio_only_count: 0,
+        combined_360_only: false,
+        full_format_available: false,
+    }
+}
+
+/// Timeout for the entire yt-dlp subprocess per attempt.
+/// Must be greater than --socket-timeout to cover DNS, proxy handshake, etc.
+const SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(8);
+
 async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionError> {
     let _permit = get_semaphore().acquire().await.map_err(|error| {
         ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
@@ -269,48 +404,178 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
 
     for attempt in 0..max_attempts {
         let selected_proxy = require_proxy()?;
+        let attempt_started_at = Instant::now();
         debug!(
-            "yt-dlp attempt {}/{} for {} using {}",
-            attempt + 1,
-            max_attempts,
-            url,
-            selected_proxy.url
+            url = %url,
+            attempt = attempt + 1,
+            max_attempts = max_attempts,
+            proxy = %selected_proxy.url,
+            "yt-dlp attempt starting"
         );
 
-        let output = run_ytdlp_command(&url, &selected_proxy).await?;
+        let mut child = match spawn_ytdlp_command(&url, &selected_proxy) {
+            Ok(child) => child,
+            Err(error) => {
+                let elapsed_ms = attempt_started_at.elapsed().as_millis() as u64;
+                warn!(
+                    url = %url,
+                    attempt = attempt + 1,
+                    max_attempts = max_attempts,
+                    proxy = %selected_proxy.url,
+                    elapsed_ms = elapsed_ms,
+                    failure_kind = "launch_failed",
+                    "yt-dlp subprocess launch failed"
+                );
+                return Err(error);
+            }
+        };
+
+        // Take pipe handles before timeout. Read them concurrently with wait()
+        // using try_join! to avoid pipe buffer deadlock when yt-dlp outputs > 64KB.
+        let mut stdout_pipe = child.stdout.take();
+        let mut stderr_pipe = child.stderr.take();
+
+        let wait_result = tokio::time::timeout(SUBPROCESS_TIMEOUT, async {
+            tokio::try_join!(
+                child.wait(),
+                async {
+                    let data = drain_stdout(&mut stdout_pipe).await;
+                    Ok::<_, std::io::Error>(data)
+                },
+                async {
+                    let data = drain_stderr(&mut stderr_pipe).await;
+                    Ok::<_, std::io::Error>(data)
+                },
+            )
+        })
+        .await;
+
+        let output = match wait_result {
+            Ok(Ok((status, stdout, stderr))) => YtdlpAttemptOutput {
+                stdout,
+                stderr,
+                status,
+            },
+            Ok(Err(error)) => {
+                let elapsed_ms = attempt_started_at.elapsed().as_millis() as u64;
+                warn!(
+                    url = %url,
+                    attempt = attempt + 1,
+                    max_attempts = max_attempts,
+                    proxy = %selected_proxy.url,
+                    elapsed_ms = elapsed_ms,
+                    failure_kind = "io_error",
+                    "yt-dlp subprocess I/O error: {error}"
+                );
+                return Err(ExtractionError::ScriptExecutionFailed(format!(
+                    "yt-dlp I/O error: {error}"
+                )));
+            }
+            Err(_timeout) => {
+                // Timeout: kill child process. Pipes were taken out, so dropping
+                // the async block closed our read ends; the process may already
+                // have received SIGPIPE. kill() ensures it's fully reaped.
+                let _ = child.kill().await;
+                let elapsed_ms = attempt_started_at.elapsed().as_millis() as u64;
+                warn!(
+                    url = %url,
+                    attempt = attempt + 1,
+                    max_attempts = max_attempts,
+                    proxy = %selected_proxy.url,
+                    elapsed_ms = elapsed_ms,
+                    failure_kind = "subprocess_timeout",
+                    timeout_secs = SUBPROCESS_TIMEOUT.as_secs(),
+                    "yt-dlp subprocess timed out, child process killed"
+                );
+                if selected_proxy.from_pool {
+                    if let Some(pool) = get_proxy_pool() {
+                        pool.cooldown_now(&selected_proxy.url, "yt-dlp-subprocess-timeout");
+                        pool.record_extract_result(
+                            &selected_proxy.url,
+                            build_failed_extract_event("subprocess_timeout", elapsed_ms),
+                        );
+                    }
+                }
+                last_error = Some(format!(
+                    "yt-dlp subprocess timed out after {}s",
+                    SUBPROCESS_TIMEOUT.as_secs()
+                ));
+                continue;
+            }
+        };
+
+        let elapsed_ms = attempt_started_at.elapsed().as_millis() as u64;
+
         if output.status.success() {
+            let info = parse_ytdlp_success(&output.stdout, &url)?;
             if selected_proxy.from_pool {
                 if let Some(pool) = get_proxy_pool() {
                     pool.mark_success(&selected_proxy.url);
+                    pool.record_extract_result(
+                        &selected_proxy.url,
+                        build_success_extract_event(&info, elapsed_ms),
+                    );
                 }
             }
 
-            let info = parse_ytdlp_success(&output.stdout, &url)?;
+            let catalog_stats = summarize_catalog_stats(&info);
+            info!(
+                url = %url,
+                attempt = attempt + 1,
+                proxy = %selected_proxy.url,
+                elapsed_ms = elapsed_ms,
+                failure_kind = "success",
+                format_count = info.formats.len(),
+                combined_stream_count = catalog_stats.combined_stream_count,
+                video_only_count = catalog_stats.video_only_count,
+                audio_only_count = catalog_stats.audio_only_count,
+                combined_360_only = catalog_stats.combined_360_only,
+                full_format_available = catalog_stats.full_format_available,
+                "yt-dlp extract succeeded"
+            );
             remember_stream_proxy(&info.formats, &selected_proxy.url).await;
             return Ok(Arc::new(info));
         }
 
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let failure_kind = classify_failure_kind(&stderr);
+        let stderr_snippet: String = stderr.chars().take(200).collect();
+
+        warn!(
+            url = %url,
+            attempt = attempt + 1,
+            max_attempts = max_attempts,
+            proxy = %selected_proxy.url,
+            elapsed_ms = elapsed_ms,
+            failure_kind = failure_kind.as_str(),
+            stderr_snippet = %stderr_snippet,
+            "yt-dlp attempt failed"
+        );
+
         if selected_proxy.from_pool {
-            if should_mark_proxy_failed(&stderr) {
-                if let Some(pool) = get_proxy_pool() {
-                    if should_quarantine_proxy(&stderr) {
+            if let Some(pool) = get_proxy_pool() {
+                pool.record_extract_result(
+                    &selected_proxy.url,
+                    build_failed_extract_event(failure_kind.as_str(), elapsed_ms),
+                );
+                match failure_kind {
+                    ProxyFailureKind::BotCheck => {
                         pool.quarantine(&selected_proxy.url, "yt-dlp-bot-check");
-                    } else {
+                    }
+                    ProxyFailureKind::TransportDead => {
+                        pool.cooldown_now(&selected_proxy.url, "yt-dlp-transport-dead");
+                    }
+                    ProxyFailureKind::RateLimit => {
                         pool.mark_failed(&selected_proxy.url);
+                    }
+                    ProxyFailureKind::NotProxyRelated => {
+                        // Do not penalize proxy for non-proxy errors
                     }
                 }
             }
         }
 
-        last_error = Some(stderr.clone());
-        warn!(
-            "yt-dlp failed for {} (attempt {}/{}): {}",
-            url,
-            attempt + 1,
-            max_attempts,
-            stderr
-        );
+        last_error = Some(stderr);
     }
 
     let final_error = last_error.unwrap_or_else(|| "unknown yt-dlp error".to_string());
@@ -326,25 +591,39 @@ struct YtdlpAttemptOutput {
     status: std::process::ExitStatus,
 }
 
-async fn run_ytdlp_command(
+/// Drain remaining data from a taken stdout pipe handle.
+/// Safe to call after the child process has exited (pipe write end is closed).
+async fn drain_stdout(pipe: &mut Option<tokio::process::ChildStdout>) -> Vec<u8> {
+    use tokio::io::AsyncReadExt;
+    let mut buf = Vec::new();
+    if let Some(ref mut pipe) = pipe {
+        let _ = pipe.read_to_end(&mut buf).await;
+    }
+    buf
+}
+
+/// Drain remaining data from a taken stderr pipe handle.
+async fn drain_stderr(pipe: &mut Option<tokio::process::ChildStderr>) -> Vec<u8> {
+    use tokio::io::AsyncReadExt;
+    let mut buf = Vec::new();
+    if let Some(ref mut pipe) = pipe {
+        let _ = pipe.read_to_end(&mut buf).await;
+    }
+    buf
+}
+
+fn spawn_ytdlp_command(
     url: &str,
     proxy: &SelectedProxy,
-) -> Result<YtdlpAttemptOutput, ExtractionError> {
+) -> Result<tokio::process::Child, ExtractionError> {
     let mut command = build_command(url, proxy);
-    let output = command
+    command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .output()
-        .await
+        .spawn()
         .map_err(|error| {
             ExtractionError::ScriptExecutionFailed(format!("yt-dlp launch failed: {error}"))
-        })?;
-
-    Ok(YtdlpAttemptOutput {
-        stdout: output.stdout,
-        stderr: output.stderr,
-        status: output.status,
-    })
+        })
 }
 
 fn parse_ytdlp_success(stdout: &[u8], url: &str) -> Result<VideoInfo, ExtractionError> {
@@ -369,7 +648,7 @@ fn build_command(url: &str, proxy: &SelectedProxy) -> Command {
         "--no-playlist", // Single video only (ignore playlist)
         "--no-warnings", // Suppress non-fatal warnings
         "--socket-timeout",
-        "15",
+        "5",
         "--no-check-certificates",
     ]);
 

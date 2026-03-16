@@ -26,15 +26,17 @@ struct ProxyEntry {
     url: String,
     quarantined: AtomicBool,
     failed_count: AtomicUsize,
+    health_score: AtomicUsize,
     last_failed: RwLock<Option<Instant>>,
 }
 
 impl ProxyEntry {
-    fn new(url: String, quarantined: bool) -> Self {
+    fn new(url: String, quarantined: bool, health_score: i32) -> Self {
         Self {
             url,
             quarantined: AtomicBool::new(quarantined),
             failed_count: AtomicUsize::new(0),
+            health_score: AtomicUsize::new(health_score.clamp(0, 100) as usize),
             last_failed: RwLock::new(None),
         }
     }
@@ -115,6 +117,19 @@ impl ProxyEntry {
         }
     }
 
+    fn set_health_score(&self, health_score: i32) {
+        self.health_score
+            .store(health_score.clamp(0, 100) as usize, Ordering::Relaxed);
+    }
+
+    fn health_score(&self) -> usize {
+        self.health_score.load(Ordering::Relaxed)
+    }
+
+    fn selection_weight(&self) -> usize {
+        self.health_score().max(1)
+    }
+
     fn apply_runtime_health(&self, health: &ProxyRuntimeHealth) {
         if self.is_quarantined() {
             return;
@@ -150,9 +165,16 @@ impl ProxyPool {
             .map(|proxy_url| ProxyInventoryRecord {
                 proxy_url,
                 status: "active".to_string(),
+                health_score: 100,
             })
             .collect();
         Self::new_with_runtime(records, None, None, None)
+    }
+
+    /// Create a proxy pool from a raw multi-format proxy string.
+    /// Accepts comma/newline-separated entries in either full URL or `host:port:user:pass` format.
+    pub fn from_raw_list(raw: &str) -> Self {
+        Self::new(parse_proxy_tokens(raw))
     }
 
     pub fn new_with_runtime(
@@ -178,22 +200,13 @@ impl ProxyPool {
             return None;
         }
 
-        let proxy_count = guard.len();
-        for i in 0..proxy_count {
-            let idx = (start_idx + i) % proxy_count;
-            let entry = &guard[idx];
-            if entry.is_healthy() {
-                return Some(entry.url.clone());
-            }
+        if let Some(proxy) = weighted_pick(&guard, start_idx, |entry| entry.is_healthy()) {
+            return Some(proxy);
         }
 
-        for i in 0..proxy_count {
-            let idx = (start_idx + i) % proxy_count;
-            let entry = &guard[idx];
-            if !entry.is_quarantined() {
-                warn!("No healthy proxies available, falling back to non-quarantined proxy");
-                return Some(entry.url.clone());
-            }
+        if let Some(proxy) = weighted_pick(&guard, start_idx, |entry| !entry.is_quarantined()) {
+            warn!("No healthy proxies available, falling back to non-quarantined proxy");
+            return Some(proxy);
         }
 
         warn!("No usable proxies available (all proxies quarantined)");
@@ -246,6 +259,48 @@ impl ProxyPool {
                 );
             }
         }
+    }
+
+    /// Immediately cooldown a proxy without waiting for MAX_FAILURES.
+    /// Used for hard transport failures (timeout, connection reset) where
+    /// a single failure is enough to know the proxy is currently dead.
+    pub fn cooldown_now(&self, proxy_url: &str, reason: &str) {
+        if let Some(entry) = self.find_entry(proxy_url) {
+            entry.failed_count.store(MAX_FAILURES, Ordering::Relaxed);
+            if let Ok(mut last_failed) = entry.last_failed.write() {
+                *last_failed = Some(Instant::now());
+            }
+            warn!(
+                "Proxy {} immediately cooled down. reason={}",
+                proxy_url, reason
+            );
+        }
+        if let Some(health_store) = self.health_store.clone() {
+            let proxy_url = proxy_url.to_string();
+            let reason = reason.to_string();
+            tokio::spawn(async move {
+                if let Err(error) = health_store
+                    .cooldown_now(&proxy_url, &reason, FAILURE_COOLDOWN.as_secs())
+                    .await
+                {
+                    warn!(err = %error, "Failed to persist proxy immediate cooldown to redis");
+                }
+            });
+        }
+    }
+
+    pub fn record_extract_result(&self, proxy_url: &str, event: crate::ProxyExtractEvent) {
+        let Some(inventory_pool) = self.inventory_pool.clone() else {
+            return;
+        };
+
+        let proxy_url = proxy_url.to_string();
+        tokio::spawn(async move {
+            let store = ProxyInventoryStore::new(inventory_pool);
+            if let Err(error) = store.record_extract_result(&proxy_url, event).await {
+                warn!(err = %error, proxy = %proxy_url, "Failed to persist proxy extract-result event");
+            }
+        });
     }
 
     pub async fn refresh_from_runtime(&self) -> anyhow::Result<()> {
@@ -359,15 +414,54 @@ fn build_entries(
                     }
                     _ => {}
                 }
+                existing.set_health_score(record.health_score);
                 return Arc::clone(existing);
             }
 
             Arc::new(ProxyEntry::new(
                 record.proxy_url.clone(),
                 record.status == "quarantined",
+                record.health_score,
             ))
         })
         .collect()
+}
+
+fn weighted_pick(
+    entries: &[Arc<ProxyEntry>],
+    start_idx: usize,
+    predicate: impl Fn(&ProxyEntry) -> bool,
+) -> Option<String> {
+    let rotated_entries = entries
+        .iter()
+        .cycle()
+        .skip(start_idx % entries.len())
+        .take(entries.len());
+
+    let mut weighted_entries = Vec::with_capacity(entries.len());
+    let mut total_weight = 0usize;
+
+    for entry in rotated_entries {
+        if predicate(entry) {
+            let weight = entry.selection_weight();
+            total_weight += weight;
+            weighted_entries.push((entry, weight));
+        }
+    }
+
+    if total_weight == 0 {
+        return None;
+    }
+
+    let mut ticket = start_idx % total_weight;
+    for (entry, weight) in weighted_entries {
+        if ticket < weight {
+            return Some(entry.url.clone());
+        }
+        ticket -= weight;
+    }
+
+    None
 }
 
 fn persist_quarantine_blocking(inventory_pool: PgPool, proxy_url: String, reason: String) {
@@ -500,6 +594,7 @@ mod tests {
             vec![ProxyInventoryRecord {
                 proxy_url: "http://proxy1:8080".to_string(),
                 status: "active".to_string(),
+                health_score: 100,
             }],
             Some(path.clone()),
             None,
@@ -520,6 +615,7 @@ mod tests {
             vec![ProxyInventoryRecord {
                 proxy_url: "http://proxy1:8080".to_string(),
                 status: "quarantined".to_string(),
+                health_score: 100,
             }],
             None,
         );
@@ -530,6 +626,7 @@ mod tests {
             vec![ProxyInventoryRecord {
                 proxy_url: "http://proxy1:8080".to_string(),
                 status: "active".to_string(),
+                health_score: 100,
             }],
             Some(&previous),
         );
@@ -542,10 +639,45 @@ mod tests {
             vec![ProxyInventoryRecord {
                 proxy_url: "http://proxy1:8080".to_string(),
                 status: "disabled".to_string(),
+                health_score: 100,
             }],
             None,
         );
         assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn test_weighted_selection_prefers_higher_score() {
+        let pool = ProxyPool::new_with_runtime(
+            vec![
+                ProxyInventoryRecord {
+                    proxy_url: "http://proxy-high:8080".to_string(),
+                    status: "active".to_string(),
+                    health_score: 95,
+                },
+                ProxyInventoryRecord {
+                    proxy_url: "http://proxy-low:8080".to_string(),
+                    status: "active".to_string(),
+                    health_score: 5,
+                },
+            ],
+            None,
+            None,
+            None,
+        );
+
+        let mut high_hits = 0usize;
+        let mut low_hits = 0usize;
+        for _ in 0..100 {
+            match pool.next().as_deref() {
+                Some("http://proxy-high:8080") => high_hits += 1,
+                Some("http://proxy-low:8080") => low_hits += 1,
+                other => panic!("unexpected proxy selection: {:?}", other),
+            }
+        }
+
+        assert!(high_hits > low_hits);
+        assert!(high_hits >= 90);
     }
 
     #[test]

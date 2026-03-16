@@ -163,12 +163,21 @@ impl JobRepository {
         job_id: &str,
         owner: &JobOwner,
     ) -> anyhow::Result<bool> {
+        // Slide expires_at forward by 24h on access, capped at 7 days from artifact creation.
+        // Also update delete_after_at on all jobs attached to this artifact.
         let updated_rows = match (&owner.user_id, &owner.session_id) {
             (Some(user_id), _) => {
-                sqlx::query(
+                let artifact_updated = sqlx::query(
                     r#"
                     UPDATE mux_artifacts
-                    SET last_accessed_at = NOW()
+                    SET last_accessed_at = NOW(),
+                        expires_at = GREATEST(
+                            expires_at,
+                            LEAST(
+                                NOW() + INTERVAL '24 hours',
+                                created_at + INTERVAL '7 days'
+                            )
+                        )
                     WHERE id = (
                         SELECT artifact_id
                         FROM mux_jobs
@@ -179,13 +188,44 @@ impl JobRepository {
                 .bind(job_id)
                 .bind(user_id)
                 .execute(self.pool())
-                .await
+                .await;
+
+                if let Ok(result) = &artifact_updated {
+                    if result.rows_affected() > 0 {
+                        // Propagate new expires_at to delete_after_at on related jobs
+                        let _ = sqlx::query(
+                            r#"
+                            UPDATE mux_jobs
+                            SET delete_after_at = (
+                                SELECT expires_at FROM mux_artifacts WHERE id = mux_jobs.artifact_id
+                            )
+                            WHERE artifact_id = (
+                                SELECT artifact_id FROM mux_jobs WHERE id = $1 AND user_id = $2
+                            )
+                            AND artifact_id IS NOT NULL
+                            "#,
+                        )
+                        .bind(job_id)
+                        .bind(user_id)
+                        .execute(self.pool())
+                        .await;
+                    }
+                }
+
+                artifact_updated
             }
             (None, Some(session_id)) => {
-                sqlx::query(
+                let artifact_updated = sqlx::query(
                     r#"
                     UPDATE mux_artifacts
-                    SET last_accessed_at = NOW()
+                    SET last_accessed_at = NOW(),
+                        expires_at = GREATEST(
+                            expires_at,
+                            LEAST(
+                                NOW() + INTERVAL '24 hours',
+                                created_at + INTERVAL '7 days'
+                            )
+                        )
                     WHERE id = (
                         SELECT artifact_id
                         FROM mux_jobs
@@ -196,7 +236,30 @@ impl JobRepository {
                 .bind(job_id)
                 .bind(session_id)
                 .execute(self.pool())
-                .await
+                .await;
+
+                if let Ok(result) = &artifact_updated {
+                    if result.rows_affected() > 0 {
+                        let _ = sqlx::query(
+                            r#"
+                            UPDATE mux_jobs
+                            SET delete_after_at = (
+                                SELECT expires_at FROM mux_artifacts WHERE id = mux_jobs.artifact_id
+                            )
+                            WHERE artifact_id = (
+                                SELECT artifact_id FROM mux_jobs WHERE id = $1 AND session_id = $2
+                            )
+                            AND artifact_id IS NOT NULL
+                            "#,
+                        )
+                        .bind(job_id)
+                        .bind(session_id)
+                        .execute(self.pool())
+                        .await;
+                    }
+                }
+
+                artifact_updated
             }
             (None, None) => return Ok(false),
         }

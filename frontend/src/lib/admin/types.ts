@@ -36,12 +36,23 @@ export type AdminProxyRow = {
 	status: ProxyStatus;
 	source: string;
 	notes: string | null;
+	healthScore: number;
+	autoDisabledAt: string | null;
+	autoDisabledReason: string | null;
 	lastQuarantinedAt: string | null;
 	lastQuarantineReason: string | null;
 	updatedAt: string;
 	eventCount24h: number;
 	lastEventType: string | null;
 	lastEventAt: string | null;
+	extractAttempts24h: number;
+	proxyRelevantAttempts24h: number;
+	extractSuccesses24h: number;
+	fullFormatHits24h: number;
+	combined360OnlyHits24h: number;
+	timeoutHits24h: number;
+	p95ExtractLatencyMs: number | null;
+	lastExtractOutcome: string | null;
 };
 
 export type AdminActivityRow = {
