@@ -43,46 +43,37 @@
 	function resolveScopeTone(scope: AdminActivityRow['scope']): Tone {
 		switch (scope) {
 			case 'job':
-				return 'sky';
+				return 'neutral';
 			case 'proxy':
 				return 'amber';
 		}
 	}
 
 	function resolveTone(): Tone {
-		if (kind === 'job') {
-			return resolveJobTone(value as AdminJobStatus);
-		}
-
-		if (kind === 'proxy') {
-			return resolveProxyTone(value as ProxyStatus);
-		}
-
-		if (kind === 'scope') {
-			return resolveScopeTone(value as AdminActivityRow['scope']);
-		}
-
+		if (kind === 'job') return resolveJobTone(value as AdminJobStatus);
+		if (kind === 'proxy') return resolveProxyTone(value as ProxyStatus);
+		if (kind === 'scope') return resolveScopeTone(value as AdminActivityRow['scope']);
 		return tone;
 	}
 
 	const classes = $derived.by(() => {
 		switch (resolveTone()) {
 			case 'sky':
-				return 'border-sky-200/80 bg-sky-100/80 text-sky-800';
+				return 'border-blue-200 bg-blue-50 text-blue-700';
 			case 'emerald':
-				return 'border-emerald-200/80 bg-emerald-100/80 text-emerald-800';
+				return 'border-green-200 bg-green-50 text-green-700';
 			case 'amber':
-				return 'border-amber-200/80 bg-amber-100/80 text-amber-800';
+				return 'border-amber-200 bg-amber-50 text-amber-700';
 			case 'rose':
-				return 'border-rose-200/80 bg-rose-100/80 text-rose-800';
+				return 'border-red-200 bg-red-50 text-red-700';
 			default:
-				return 'border-slate-200/90 bg-slate-100/90 text-slate-700';
+				return 'border-gray-200 bg-gray-50 text-gray-600';
 		}
 	});
 </script>
 
 <span
-	class={`inline-flex items-center rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${classes}`}
+	class={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${classes}`}
 >
 	{value}
 </span>

@@ -28,7 +28,9 @@ services:
       - RUST_LOG=info
       - PROXY_QUARANTINE_FILE=/app/proxy-state/quarantined-proxies.txt
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - PROXY_DATABASE_URL=${PROXY_DATABASE_URL}
       - REDIS_URL=redis://redis:6379
+      - PROXY_REDIS_URL=${PROXY_REDIS_URL}
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
       - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND}
       - MUX_FILE_TICKET_TTL_SECS=${MUX_FILE_TICKET_TTL_SECS}
@@ -63,7 +65,9 @@ services:
       - RUST_LOG=info
       - PROXY_QUARANTINE_FILE=/app/proxy-state/quarantined-proxies.txt
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - PROXY_DATABASE_URL=${PROXY_DATABASE_URL}
       - REDIS_URL=redis://redis:6379
+      - PROXY_REDIS_URL=${PROXY_REDIS_URL}
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
       - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND}
       - MUX_ARTIFACT_TTL_SECS=${MUX_ARTIFACT_TTL_SECS}
@@ -95,6 +99,7 @@ services:
       - HOST=0.0.0.0
       - ORIGIN=${ORIGIN}
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
+      - PROXY_DATABASE_URL=${PROXY_DATABASE_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_TRUSTED_ORIGINS=${BETTER_AUTH_TRUSTED_ORIGINS}
       - ADMIN_EMAILS=${ADMIN_EMAILS}

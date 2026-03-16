@@ -1,4 +1,4 @@
-import { getDatabasePool } from './auth-utils';
+import { getDatabasePool, getProxyDatabasePool } from './auth-utils';
 import { maskProxyUrl } from './admin-proxy-management';
 import type { AdminActivityRow, AdminDashboardData, AdminJobRow, AdminOverview, AdminProxyRow } from '$lib/admin/types';
 
@@ -20,14 +20,15 @@ const overviewQuery = `
 		(SELECT COUNT(*)::int FROM mux_jobs WHERE status = 'expired') AS "expiredJobs",
 		(SELECT COUNT(*)::int FROM mux_artifacts WHERE status = 'building') AS "buildingArtifacts",
 		(SELECT COUNT(*)::int FROM mux_artifacts WHERE status = 'ready') AS "readyArtifacts",
+		(SELECT COUNT(*) FROM mux_job_events WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS "jobEventsLast24h"
+`;
+
+const proxyOverviewQuery = `
+	SELECT
 		(SELECT COUNT(*)::int FROM proxies WHERE status = 'active') AS "activeProxies",
 		(SELECT COUNT(*)::int FROM proxies WHERE status = 'quarantined') AS "quarantinedProxies",
 		(SELECT COUNT(*)::int FROM proxies WHERE status = 'disabled') AS "disabledProxies",
-		(
-			(SELECT COUNT(*) FROM mux_job_events WHERE created_at >= NOW() - INTERVAL '24 hours')
-			+
-			(SELECT COUNT(*) FROM proxy_health_events WHERE created_at >= NOW() - INTERVAL '24 hours')
-		)::int AS "eventsLast24h"
+		(SELECT COUNT(*) FROM proxy_health_events WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS "proxyEventsLast24h"
 `;
 
 const jobsQuery = `
@@ -123,40 +124,53 @@ const proxiesQuery = `
 	LIMIT 40
 `;
 
-const activityQuery = `
-	SELECT *
-	FROM (
-		SELECT
-			e.id,
-			'job'::text AS scope,
-			e.job_id AS "entityId",
-			COALESCE(j.title, j.id) AS label,
-			e.event_type AS "eventType",
-			LEFT(COALESCE(e.payload_json::text, ''), 180) AS detail,
-			e.created_at AS "createdAt"
-		FROM mux_job_events e
-		JOIN mux_jobs j ON j.id = e.job_id
-		UNION ALL
-		SELECT
-			e.id,
-			'proxy'::text AS scope,
-			p.id AS "entityId",
-			COALESCE(NULLIF(p.display_name, ''), p.proxy_url) AS label,
-			e.event_type AS "eventType",
-			e.reason AS detail,
-			e.created_at AS "createdAt"
-		FROM proxy_health_events e
-		JOIN proxies p ON p.id = e.proxy_id
-	) activity
-	ORDER BY "createdAt" DESC
+const jobActivityQuery = `
+	SELECT
+		e.id,
+		'job'::text AS scope,
+		e.job_id AS "entityId",
+		COALESCE(j.title, j.id) AS label,
+		e.event_type AS "eventType",
+		LEFT(COALESCE(e.payload_json::text, ''), 180) AS detail,
+		e.created_at AS "createdAt"
+	FROM mux_job_events e
+	JOIN mux_jobs j ON j.id = e.job_id
+	ORDER BY e.created_at DESC
+	LIMIT 24
+`;
+
+const proxyActivityQuery = `
+	SELECT
+		e.id,
+		'proxy'::text AS scope,
+		p.id AS "entityId",
+		COALESCE(NULLIF(p.display_name, ''), p.proxy_url) AS label,
+		e.event_type AS "eventType",
+		e.reason AS detail,
+		e.created_at AS "createdAt"
+	FROM proxy_health_events e
+	JOIN proxies p ON p.id = e.proxy_id
+	ORDER BY e.created_at DESC
 	LIMIT 24
 `;
 
 export async function loadAdminOverview(): Promise<AdminOverview> {
-	const pool = getDatabasePool();
-	const overviewResult = await pool.query<OverviewRow>(overviewQuery);
+	const appPool = getDatabasePool();
+	const proxyPool = getProxyDatabasePool();
+	const [overviewResult, proxyOverviewResult] = await Promise.all([
+		appPool.query<OverviewRow>(overviewQuery),
+		proxyPool.query<OverviewRow>(proxyOverviewQuery)
+	]);
+	const jobOverview = overviewResult.rows[0] ?? {};
+	const proxyOverview = proxyOverviewResult.rows[0] ?? {};
 
-	return (overviewResult.rows[0] ?? {}) as AdminOverview;
+	return {
+		...(jobOverview as AdminOverview),
+		activeProxies: Number(proxyOverview.activeProxies ?? 0),
+		quarantinedProxies: Number(proxyOverview.quarantinedProxies ?? 0),
+		disabledProxies: Number(proxyOverview.disabledProxies ?? 0),
+		eventsLast24h: Number(jobOverview.jobEventsLast24h ?? 0) + Number(proxyOverview.proxyEventsLast24h ?? 0)
+	} as AdminOverview;
 }
 
 export async function loadAdminJobs(): Promise<AdminJobRow[]> {
@@ -167,7 +181,7 @@ export async function loadAdminJobs(): Promise<AdminJobRow[]> {
 }
 
 export async function loadAdminProxies(): Promise<AdminProxyRow[]> {
-	const pool = getDatabasePool();
+	const pool = getProxyDatabasePool();
 	const proxiesResult = await pool.query<AdminProxyRow>(proxiesQuery);
 
 	return proxiesResult.rows.map((row) => ({
@@ -181,10 +195,17 @@ export async function loadAdminProxies(): Promise<AdminProxyRow[]> {
 }
 
 export async function loadAdminActivity(): Promise<AdminActivityRow[]> {
-	const pool = getDatabasePool();
-	const activityResult = await pool.query<AdminActivityRow>(activityQuery);
+	const appPool = getDatabasePool();
+	const proxyPool = getProxyDatabasePool();
+	const [jobActivityResult, proxyActivityResult] = await Promise.all([
+		appPool.query<AdminActivityRow>(jobActivityQuery),
+		proxyPool.query<AdminActivityRow>(proxyActivityQuery)
+	]);
 
-	return activityResult.rows.map((row) => ({
+	return [...jobActivityResult.rows, ...proxyActivityResult.rows]
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+		.slice(0, 24)
+		.map((row) => ({
 		...row,
 		createdAt: normalizeDate(row.createdAt) ?? row.createdAt
 	}));

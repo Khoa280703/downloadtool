@@ -48,6 +48,8 @@ pub struct Config {
     pub extractor_dir: String,
     /// PostgreSQL connection string
     pub database_url: String,
+    /// Shared PostgreSQL connection string for proxy inventory/health.
+    pub proxy_database_url: String,
     /// Better Auth shared secret (JWT verify + session signing key)
     pub jwt_secret: String,
     /// Whop webhook HMAC secret
@@ -57,6 +59,7 @@ pub struct Config {
     pub mux_artifact_backend: MuxArtifactBackend,
     pub mux_direct_download: bool,
     pub redis_url: String,
+    pub proxy_redis_url: String,
     pub mux_queue_stream: String,
     pub mux_job_max_attempts: i32,
     pub mux_file_ticket_ttl_secs: u64,
@@ -209,7 +212,14 @@ impl Config {
             return raw_url.to_string();
         }
 
-        let Some(ip) = Self::resolve_compose_service_ip("postgres", "downloadtool-postgres") else {
+        let (service, fallback_container_name) =
+            if raw_url.contains("@127.0.0.1:15432") || raw_url.contains("@localhost:15432") {
+                ("shared-proxy-postgres", "shared-proxy-postgres")
+            } else {
+                ("postgres", "downloadtool-postgres")
+            };
+
+        let Some(ip) = Self::resolve_compose_service_ip(service, fallback_container_name) else {
             return raw_url.to_string();
         };
 
@@ -222,7 +232,14 @@ impl Config {
             return raw_url.to_string();
         }
 
-        let Some(ip) = Self::resolve_compose_service_ip("redis", "downloadtool-redis") else {
+        let (service, fallback_container_name) =
+            if raw_url.contains("//127.0.0.1:6381") || raw_url.contains("//localhost:6381") {
+                ("shared-proxy-redis", "shared-proxy-redis")
+            } else {
+                ("redis", "downloadtool-redis")
+            };
+
+        let Some(ip) = Self::resolve_compose_service_ip(service, fallback_container_name) else {
             return raw_url.to_string();
         };
 
@@ -249,6 +266,9 @@ impl Config {
         let database_url = env::var("DATABASE_URL")
             .map_err(|_| anyhow::anyhow!("DATABASE_URL env var is required"))?;
         let database_url = Self::resolve_local_database_url(&database_url);
+        let proxy_database_url = Self::optional_env("PROXY_DATABASE_URL")
+            .map(|value| Self::resolve_local_database_url(&value))
+            .unwrap_or_else(|| database_url.clone());
         let jwt_secret = env::var("BETTER_AUTH_SECRET")
             .map_err(|_| anyhow::anyhow!("BETTER_AUTH_SECRET env var is required"))?;
         let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")
@@ -269,6 +289,9 @@ impl Config {
             "REDIS_URL",
             "redis://127.0.0.1:6379",
         ));
+        let proxy_redis_url = Self::optional_env("PROXY_REDIS_URL")
+            .map(|value| Self::resolve_local_redis_url(&value))
+            .unwrap_or_else(|| redis_url.clone());
         let mux_queue_stream = Self::env_or_default("MUX_QUEUE_STREAM", "mux_jobs");
         let mux_job_max_attempts = env::var("MUX_JOB_MAX_ATTEMPTS")
             .ok()
@@ -297,12 +320,14 @@ impl Config {
             port,
             extractor_dir,
             database_url,
+            proxy_database_url,
             jwt_secret,
             whop_webhook_secret,
             extract_rate_limit_enabled,
             mux_artifact_backend,
             mux_direct_download,
             redis_url,
+            proxy_redis_url,
             mux_queue_stream,
             mux_job_max_attempts,
             mux_file_ticket_ttl_secs,
@@ -326,12 +351,14 @@ mod tests {
             port: 3068,
             extractor_dir: "./extractors".to_string(),
             database_url: "postgres://user:pass@localhost:5432/db".to_string(),
+            proxy_database_url: "postgres://user:pass@localhost:5432/db".to_string(),
             jwt_secret: "secret".to_string(),
             whop_webhook_secret: "whop_secret".to_string(),
             extract_rate_limit_enabled: true,
             mux_artifact_backend: MuxArtifactBackend::LocalFs,
             mux_direct_download: false,
             redis_url: "redis://127.0.0.1:6379".to_string(),
+            proxy_redis_url: "redis://127.0.0.1:6379".to_string(),
             mux_queue_stream: "mux_jobs".to_string(),
             mux_job_max_attempts: 3,
             mux_file_ticket_ttl_secs: 900,
@@ -346,12 +373,14 @@ mod tests {
         assert_eq!(config.port, 3068);
         assert_eq!(config.extractor_dir, "./extractors");
         assert!(config.database_url.starts_with("postgres://"));
+        assert!(config.proxy_database_url.starts_with("postgres://"));
         assert_eq!(config.jwt_secret, "secret");
         assert_eq!(config.whop_webhook_secret, "whop_secret");
         assert!(config.extract_rate_limit_enabled);
         assert_eq!(config.mux_artifact_backend, MuxArtifactBackend::LocalFs);
         assert!(!config.mux_direct_download);
         assert_eq!(config.redis_url, "redis://127.0.0.1:6379");
+        assert_eq!(config.proxy_redis_url, "redis://127.0.0.1:6379");
         assert_eq!(config.mux_queue_stream, "mux_jobs");
         assert_eq!(config.mux_job_max_attempts, 3);
         assert_eq!(config.mux_file_ticket_ttl_secs, 900);

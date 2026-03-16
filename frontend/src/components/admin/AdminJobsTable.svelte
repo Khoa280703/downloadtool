@@ -13,43 +13,43 @@
 </script>
 
 <div class="overflow-x-auto">
-	<table class="admin-data-table min-w-full text-sm text-slate-700">
-		<thead class="sticky top-0 z-10 bg-slate-100 text-left text-[10px] uppercase tracking-[0.18em] text-slate-500">
+	<table class="min-w-full text-[13px] text-gray-700">
+		<thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-left text-[10px] uppercase tracking-wider text-gray-500">
 			<tr>
-				<th class="px-4 py-3 font-bold">Job</th>
-				<th class="px-4 py-3 font-bold">Status</th>
-				<th class="px-4 py-3 font-bold">Owner</th>
-				<th class="px-4 py-3 font-bold">Attempts</th>
-				<th class="px-4 py-3 font-bold">Artifact</th>
-				<th class="px-4 py-3 font-bold">Updated</th>
+				<th class="px-4 py-2.5 font-semibold">Job</th>
+				<th class="px-4 py-2.5 font-semibold">Status</th>
+				<th class="px-4 py-2.5 font-semibold">Owner</th>
+				<th class="px-4 py-2.5 font-semibold">Attempts</th>
+				<th class="px-4 py-2.5 font-semibold">Artifact</th>
+				<th class="px-4 py-2.5 font-semibold">Updated</th>
 			</tr>
 		</thead>
-		<tbody class="divide-y divide-slate-200/80">
+		<tbody class="divide-y divide-gray-100">
 			{#each jobs as job}
-				<tr class="align-top transition hover:bg-slate-50/80">
-					<td class="px-4 py-3.5 pr-2">
-						<p class="max-w-[24rem] truncate text-sm font-semibold text-slate-900">{job.title ?? job.id}</p>
-						<p class="mt-1 font-mono text-[11px] text-slate-500">{job.id}</p>
+				<tr class="align-top hover:bg-gray-50/50">
+					<td class="px-4 py-3">
+						<p class="max-w-[22rem] truncate font-medium text-gray-900">{job.title ?? job.id}</p>
+						<p class="mt-0.5 font-mono text-[10px] text-gray-400">{job.id}</p>
 						{#if job.lastError}
-							<p class="mt-2 max-w-[28rem] text-xs text-rose-700">{job.lastError}</p>
+							<p class="mt-1.5 max-w-[26rem] text-[11px] text-red-600">{job.lastError}</p>
 						{/if}
 					</td>
-					<td class="px-4 py-3.5 pr-2">
+					<td class="px-4 py-3">
 						<AdminStatusBadge value={job.status} kind="job" />
 					</td>
-					<td class="px-4 py-3.5 pr-2 font-mono text-xs text-slate-600">{job.ownerLabel}</td>
-					<td class="px-4 py-3.5 pr-2 text-slate-600">{job.attemptLabel}</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm text-slate-700">{job.backend ?? '—'}</p>
-						<p class="text-xs text-slate-500">{formatBytes(job.fileSizeBytes)}</p>
+					<td class="px-4 py-3 font-mono text-[11px] text-gray-500">{job.ownerLabel}</td>
+					<td class="px-4 py-3 tabular-nums text-gray-600">{job.attemptLabel}</td>
+					<td class="px-4 py-3">
+						<p class="text-gray-700">{job.backend ?? '—'}</p>
+						<p class="text-[11px] text-gray-400">{formatBytes(job.fileSizeBytes)}</p>
 					</td>
-					<td class="px-4 py-3.5 text-slate-600">{new Date(job.updatedAt).toLocaleString()}</td>
+					<td class="px-4 py-3 tabular-nums text-gray-500">{new Date(job.updatedAt).toLocaleString()}</td>
 				</tr>
 			{/each}
 			{#if jobs.length === 0}
 				<tr>
-					<td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">
-						Chưa có job nào trong phạm vi hiển thị.
+					<td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400">
+						No jobs to display.
 					</td>
 				</tr>
 			{/if}

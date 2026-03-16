@@ -22,7 +22,10 @@ export type SubscriptionSummary = {
 	whopMembershipId: string | null;
 };
 
-const globalPool = globalThis as typeof globalThis & { __frontendAuthDbPool?: Pool };
+const globalPool = globalThis as typeof globalThis & {
+	__frontendAuthDbPool?: Pool;
+	__frontendProxyDbPool?: Pool;
+};
 
 function requireEnv(name: keyof typeof env, fallback = ''): string {
 	const value = env[name];
@@ -70,6 +73,18 @@ export function getDatabasePool(): Pool {
 		});
 	}
 	return globalPool.__frontendAuthDbPool;
+}
+
+export function getProxyDatabasePool(): Pool {
+	if (!globalPool.__frontendProxyDbPool) {
+		const connectionString =
+			env.PROXY_DATABASE_URL?.trim() ||
+			requireEnv('DATABASE_URL', 'postgres://postgres:postgres@127.0.0.1:5432/postgres');
+		globalPool.__frontendProxyDbPool = new Pool({
+			connectionString
+		});
+	}
+	return globalPool.__frontendProxyDbPool;
 }
 
 export async function getUserTier(userId: string): Promise<'free' | 'premium'> {

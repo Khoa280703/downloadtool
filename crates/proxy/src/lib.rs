@@ -17,6 +17,7 @@ mod proxy_inventory_store;
 pub mod proxy_pool;
 mod proxy_quarantine;
 pub mod proxy_runtime;
+mod proxy_schema;
 pub mod stream;
 pub mod throttle;
 
@@ -27,6 +28,7 @@ pub use platform::Platform;
 pub use proxy_inventory_store::ProxyExtractEvent;
 pub use proxy_pool::ProxyPool;
 pub use proxy_runtime::{global_proxy_pool, init_global_proxy_pool};
+pub use proxy_schema::ensure_proxy_schema;
 pub use stream::StreamProxy;
 pub use throttle::DomainThrottle;
 

@@ -39,7 +39,16 @@ async fn main() -> Result<()> {
         .connect(&config.database_url)
         .await?;
     sqlx::migrate!("../api/migrations").run(&db_pool).await?;
-    init_global_proxy_pool(db_pool.clone(), &config.redis_url).await?;
+    let proxy_db_pool = if config.proxy_database_url == config.database_url {
+        db_pool.clone()
+    } else {
+        PgPoolOptions::new()
+            .max_connections(3)
+            .connect(&config.proxy_database_url)
+            .await?
+    };
+    proxy::ensure_proxy_schema(&proxy_db_pool).await?;
+    init_global_proxy_pool(proxy_db_pool, &config.proxy_redis_url).await?;
 
     let repo = JobRepository::new(db_pool);
     let queue = Arc::new(RedisStreamsQueue::new(

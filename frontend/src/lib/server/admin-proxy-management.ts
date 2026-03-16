@@ -1,4 +1,4 @@
-import { getDatabasePool } from './auth-utils';
+import { getProxyDatabasePool } from './auth-utils';
 import type { ProxyStatus } from '$lib/admin/types';
 
 type ProxyMutationInput = {
@@ -41,7 +41,7 @@ export async function createProxy(input: {
 	displayName?: string;
 	notes?: string;
 }): Promise<void> {
-	const pool = getDatabasePool();
+	const pool = getProxyDatabasePool();
 	await pool.query(
 		`
 			INSERT INTO proxies (proxy_url, display_name, status, source, notes)
@@ -56,7 +56,7 @@ export async function createProxy(input: {
 }
 
 export async function updateProxyStatus(input: ProxyMutationInput): Promise<ProxyMutationResult> {
-	const pool = getDatabasePool();
+	const pool = getProxyDatabasePool();
 	const client = await pool.connect();
 	const reason = input.reason?.trim() || `admin set ${input.status}`;
 

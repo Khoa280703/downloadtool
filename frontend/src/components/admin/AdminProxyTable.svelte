@@ -17,97 +17,97 @@
 	}
 
 	function scoreTone(score: number): string {
-		if (score >= 80) return 'text-emerald-700';
-		if (score >= 55) return 'text-amber-700';
-		return 'text-rose-700';
+		if (score >= 80) return 'text-green-700';
+		if (score >= 55) return 'text-amber-600';
+		return 'text-red-600';
 	}
 </script>
 
 <div class="overflow-x-auto">
-	<table class="admin-data-table min-w-full text-sm text-slate-700">
-		<thead class="sticky top-0 z-10 bg-slate-100 text-left text-[10px] uppercase tracking-[0.18em] text-slate-500">
+	<table class="min-w-full text-[13px] text-gray-700">
+		<thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-left text-[10px] uppercase tracking-wider text-gray-500">
 			<tr>
-				<th class="px-4 py-3 font-bold">Proxy</th>
-				<th class="px-4 py-3 font-bold">Status</th>
-				<th class="px-4 py-3 font-bold">Score</th>
-				<th class="px-4 py-3 font-bold">Extract 24h</th>
-				<th class="px-4 py-3 font-bold">Success</th>
-				<th class="px-4 py-3 font-bold">Full format</th>
-				<th class="px-4 py-3 font-bold">360-only</th>
-				<th class="px-4 py-3 font-bold">Timeout</th>
-				<th class="px-4 py-3 font-bold">P95</th>
-				<th class="px-4 py-3 font-bold">Last quarantine</th>
-				<th class="px-4 py-3 font-bold">Action</th>
+				<th class="px-4 py-2.5 font-semibold">Proxy</th>
+				<th class="px-4 py-2.5 font-semibold">Status</th>
+				<th class="px-4 py-2.5 font-semibold">Score</th>
+				<th class="px-4 py-2.5 font-semibold">Extract 24h</th>
+				<th class="px-4 py-2.5 font-semibold">Success</th>
+				<th class="px-4 py-2.5 font-semibold">Full format</th>
+				<th class="px-4 py-2.5 font-semibold">360-only</th>
+				<th class="px-4 py-2.5 font-semibold">Timeout</th>
+				<th class="px-4 py-2.5 font-semibold">P95</th>
+				<th class="px-4 py-2.5 font-semibold">Last quarantine</th>
+				<th class="px-4 py-2.5 font-semibold">Action</th>
 			</tr>
 		</thead>
-		<tbody class="divide-y divide-slate-200/80">
+		<tbody class="divide-y divide-gray-100">
 			{#each proxies as proxy (proxy.id)}
-				<tr class="align-top transition hover:bg-slate-50/80">
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm font-semibold text-slate-900">{proxy.displayName || 'Unnamed proxy'}</p>
-						<p class="mt-1 break-all font-mono text-[11px] text-slate-500">{proxy.maskedProxyUrl}</p>
+				<tr class="align-top hover:bg-gray-50/50">
+					<td class="px-4 py-3">
+						<p class="font-medium text-gray-900">{proxy.displayName || 'Unnamed proxy'}</p>
+						<p class="mt-0.5 break-all font-mono text-[10px] text-gray-400">{proxy.maskedProxyUrl}</p>
 						{#if proxy.notes}
-							<p class="mt-2 text-xs text-slate-600">{proxy.notes}</p>
+							<p class="mt-1 text-[11px] text-gray-500">{proxy.notes}</p>
 						{/if}
 					</td>
-					<td class="px-4 py-3.5 pr-2">
+					<td class="px-4 py-3">
 						<AdminStatusBadge value={proxy.status} kind="proxy" />
-						<p class="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">{proxy.source}</p>
+						<p class="mt-1.5 text-[10px] uppercase tracking-wider text-gray-400">{proxy.source}</p>
 						{#if proxy.autoDisabledReason}
-							<p class="mt-2 max-w-[14rem] text-xs text-rose-700">{proxy.autoDisabledReason}</p>
+							<p class="mt-1 max-w-[12rem] text-[11px] text-red-600">{proxy.autoDisabledReason}</p>
 						{/if}
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class={`text-base font-bold ${scoreTone(proxy.healthScore)}`}>{proxy.healthScore}</p>
-						<p class="text-xs text-slate-500">{proxy.lastExtractOutcome ?? proxy.lastEventType ?? 'No signals yet'}</p>
+					<td class="px-4 py-3">
+						<p class={`text-sm font-semibold tabular-nums ${scoreTone(proxy.healthScore)}`}>{proxy.healthScore}</p>
+						<p class="text-[11px] text-gray-400">{proxy.lastExtractOutcome ?? proxy.lastEventType ?? '—'}</p>
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm font-semibold text-slate-900">{proxy.extractAttempts24h}</p>
-						<p class="text-xs text-slate-500">{proxy.proxyRelevantAttempts24h} relevant</p>
+					<td class="px-4 py-3">
+						<p class="font-medium tabular-nums text-gray-900">{proxy.extractAttempts24h}</p>
+						<p class="text-[11px] text-gray-400">{proxy.proxyRelevantAttempts24h} relevant</p>
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm font-semibold text-slate-900">
+					<td class="px-4 py-3">
+						<p class="font-medium tabular-nums text-gray-900">
 							{formatPercent(proxy.extractSuccesses24h, proxy.proxyRelevantAttempts24h)}
 						</p>
-						<p class="text-xs text-slate-500">{proxy.extractSuccesses24h}/{proxy.proxyRelevantAttempts24h}</p>
+						<p class="text-[11px] text-gray-400">{proxy.extractSuccesses24h}/{proxy.proxyRelevantAttempts24h}</p>
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm font-semibold text-slate-900">
+					<td class="px-4 py-3">
+						<p class="font-medium tabular-nums text-gray-900">
 							{formatPercent(proxy.fullFormatHits24h, proxy.proxyRelevantAttempts24h)}
 						</p>
-						<p class="text-xs text-slate-500">{proxy.fullFormatHits24h} hits</p>
+						<p class="text-[11px] text-gray-400">{proxy.fullFormatHits24h} hits</p>
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm font-semibold text-slate-900">
+					<td class="px-4 py-3">
+						<p class="font-medium tabular-nums text-gray-900">
 							{formatPercent(proxy.combined360OnlyHits24h, proxy.proxyRelevantAttempts24h)}
 						</p>
-						<p class="text-xs text-slate-500">{proxy.combined360OnlyHits24h} hits</p>
+						<p class="text-[11px] text-gray-400">{proxy.combined360OnlyHits24h} hits</p>
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm font-semibold text-slate-900">
+					<td class="px-4 py-3">
+						<p class="font-medium tabular-nums text-gray-900">
 							{formatPercent(proxy.timeoutHits24h, proxy.proxyRelevantAttempts24h)}
 						</p>
-						<p class="text-xs text-slate-500">{proxy.timeoutHits24h} hits</p>
+						<p class="text-[11px] text-gray-400">{proxy.timeoutHits24h} hits</p>
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm font-semibold text-slate-900">{formatLatency(proxy.p95ExtractLatencyMs)}</p>
-						<p class="text-xs text-slate-500">p95 latency</p>
+					<td class="px-4 py-3">
+						<p class="font-medium tabular-nums text-gray-900">{formatLatency(proxy.p95ExtractLatencyMs)}</p>
+						<p class="text-[11px] text-gray-400">p95</p>
 					</td>
-					<td class="px-4 py-3.5 pr-2">
-						<p class="text-sm text-slate-700">
+					<td class="px-4 py-3">
+						<p class="tabular-nums text-gray-600">
 							{proxy.lastQuarantinedAt ? new Date(proxy.lastQuarantinedAt).toLocaleString() : '—'}
 						</p>
-						<p class="mt-1 max-w-[16rem] text-xs text-rose-700">{proxy.lastQuarantineReason ?? ''}</p>
+						<p class="mt-0.5 max-w-[14rem] text-[11px] text-red-600">{proxy.lastQuarantineReason ?? ''}</p>
 						{#if proxy.autoDisabledAt}
-							<p class="mt-2 text-xs text-slate-500">Auto-disabled {new Date(proxy.autoDisabledAt).toLocaleString()}</p>
+							<p class="mt-1 text-[11px] text-gray-400">Disabled {new Date(proxy.autoDisabledAt).toLocaleString()}</p>
 						{/if}
 					</td>
-					<td class="px-4 py-3.5">
-						<form method="POST" action="?/updateProxyStatus" class="grid gap-2 lg:max-w-[13rem]">
+					<td class="px-4 py-3">
+						<form method="POST" action="?/updateProxyStatus" class="grid gap-1.5 lg:max-w-[12rem]">
 							<input type="hidden" name="proxyId" value={proxy.id} />
 							<select
 								name="status"
-								class="admin-field rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-slate-400 focus:ring-0"
+								class="rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] text-gray-700 focus:border-gray-400 focus:outline-none focus:ring-0"
 							>
 								{#each nextStatuses.filter((status) => !(proxy.status === 'quarantined' && status === 'active')) as status}
 									<option value={status} selected={status === proxy.status}>{status}</option>
@@ -116,12 +116,12 @@
 							<input
 								type="text"
 								name="reason"
-								class="admin-field rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-slate-400 focus:ring-0"
+								class="rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] text-gray-700 placeholder:text-gray-300 focus:border-gray-400 focus:outline-none focus:ring-0"
 								placeholder="Reason"
 							/>
 							<button
 								type="submit"
-								class="rounded-md bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+								class="rounded bg-gray-900 px-2.5 py-1.5 text-[12px] font-medium text-white transition hover:bg-gray-800"
 							>
 								Update
 							</button>
@@ -131,8 +131,8 @@
 			{/each}
 			{#if proxies.length === 0}
 				<tr>
-					<td colspan="11" class="px-4 py-10 text-center text-sm text-slate-500">
-						Chưa có proxy nào trong inventory.
+					<td colspan="11" class="px-4 py-8 text-center text-sm text-gray-400">
+						No proxies in inventory.
 					</td>
 				</tr>
 			{/if}

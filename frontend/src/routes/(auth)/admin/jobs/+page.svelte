@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import AppIcon from '$components/AppIcon.svelte';
 	import AdminJobsTable from '$components/admin/AdminJobsTable.svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -10,46 +9,42 @@
 	<title>Admin Jobs</title>
 </svelte:head>
 
-<div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+<div class="mb-5 flex items-center justify-between">
 	<div>
-		<h2 class="text-3xl font-black tracking-tight text-slate-900">Mux Queue</h2>
-		<p class="mt-1 text-sm text-slate-500">Theo dõi trạng thái, attempts, artifact backend và lỗi của các job gần nhất.</p>
-	</div>
-	<div class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#137fec]/25">
-		<AppIcon name="table_rows" />
-		<span>Recent jobs</span>
+		<h2 class="text-lg font-semibold text-gray-900">Mux Queue</h2>
+		<p class="mt-0.5 text-[13px] text-gray-500">Job status, attempts, artifact backend, and errors.</p>
 	</div>
 </div>
 
-<section class="admin-panel mb-6 overflow-hidden border border-slate-200 bg-white">
-	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
-		<h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Queue Summary</h3>
+<section class="admin-panel mb-5 overflow-hidden border border-gray-200 bg-white">
+	<div class="border-b border-gray-200 bg-gray-50 px-5 py-3">
+		<h3 class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Queue Summary</h3>
 	</div>
 	<div class="overflow-x-auto">
-		<table class="w-full border-collapse text-left">
+		<table class="w-full border-collapse text-left text-[13px]">
 			<thead>
-				<tr class="border-b border-slate-200 bg-slate-50/60">
-					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
-					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Count</th>
-					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Meaning</th>
+				<tr class="border-b border-gray-100 bg-gray-50/40">
+					<th class="px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Status</th>
+					<th class="px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Count</th>
+					<th class="px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Note</th>
 				</tr>
 			</thead>
-			<tbody class="divide-y divide-slate-100 text-sm">
-				<tr><td class="px-6 py-4 font-semibold text-slate-900">Queued</td><td class="px-6 py-4">{data.overview.queuedJobs}</td><td class="px-6 py-4 text-slate-500">Chờ worker nhận.</td></tr>
-				<tr><td class="px-6 py-4 font-semibold text-slate-900">Leased</td><td class="px-6 py-4">{data.overview.leasedJobs}</td><td class="px-6 py-4 text-slate-500">Đã có worker lease nhưng chưa hoàn tất.</td></tr>
-				<tr><td class="px-6 py-4 font-semibold text-slate-900">Processing</td><td class="px-6 py-4">{data.overview.processingJobs}</td><td class="px-6 py-4 text-slate-500">Đang mux/upload.</td></tr>
-				<tr><td class="px-6 py-4 font-semibold text-slate-900">Ready</td><td class="px-6 py-4">{data.overview.readyJobs}</td><td class="px-6 py-4 text-slate-500">Sẵn sàng cấp file ticket.</td></tr>
-				<tr><td class="px-6 py-4 font-semibold text-slate-900">Failed</td><td class="px-6 py-4">{data.overview.failedJobs}</td><td class="px-6 py-4 text-slate-500">Thất bại cần attention.</td></tr>
-				<tr><td class="px-6 py-4 font-semibold text-slate-900">Expired</td><td class="px-6 py-4">{data.overview.expiredJobs}</td><td class="px-6 py-4 text-slate-500">Lease hoặc lifetime đã hết.</td></tr>
+			<tbody class="divide-y divide-gray-50">
+				<tr><td class="px-5 py-2.5 font-medium text-gray-900">Queued</td><td class="px-5 py-2.5 tabular-nums text-gray-700">{data.overview.queuedJobs}</td><td class="px-5 py-2.5 text-gray-400">Waiting for worker.</td></tr>
+				<tr><td class="px-5 py-2.5 font-medium text-gray-900">Leased</td><td class="px-5 py-2.5 tabular-nums text-gray-700">{data.overview.leasedJobs}</td><td class="px-5 py-2.5 text-gray-400">Leased, not yet complete.</td></tr>
+				<tr><td class="px-5 py-2.5 font-medium text-gray-900">Processing</td><td class="px-5 py-2.5 tabular-nums text-gray-700">{data.overview.processingJobs}</td><td class="px-5 py-2.5 text-gray-400">Muxing and uploading.</td></tr>
+				<tr><td class="px-5 py-2.5 font-medium text-gray-900">Ready</td><td class="px-5 py-2.5 tabular-nums text-gray-700">{data.overview.readyJobs}</td><td class="px-5 py-2.5 text-gray-400">Download ticket available.</td></tr>
+				<tr><td class="px-5 py-2.5 font-medium text-gray-900">Failed</td><td class="px-5 py-2.5 tabular-nums text-gray-700">{data.overview.failedJobs}</td><td class="px-5 py-2.5 text-gray-400">Needs attention.</td></tr>
+				<tr><td class="px-5 py-2.5 font-medium text-gray-900">Expired</td><td class="px-5 py-2.5 tabular-nums text-gray-700">{data.overview.expiredJobs}</td><td class="px-5 py-2.5 text-gray-400">Lease or lifetime expired.</td></tr>
 			</tbody>
 		</table>
 	</div>
 </section>
 
-<section class="admin-panel overflow-hidden border border-slate-200 bg-white">
-	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
-		<h3 class="text-sm font-bold text-slate-900">Recent Mux Jobs</h3>
-		<p class="mt-1 text-sm text-slate-500">20 job mới nhất theo thời gian cập nhật.</p>
+<section class="admin-panel overflow-hidden border border-gray-200 bg-white">
+	<div class="border-b border-gray-200 bg-gray-50 px-5 py-3">
+		<h3 class="text-[13px] font-semibold text-gray-900">Recent Mux Jobs</h3>
+		<p class="mt-0.5 text-[12px] text-gray-400">Last 20 jobs by update time.</p>
 	</div>
 	<AdminJobsTable jobs={data.jobs} />
 </section>

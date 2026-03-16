@@ -220,7 +220,16 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     services::auth_schema_bootstrap::ensure_better_auth_schema(&db_pool).await?;
     sqlx::migrate!("./migrations").run(&db_pool).await?;
-    init_global_proxy_pool(db_pool.clone(), &config.redis_url).await?;
+    let proxy_db_pool = if config.proxy_database_url == config.database_url {
+        db_pool.clone()
+    } else {
+        PgPoolOptions::new()
+            .max_connections(3)
+            .connect(&config.proxy_database_url)
+            .await?
+    };
+    proxy::ensure_proxy_schema(&proxy_db_pool).await?;
+    init_global_proxy_pool(proxy_db_pool, &config.proxy_redis_url).await?;
     info!("Database pool connected");
     let durable_job_repository = Arc::new(job_system::JobRepository::new(db_pool.clone()));
     let queue_publisher = Arc::new(RedisStreamsQueue::new(

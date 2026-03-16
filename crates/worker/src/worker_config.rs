@@ -5,7 +5,9 @@ use std::process::Command;
 #[derive(Clone, Debug)]
 pub struct WorkerConfig {
     pub database_url: String,
+    pub proxy_database_url: String,
     pub redis_url: String,
+    pub proxy_redis_url: String,
     pub queue_stream: String,
     pub queue_group: String,
     pub worker_id: String,
@@ -163,7 +165,14 @@ impl WorkerConfig {
             return raw_url.to_string();
         }
 
-        let Some(ip) = Self::resolve_compose_service_ip("postgres", "downloadtool-postgres") else {
+        let (service, fallback_container_name) =
+            if raw_url.contains("@127.0.0.1:15432") || raw_url.contains("@localhost:15432") {
+                ("shared-proxy-postgres", "shared-proxy-postgres")
+            } else {
+                ("postgres", "downloadtool-postgres")
+            };
+
+        let Some(ip) = Self::resolve_compose_service_ip(service, fallback_container_name) else {
             return raw_url.to_string();
         };
 
@@ -176,7 +185,14 @@ impl WorkerConfig {
             return raw_url.to_string();
         }
 
-        let Some(ip) = Self::resolve_compose_service_ip("redis", "downloadtool-redis") else {
+        let (service, fallback_container_name) =
+            if raw_url.contains("//127.0.0.1:6381") || raw_url.contains("//localhost:6381") {
+                ("shared-proxy-redis", "shared-proxy-redis")
+            } else {
+                ("redis", "downloadtool-redis")
+            };
+
+        let Some(ip) = Self::resolve_compose_service_ip(service, fallback_container_name) else {
             return raw_url.to_string();
         };
 
@@ -187,12 +203,20 @@ impl WorkerConfig {
         let host = std::env::var("HOSTNAME").unwrap_or_else(|_| "worker".to_string());
         let pid = std::process::id();
         let database_url = Self::resolve_local_database_url(&env::var("DATABASE_URL")?);
+        let proxy_database_url = Self::optional_env("PROXY_DATABASE_URL")
+            .map(|value| Self::resolve_local_database_url(&value))
+            .unwrap_or_else(|| database_url.clone());
         let redis_url = Self::resolve_local_redis_url(&Self::env_or_default("REDIS_URL", || {
             "redis://127.0.0.1:6379".to_string()
         }));
+        let proxy_redis_url = Self::optional_env("PROXY_REDIS_URL")
+            .map(|value| Self::resolve_local_redis_url(&value))
+            .unwrap_or_else(|| redis_url.clone());
         Ok(Self {
             database_url,
+            proxy_database_url,
             redis_url,
+            proxy_redis_url,
             queue_stream: Self::env_or_default("MUX_QUEUE_STREAM", || "mux_jobs".to_string()),
             queue_group: Self::env_or_default("MUX_QUEUE_GROUP", || "mux-workers".to_string()),
             worker_id: Self::env_or_default("MUX_WORKER_ID", || format!("{host}-{pid}")),

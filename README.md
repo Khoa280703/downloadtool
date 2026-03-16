@@ -38,6 +38,13 @@ http://<server-ip>:5168
 DATABASE_URL=postgres://downloadtool:...@127.0.0.1:5432/downloadtool
 REDIS_URL=redis://127.0.0.1:6379
 ```
+- Optional shared proxy source of truth:
+```text
+PROXY_DATABASE_URL=postgres://downloadtool_proxy:...@127.0.0.1:15432/downloadtool_proxy
+PROXY_REDIS_URL=redis://127.0.0.1:6381
+```
+- When `PROXY_DATABASE_URL` / `PROXY_REDIS_URL` are set, only proxy inventory + proxy health are shared.
+  Users, subscriptions, jobs, artifacts still use local `DATABASE_URL` / `REDIS_URL`.
 - Production uses the internal Compose service names `postgres` and `redis` inside the deployed stack.
 - Do not point local `.env` to shared services like `server-redis`, otherwise dev and non-dev state becomes ambiguous.
 
@@ -84,6 +91,9 @@ pnpm dev:down  # stop docker compose services
 - Local dev target should stay isolated:
 - `DATABASE_URL` -> `127.0.0.1:5432/downloadtool`
 - `REDIS_URL` -> `127.0.0.1:6379`
+- Optional shared proxy state:
+- `PROXY_DATABASE_URL` -> `127.0.0.1:15432` locally, `shared-proxy-postgres:5432` in Docker/Coolify
+- `PROXY_REDIS_URL` -> `127.0.0.1:6381` locally, `shared-proxy-redis:6379` in Docker/Coolify
 - Production should keep using internal service names from `docker/docker-compose.server.yml`:
 - `DATABASE_URL=postgres://downloadtool:...@postgres:5432/downloadtool`
 - `REDIS_URL=redis://redis:6379`

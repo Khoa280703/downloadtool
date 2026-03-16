@@ -1,132 +1,111 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import AppIcon from '$components/AppIcon.svelte';
-	import AdminActivityTable from '$components/admin/AdminActivityTable.svelte';
-	import AdminJobsTable from '$components/admin/AdminJobsTable.svelte';
-	import AdminProxyTable from '$components/admin/AdminProxyTable.svelte';
+	import AdminStatCard from '$components/admin/AdminStatCard.svelte';
+	import AdminBarChart from '$components/admin/AdminBarChart.svelte';
 
 	let { data }: { data: PageData } = $props();
 
-	const attentionJobs = $derived(
-		data.jobs.filter((job) => ['failed', 'expired', 'queued', 'leased'].includes(job.status)).slice(0, 8)
+	const totalProxies = $derived(
+		data.overview.activeProxies + data.overview.quarantinedProxies + data.overview.disabledProxies
 	);
-	const proxyRows = $derived(
-		(data.proxies.filter((proxy) => proxy.status !== 'active').slice(0, 6).length > 0
-			? data.proxies.filter((proxy) => proxy.status !== 'active').slice(0, 6)
-			: data.proxies.slice(0, 6))
+
+	const avgProxyHealth = $derived(
+		data.proxies.length
+			? Math.round(data.proxies.reduce((sum, p) => sum + p.healthScore, 0) / data.proxies.length)
+			: 0
 	);
-	const recentActivity = $derived(data.activity.slice(0, 8));
+
+	const recentFailedJobs = $derived(
+		data.jobs.filter((j) => j.status === 'failed' || j.status === 'expired').length
+	);
+
+	const proxySuccessRate = $derived(() => {
+		const total = data.proxies.reduce((s, p) => s + p.proxyRelevantAttempts24h, 0);
+		const success = data.proxies.reduce((s, p) => s + p.extractSuccesses24h, 0);
+		return total > 0 ? Math.round((success / total) * 100) : 0;
+	});
 </script>
 
 <svelte:head>
 	<title>Admin Overview</title>
 </svelte:head>
 
-<div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-	<div>
-		<h2 class="text-3xl font-black tracking-tight text-slate-900">System Overview</h2>
-		<p class="mt-1 text-sm text-slate-500">
-			Theo dõi queue, proxy fleet, artifact cache và activity gần nhất của hệ thống.
-		</p>
-	</div>
-	<a
-		href="/admin/jobs"
-		class="inline-flex items-center gap-2 rounded-xl bg-[#137fec] px-6 py-3 font-bold text-white shadow-lg shadow-[#137fec]/25 transition-all hover:opacity-90"
-	>
-		<AppIcon name="open_in_new" />
-		<span>Open Queue</span>
-	</a>
+<div class="mb-6">
+	<h2 class="text-lg font-semibold text-gray-900">System Overview</h2>
+	<p class="mt-0.5 text-[13px] text-gray-500">Real-time system health and key metrics.</p>
 </div>
 
-<section class="admin-panel mb-6 overflow-hidden border border-slate-200 bg-white">
-	<div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
-		<h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">System Summary</h3>
-	</div>
-	<div class="overflow-x-auto">
-		<table class="w-full border-collapse text-left">
-			<thead>
-				<tr class="border-b border-slate-200 bg-slate-50/60">
-					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Metric</th>
-					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Value</th>
-					<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Detail</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y divide-slate-100 text-sm">
-				<tr>
-					<td class="px-6 py-4 font-semibold text-slate-900">Queued Jobs</td>
-					<td class="px-6 py-4 text-slate-700">{data.overview.queuedJobs}</td>
-					<td class="px-6 py-4 text-slate-500">Chưa được worker nhận lease.</td>
-				</tr>
-				<tr>
-					<td class="px-6 py-4 font-semibold text-slate-900">Processing Jobs</td>
-					<td class="px-6 py-4 text-slate-700">{data.overview.processingJobs}</td>
-					<td class="px-6 py-4 text-slate-500">Đang mux và upload artifact.</td>
-				</tr>
-				<tr>
-					<td class="px-6 py-4 font-semibold text-slate-900">Ready Jobs</td>
-					<td class="px-6 py-4 text-slate-700">{data.overview.readyJobs}</td>
-					<td class="px-6 py-4 text-slate-500">Có thể cấp ticket tải xuống.</td>
-				</tr>
-				<tr>
-					<td class="px-6 py-4 font-semibold text-slate-900">Failed / Expired</td>
-					<td class="px-6 py-4 text-slate-700">{data.overview.failedJobs + data.overview.expiredJobs}</td>
-					<td class="px-6 py-4 text-slate-500">Job cần attention hoặc retry logic.</td>
-				</tr>
-				<tr>
-					<td class="px-6 py-4 font-semibold text-slate-900">Ready Artifacts</td>
-					<td class="px-6 py-4 text-slate-700">{data.overview.readyArtifacts}</td>
-					<td class="px-6 py-4 text-slate-500">Dung lượng cache file sẵn sàng để reuse.</td>
-				</tr>
-				<tr>
-					<td class="px-6 py-4 font-semibold text-slate-900">Proxy Fleet</td>
-					<td class="px-6 py-4 text-slate-700">
-						{data.overview.activeProxies + data.overview.quarantinedProxies + data.overview.disabledProxies}
-					</td>
-					<td class="px-6 py-4 text-slate-500">
-						{data.overview.activeProxies} active, {data.overview.quarantinedProxies} quarantined, {data.overview.disabledProxies} disabled.
-					</td>
-				</tr>
-				<tr>
-					<td class="px-6 py-4 font-semibold text-slate-900">Events / 24h</td>
-					<td class="px-6 py-4 text-slate-700">{data.overview.eventsLast24h}</td>
-					<td class="px-6 py-4 text-slate-500">Tổng job events và proxy health events.</td>
-				</tr>
-			</tbody>
-		</table>
-	</div>
-</section>
+<!-- KPI Cards -->
+<div class="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+	<AdminStatCard label="Queued" value={data.overview.queuedJobs} caption="Waiting for worker" />
+	<AdminStatCard label="Processing" value={data.overview.processingJobs + data.overview.leasedJobs} caption="Active pipeline" />
+	<AdminStatCard label="Ready" value={data.overview.readyJobs} caption="Download available" />
+	<AdminStatCard label="Failed" value={data.overview.failedJobs + data.overview.expiredJobs} caption="Needs attention" />
+	<AdminStatCard label="Artifacts" value={data.overview.readyArtifacts} caption="Cached for reuse" />
+	<AdminStatCard label="Proxies" value="{data.overview.activeProxies}/{totalProxies}" caption="Active / total" />
+</div>
 
-<section class="admin-panel mb-6 overflow-hidden border border-slate-200 bg-white">
-	<div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
-		<div>
-			<h3 class="text-sm font-bold text-slate-900">Jobs Requiring Attention</h3>
-			<p class="mt-1 text-sm text-slate-500">Ưu tiên xử lý các job lỗi, expired, queued hoặc còn treo lease.</p>
-		</div>
-		<a href="/admin/jobs" class="text-sm font-semibold text-[#137fec] hover:underline">View all</a>
-	</div>
-	<AdminJobsTable jobs={attentionJobs} />
-</section>
+<!-- Charts -->
+<div class="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+	<AdminBarChart
+		title="Job Status Distribution"
+		description="Current job counts by status"
+		items={[
+			{ label: 'Queued', value: data.overview.queuedJobs, tone: 'amber' },
+			{ label: 'Leased', value: data.overview.leasedJobs, tone: 'blue' },
+			{ label: 'Processing', value: data.overview.processingJobs, tone: 'blue' },
+			{ label: 'Ready', value: data.overview.readyJobs, tone: 'green' },
+			{ label: 'Failed', value: data.overview.failedJobs, tone: 'red' },
+			{ label: 'Expired', value: data.overview.expiredJobs, tone: 'red' }
+		]}
+	/>
 
-<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-	<section class="admin-panel overflow-hidden border border-slate-200 bg-white">
-		<div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
-			<div>
-				<h3 class="text-sm font-bold text-slate-900">Proxy Fleet</h3>
-				<p class="mt-1 text-sm text-slate-500">Danh sách proxy cần kiểm tra hoặc nhóm gần nhất.</p>
-			</div>
-			<a href="/admin/proxies" class="text-sm font-semibold text-[#137fec] hover:underline">Manage</a>
-		</div>
-		<AdminProxyTable proxies={proxyRows} />
-	</section>
+	<AdminBarChart
+		title="Proxy Fleet Health"
+		description="Fleet status and extract metrics"
+		items={[
+			{ label: 'Active', value: data.overview.activeProxies, tone: 'green' },
+			{ label: 'Quarantined', value: data.overview.quarantinedProxies, tone: 'red' },
+			{ label: 'Disabled', value: data.overview.disabledProxies, tone: 'amber' },
+			{ label: 'Avg. Health Score', value: avgProxyHealth, tone: 'blue' },
+			{ label: 'Extract Success %', value: proxySuccessRate(), tone: 'green' }
+		]}
+	/>
+</div>
 
-	<section class="admin-panel overflow-hidden border border-slate-200 bg-white">
-		<div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
-			<div>
-				<h3 class="text-sm font-bold text-slate-900">Recent Activity</h3>
-				<p class="mt-1 text-sm text-slate-500">Các event mới nhất từ jobs và proxies.</p>
-			</div>
-			<a href="/admin/activity" class="text-sm font-semibold text-[#137fec] hover:underline">View all</a>
+<div class="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+	<AdminBarChart
+		title="Artifact Pipeline"
+		description="Build and cache status"
+		items={[
+			{ label: 'Building', value: data.overview.buildingArtifacts, tone: 'blue' },
+			{ label: 'Ready (cached)', value: data.overview.readyArtifacts, tone: 'green' },
+			{ label: 'Events / 24h', value: data.overview.eventsLast24h, tone: 'neutral' }
+		]}
+	/>
+
+	<section class="admin-panel rounded-lg border border-gray-200 bg-white p-4">
+		<div class="border-b border-gray-100 pb-3">
+			<h3 class="text-sm font-semibold text-gray-900">Quick Links</h3>
+			<p class="mt-0.5 text-[11px] text-gray-500">Jump to detailed views</p>
 		</div>
-		<AdminActivityTable activity={recentActivity} />
+		<div class="mt-3 grid grid-cols-2 gap-2">
+			<a href="/admin/jobs" class="rounded-md border border-gray-200 px-3 py-2.5 text-center text-[13px] font-medium text-gray-700 transition hover:bg-gray-50">
+				Mux Queue
+				<span class="mt-0.5 block text-[11px] tabular-nums text-gray-400">{data.overview.queuedJobs + data.overview.processingJobs + data.overview.leasedJobs} active</span>
+			</a>
+			<a href="/admin/proxies" class="rounded-md border border-gray-200 px-3 py-2.5 text-center text-[13px] font-medium text-gray-700 transition hover:bg-gray-50">
+				Proxy Fleet
+				<span class="mt-0.5 block text-[11px] tabular-nums text-gray-400">{data.overview.activeProxies} active</span>
+			</a>
+			<a href="/admin/activity" class="rounded-md border border-gray-200 px-3 py-2.5 text-center text-[13px] font-medium text-gray-700 transition hover:bg-gray-50">
+				Activity Log
+				<span class="mt-0.5 block text-[11px] tabular-nums text-gray-400">{data.overview.eventsLast24h} events/24h</span>
+			</a>
+			<a href="/admin/capacity" class="rounded-md border border-gray-200 px-3 py-2.5 text-center text-[13px] font-medium text-gray-700 transition hover:bg-gray-50">
+				Capacity
+				<span class="mt-0.5 block text-[11px] tabular-nums text-gray-400">{recentFailedJobs} failed recent</span>
+			</a>
+		</div>
 	</section>
 </div>
