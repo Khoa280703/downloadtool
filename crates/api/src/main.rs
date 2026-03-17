@@ -55,6 +55,16 @@ type KeyedLimiter = RateLimiter<IpAddr, DefaultKeyedStateStore<IpAddr>, DefaultC
 static RATE_LIMIT_429_TOTAL: AtomicU64 = AtomicU64::new(0);
 static RATE_LIMIT_403_TOTAL: AtomicU64 = AtomicU64::new(0);
 
+async fn run_app_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
+    let mut migrator = sqlx::migrate::Migrator::new(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("app-migrations"),
+    )
+    .await?;
+    migrator.set_ignore_missing(true);
+    migrator.run(pool).await?;
+    Ok(())
+}
+
 fn make_rate_limiter() -> Arc<KeyedLimiter> {
     let quota = Quota::with_period(Duration::from_secs(6))
         .expect("quota period should be valid")
@@ -219,7 +229,7 @@ async fn main() -> anyhow::Result<()> {
         .connect(&config.database_url)
         .await?;
     services::auth_schema_bootstrap::ensure_better_auth_schema(&db_pool).await?;
-    sqlx::migrate!("./migrations").run(&db_pool).await?;
+    run_app_migrations(&db_pool).await?;
     let proxy_db_pool = if config.proxy_database_url == config.database_url {
         db_pool.clone()
     } else {

@@ -22,6 +22,17 @@ use job_system::JobProgressStore;
 use storage_factory::{build_storage_backend, init_extractor_bundle};
 use worker_config::WorkerConfig;
 
+async fn run_app_migrations(pool: &sqlx::PgPool) -> Result<()> {
+    let mut migrator = sqlx::migrate::Migrator::new(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../api/app-migrations"),
+    )
+    .await?;
+    migrator.set_ignore_missing(true);
+    migrator.run(pool).await?;
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let _ = dotenvy::dotenv();
@@ -38,7 +49,7 @@ async fn main() -> Result<()> {
         .max_connections(5)
         .connect(&config.database_url)
         .await?;
-    sqlx::migrate!("../api/migrations").run(&db_pool).await?;
+    run_app_migrations(&db_pool).await?;
     let proxy_db_pool = if config.proxy_database_url == config.database_url {
         db_pool.clone()
     } else {
