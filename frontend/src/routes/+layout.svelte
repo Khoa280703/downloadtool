@@ -11,11 +11,12 @@
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
 	import { initGA } from '$lib/analytics';
+	import { AUTH_USER_STATE_EVENT, type BrowserAuthUser } from '$lib/auth-actions';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
-	type AuthUser = { name?: string | null; email: string; image?: string | null };
+	type AuthUser = BrowserAuthUser;
 	type AuthModalComponentType = typeof import('$components/AuthModal.svelte').default;
 
 	/** GA4 Measurement ID from env */
@@ -180,8 +181,14 @@
 			syncThemeFromStorage();
 		};
 
+		const authStateHandler = (event: Event) => {
+			const customEvent = event as CustomEvent<{ user: AuthUser | null }>;
+			authUser = customEvent.detail?.user ?? null;
+		};
+
 		window.addEventListener('storage', storageHandler);
 		window.addEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+		window.addEventListener(AUTH_USER_STATE_EVENT, authStateHandler as EventListener);
 
 		// Clipboard auto-read: detect YouTube URL when user returns to tab
 		const visibilityHandler = async () => {
@@ -204,6 +211,7 @@
 			return () => {
 				window.removeEventListener('storage', storageHandler);
 				window.removeEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+				window.removeEventListener(AUTH_USER_STATE_EVENT, authStateHandler as EventListener);
 				document.removeEventListener('visibilitychange', visibilityHandler);
 
 			if (serviceWorkerMessageHandler && 'serviceWorker' in navigator) {
