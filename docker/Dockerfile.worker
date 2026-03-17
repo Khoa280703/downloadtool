@@ -63,6 +63,7 @@ RUN set -eux; \
 RUN useradd -m -u 1000 -s /bin/bash appuser
 
 COPY --from=builder /app/target/release/mux-worker /usr/local/bin/
+COPY --from=builder /app/crates/api/app-migrations /app/app-migrations
 
 RUN mkdir -p /app/extractors /app/mux-artifacts /app/proxy-state && chown -R appuser:appuser /app
 

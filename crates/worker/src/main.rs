@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,14 +23,35 @@ use storage_factory::{build_storage_backend, init_extractor_bundle};
 use worker_config::WorkerConfig;
 
 async fn run_app_migrations(pool: &sqlx::PgPool) -> Result<()> {
-    let mut migrator = sqlx::migrate::Migrator::new(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../api/app-migrations"),
-    )
-    .await?;
+    let mut migrator = sqlx::migrate::Migrator::new(resolve_app_migrations_dir())
+        .await?;
     migrator.set_ignore_missing(true);
     migrator.run(pool).await?;
     Ok(())
+}
+
+fn resolve_app_migrations_dir() -> PathBuf {
+    let compile_time_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../api/app-migrations");
+    if compile_time_dir.exists() {
+        return compile_time_dir;
+    }
+
+    let runtime_dir = PathBuf::from("/app/app-migrations");
+    if runtime_dir.exists() {
+        return runtime_dir;
+    }
+
+    if let Ok(executable_path) = std::env::current_exe() {
+        if let Some(bin_dir) = executable_path.parent() {
+            let sibling_dir = bin_dir.join("app-migrations");
+            if sibling_dir.exists() {
+                return sibling_dir;
+            }
+        }
+    }
+
+    compile_time_dir
 }
 
 #[tokio::main]

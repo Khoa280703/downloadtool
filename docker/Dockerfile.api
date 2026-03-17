@@ -85,6 +85,7 @@ RUN useradd -m -u 1000 -s /bin/bash appuser
 
 # Copy binary from builder
 COPY --from=builder /app/target/release/api-server /usr/local/bin/
+COPY --from=builder /app/crates/api/app-migrations /app/app-migrations
 
 
 # Create directories

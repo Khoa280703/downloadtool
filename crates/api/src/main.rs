@@ -4,7 +4,7 @@
 
 use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU32;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -56,13 +56,34 @@ static RATE_LIMIT_429_TOTAL: AtomicU64 = AtomicU64::new(0);
 static RATE_LIMIT_403_TOTAL: AtomicU64 = AtomicU64::new(0);
 
 async fn run_app_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
-    let mut migrator = sqlx::migrate::Migrator::new(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("app-migrations"),
-    )
-    .await?;
+    let mut migrator = sqlx::migrate::Migrator::new(resolve_app_migrations_dir())
+        .await?;
     migrator.set_ignore_missing(true);
     migrator.run(pool).await?;
     Ok(())
+}
+
+fn resolve_app_migrations_dir() -> PathBuf {
+    let compile_time_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("app-migrations");
+    if compile_time_dir.exists() {
+        return compile_time_dir;
+    }
+
+    let runtime_dir = PathBuf::from("/app/app-migrations");
+    if runtime_dir.exists() {
+        return runtime_dir;
+    }
+
+    if let Ok(executable_path) = std::env::current_exe() {
+        if let Some(bin_dir) = executable_path.parent() {
+            let sibling_dir = bin_dir.join("app-migrations");
+            if sibling_dir.exists() {
+                return sibling_dir;
+            }
+        }
+    }
+
+    compile_time_dir
 }
 
 fn make_rate_limiter() -> Arc<KeyedLimiter> {
