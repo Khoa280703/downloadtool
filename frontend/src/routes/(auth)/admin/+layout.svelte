@@ -88,10 +88,6 @@
 							<span>Artifacts</span>
 							<span class="font-semibold tabular-nums text-gray-900">{data.overview.readyArtifacts}</span>
 						</div>
-						<div class="flex items-center justify-between">
-							<span>Events 24h</span>
-							<span class="font-semibold tabular-nums text-gray-900">{data.overview.eventsLast24h}</span>
-						</div>
 					</div>
 				</div>
 

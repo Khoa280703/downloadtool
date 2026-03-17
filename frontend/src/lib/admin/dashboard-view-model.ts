@@ -154,7 +154,7 @@ export function getAdminSectionBadge(sectionId: AdminSectionId, overview: AdminO
 		case 'proxies':
 			return overview.quarantinedProxies || null;
 		case 'activity':
-			return overview.eventsLast24h || null;
+			return null;
 		case 'capacity':
 			return overview.buildingArtifacts || null;
 		default:
