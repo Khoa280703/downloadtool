@@ -1,4 +1,53 @@
 services:
+  shared-proxy-postgres:
+    image: postgres:16-alpine
+    container_name: shared-proxy-postgres
+    environment:
+      - POSTGRES_DB=downloadtool_proxy
+      - POSTGRES_USER=downloadtool_proxy
+      - POSTGRES_PASSWORD=${SHARED_PROXY_POSTGRES_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=100
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - shared-proxy-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U downloadtool_proxy -d downloadtool_proxy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  shared-proxy-redis:
+    image: redis:7-alpine
+    container_name: shared-proxy-redis
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "60"
+      - "1000"
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "127.0.0.1:6381:6379"
+    volumes:
+      - shared-proxy-redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   postgres:
     image: postgres:16-alpine
     container_name: downloadtool-postgres
@@ -28,9 +77,9 @@ services:
       - RUST_LOG=info
       - PROXY_QUARANTINE_FILE=/app/proxy-state/quarantined-proxies.txt
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
-      - PROXY_DATABASE_URL=${PROXY_DATABASE_URL}
+      - PROXY_DATABASE_URL=postgres://downloadtool_proxy:${SHARED_PROXY_POSTGRES_PASSWORD}@shared-proxy-postgres:5432/downloadtool_proxy
       - REDIS_URL=redis://redis:6379
-      - PROXY_REDIS_URL=${PROXY_REDIS_URL}
+      - PROXY_REDIS_URL=redis://shared-proxy-redis:6379
       - PROXY_QUARANTINE_TTL_SECS=${PROXY_QUARANTINE_TTL_SECS}
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
       - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND}
@@ -54,6 +103,10 @@ services:
         condition: service_started
       redis:
         condition: service_started
+      shared-proxy-postgres:
+        condition: service_healthy
+      shared-proxy-redis:
+        condition: service_healthy
     labels:
       - "traefik.docker.network=coolify"
 
@@ -66,9 +119,9 @@ services:
       - RUST_LOG=info
       - PROXY_QUARANTINE_FILE=/app/proxy-state/quarantined-proxies.txt
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
-      - PROXY_DATABASE_URL=${PROXY_DATABASE_URL}
+      - PROXY_DATABASE_URL=postgres://downloadtool_proxy:${SHARED_PROXY_POSTGRES_PASSWORD}@shared-proxy-postgres:5432/downloadtool_proxy
       - REDIS_URL=redis://redis:6379
-      - PROXY_REDIS_URL=${PROXY_REDIS_URL}
+      - PROXY_REDIS_URL=redis://shared-proxy-redis:6379
       - PROXY_QUARANTINE_TTL_SECS=${PROXY_QUARANTINE_TTL_SECS}
       - MUX_QUEUE_STREAM=${MUX_QUEUE_STREAM}
       - MUX_ARTIFACT_BACKEND=${MUX_ARTIFACT_BACKEND}
@@ -87,6 +140,10 @@ services:
         condition: service_started
       redis:
         condition: service_started
+      shared-proxy-postgres:
+        condition: service_healthy
+      shared-proxy-redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -101,9 +158,9 @@ services:
       - HOST=0.0.0.0
       - ORIGIN=${ORIGIN}
       - DATABASE_URL=postgres://downloadtool:${POSTGRES_PASSWORD}@postgres:5432/downloadtool
-      - PROXY_DATABASE_URL=${PROXY_DATABASE_URL}
+      - PROXY_DATABASE_URL=postgres://downloadtool_proxy:${SHARED_PROXY_POSTGRES_PASSWORD}@shared-proxy-postgres:5432/downloadtool_proxy
       - REDIS_URL=redis://redis:6379
-      - PROXY_REDIS_URL=${PROXY_REDIS_URL}
+      - PROXY_REDIS_URL=redis://shared-proxy-redis:6379
       - PROXY_QUARANTINE_TTL_SECS=${PROXY_QUARANTINE_TTL_SECS}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_TRUSTED_ORIGINS=${BETTER_AUTH_TRUSTED_ORIGINS}
@@ -118,6 +175,8 @@ services:
     depends_on:
       - postgres
       - api
+      - shared-proxy-postgres
+      - shared-proxy-redis
     networks:
       default:
     labels:
@@ -128,3 +187,7 @@ volumes:
   postgres-data:
   redis-data:
   proxy-quarantine-data:
+  shared-proxy-postgres-data:
+    name: shared-proxy-postgres-data
+  shared-proxy-redis-data:
+    name: shared-proxy-redis-data

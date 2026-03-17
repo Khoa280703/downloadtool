@@ -40,13 +40,15 @@ REDIS_URL=redis://127.0.0.1:6379
 ```
 - Optional shared proxy source of truth:
 ```text
+SHARED_PROXY_POSTGRES_PASSWORD=...
 PROXY_DATABASE_URL=postgres://downloadtool_proxy:...@127.0.0.1:15432/downloadtool_proxy
 PROXY_REDIS_URL=redis://127.0.0.1:6381
 PROXY_QUARANTINE_TTL_SECS=172800
 ```
 - When `PROXY_DATABASE_URL` / `PROXY_REDIS_URL` are set, only proxy inventory + proxy health are shared.
   Users, subscriptions, jobs, artifacts still use local `DATABASE_URL` / `REDIS_URL`.
-- Production uses the internal Compose service names `postgres` and `redis` inside the deployed stack.
+- Production uses internal Compose service names inside `docker/docker-compose.server.yml`.
+- Shared proxy Postgres/Redis now live in the same compose file as the app stack.
 - Do not point local `.env` to shared services like `server-redis`, otherwise dev and non-dev state becomes ambiguous.
 
 ## Logs
@@ -73,7 +75,7 @@ pnpm dev:down
 ## Scripts Summary
 
 ```bash
-pnpm dev:db    # start postgres container
+pnpm dev:db    # start postgres/redis + shared proxy postgres/redis containers
 pnpm dev:be    # run rust api on host (expects local postgres/redis from dev:db)
 pnpm dev:worker # run mux worker on host (expects local postgres/redis from dev:db)
 pnpm dev:fe    # run sveltekit on host (auto-load .env + auto-resolve DB container IP)

@@ -9,7 +9,7 @@
     "onlyBuiltDependencies": ["esbuild", "@parcel/watcher", "vite-plugin-monkey"]
   },
   "scripts": {
-    "dev:db": "docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml up -d postgres redis",
+    "dev:db": "docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml up -d postgres redis shared-proxy-postgres shared-proxy-redis",
     "dev:down": "docker compose --project-directory . --env-file .env -f docker/docker-compose.server.yml down",
     "dev:be": "bash -lc 'set -a; source .env; set +a; DATABASE_URL=\"${DATABASE_URL:-postgres://downloadtool:${POSTGRES_PASSWORD}@127.0.0.1:5432/downloadtool}\"; REDIS_URL=\"${REDIS_URL:-redis://127.0.0.1:6379}\"; export DATABASE_URL REDIS_URL; cargo run -p api --bin api-server'",
     "dev:worker": "bash -lc 'set -a; source .env; set +a; DATABASE_URL=\"${DATABASE_URL:-postgres://downloadtool:${POSTGRES_PASSWORD}@127.0.0.1:5432/downloadtool}\"; REDIS_URL=\"${REDIS_URL:-redis://127.0.0.1:6379}\"; export DATABASE_URL REDIS_URL; cargo run -p worker --bin mux-worker'",
