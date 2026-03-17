@@ -2,7 +2,6 @@
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
-	import { page } from '$app/stores';
 	import BatchProgress from '$components/BatchProgress.svelte';
 	import AppIcon from '$components/AppIcon.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
@@ -69,7 +68,7 @@
 	let stagedEntries = $state<QueueEntry[]>([]);
 	let playlistCompletionNotified = $state(false);
 	/** undefined = loading skeleton, null = unauthenticated, object = authenticated */
-	let authUser = $state<AuthUser | null | undefined>(($page.data.authUser as AuthUser | null | undefined) ?? null);
+	let authUser = $state<AuthUser | null | undefined>(undefined);
 	let redirectTo = $state('/');
 	const SEO_ORIGIN = 'https://download.khoadangbui.online';
 	const SEO_LOCALES = [
@@ -185,7 +184,7 @@
 
 	async function refreshAuthUser(): Promise<void> {
 		try {
-			const resp = await fetch('/api/auth/get-session', { credentials: 'include', cache: 'no-store' });
+			const resp = await fetch('/api/auth/get-session', { credentials: 'include' });
 			authUser = resp.ok ? ((await resp.json())?.user ?? null) : null;
 		} catch {
 			authUser = null;
@@ -246,10 +245,6 @@
 	onDestroy(() => {
 		resetWorkerState();
 		resetBatch();
-	});
-
-	$effect(() => {
-		authUser = ($page.data.authUser as AuthUser | null | undefined) ?? null;
 	});
 
 	$effect(() => {

@@ -11,9 +11,8 @@
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
 	import { initGA } from '$lib/analytics';
-	import type { LayoutData } from './$types';
 
-	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
+	let { children } = $props();
 
 	type AuthUser = { name?: string | null; email: string; image?: string | null };
 	type AuthModalComponentType = typeof import('$components/AuthModal.svelte').default;
@@ -54,7 +53,7 @@
 
 	async function refreshAuthUser(): Promise<void> {
 		try {
-			const resp = await fetch('/api/auth/get-session', { credentials: 'include', cache: 'no-store' });
+			const resp = await fetch('/api/auth/get-session', { credentials: 'include' });
 			authUser = resp.ok ? ((await resp.json())?.user ?? null) : null;
 		} catch {
 			authUser = null;
@@ -213,10 +212,6 @@
 	});
 
 	// Keep layout theme in sync when navigating from pages that write localStorage in-tab.
-	$effect(() => {
-		authUser = data.authUser ?? null;
-	});
-
 	$effect(() => {
 		if (!browser) return;
 
