@@ -43,9 +43,8 @@
 	import user2Avatar from '$lib/assets/testimonials/user-2.webp';
 	import user3Avatar from '$lib/assets/testimonials/user-3.webp';
 	import { currentDownload } from '$stores/download';
-	import { AUTH_USER_STATE_EVENT, type BrowserAuthUser, broadcastAuthUserState } from '$lib/auth-actions';
 
-	type AuthUser = BrowserAuthUser;
+	type AuthUser = { name?: string | null; email: string; image?: string | null };
 	type AuthModalComponentType = typeof import('$components/AuthModal.svelte').default;
 
 	let inputUrl = $state('');
@@ -188,10 +187,8 @@
 		try {
 			const resp = await fetch('/api/auth/get-session', { credentials: 'include', cache: 'no-store' });
 			authUser = resp.ok ? ((await resp.json())?.user ?? null) : null;
-			broadcastAuthUserState(authUser ?? null);
 		} catch {
 			authUser = null;
-			broadcastAuthUserState(null);
 		}
 	}
 
@@ -237,19 +234,12 @@
 			syncThemeFromStorage();
 		};
 
-		const authStateHandler = (event: Event) => {
-			const customEvent = event as CustomEvent<{ user: AuthUser | null }>;
-			authUser = customEvent.detail?.user ?? null;
-		};
-
 		window.addEventListener('storage', storageHandler);
 		window.addEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
-		window.addEventListener(AUTH_USER_STATE_EVENT, authStateHandler as EventListener);
 
 		return () => {
 			window.removeEventListener('storage', storageHandler);
 			window.removeEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
-			window.removeEventListener(AUTH_USER_STATE_EVENT, authStateHandler as EventListener);
 		};
 	});
 
@@ -260,7 +250,6 @@
 
 	$effect(() => {
 		authUser = ($page.data.authUser as AuthUser | null | undefined) ?? null;
-		broadcastAuthUserState(authUser ?? null);
 	});
 
 	$effect(() => {

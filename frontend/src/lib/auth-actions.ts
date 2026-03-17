@@ -1,23 +1,5 @@
 import * as m from '$lib/paraglide/messages';
 
-export const AUTH_USER_STATE_EVENT = 'downloadtool-auth-user-state';
-
-export type BrowserAuthUser = {
-	name?: string | null;
-	email: string;
-	image?: string | null;
-};
-
-export function broadcastAuthUserState(user: BrowserAuthUser | null): void {
-	if (typeof window === 'undefined') return;
-
-	window.dispatchEvent(
-		new CustomEvent<{ user: BrowserAuthUser | null }>(AUTH_USER_STATE_EVENT, {
-			detail: { user }
-		})
-	);
-}
-
 function normalizeSignOutError(status: number, payload: unknown): string {
 	if (payload && typeof payload === 'object' && 'message' in payload) {
 		const message = payload.message;
@@ -32,8 +14,7 @@ function normalizeSignOutError(status: number, payload: unknown): string {
 export async function signOutFromBrowser(): Promise<void> {
 	const response = await fetch('/api/auth/sign-out', {
 		method: 'POST',
-		credentials: 'include',
-		cache: 'no-store'
+		credentials: 'include'
 	});
 
 	if (!response.ok) {
@@ -45,6 +26,4 @@ export async function signOutFromBrowser(): Promise<void> {
 		}
 		throw new Error(normalizeSignOutError(response.status, payload));
 	}
-
-	broadcastAuthUserState(null);
 }
