@@ -27,6 +27,7 @@ export type AdminJobRow = {
 	lastError: string | null;
 	sourceUrl: string | null;
 	updatedAt: string;
+	detailJson: Record<string, unknown> | null;
 };
 
 export type AdminProxyRow = {
@@ -54,16 +55,29 @@ export type AdminProxyRow = {
 	timeoutHits24h: number;
 	p95ExtractLatencyMs: number | null;
 	lastExtractOutcome: string | null;
+	downloadAccessCount: number;
+	downloadAccesses24h: number;
+	muxJobAccesses24h: number;
+	directStreamAccesses24h: number;
+	lastDownloadAccessAt: string | null;
 };
 
 export type AdminActivityRow = {
 	id: string;
-	scope: 'job' | 'proxy';
-	entityId: string;
+	source: 'job' | 'proxy' | 'audit';
+	scope: string;
+	entityId: string | null;
 	label: string;
 	eventType: string;
 	detail: string | null;
+	actorLabel: string | null;
+	clientIp: string | null;
+	routePath: string | null;
+	method: string | null;
+	statusCode: number | null;
+	outcome: string | null;
 	createdAt: string;
+	detailJson: Record<string, unknown> | null;
 };
 
 export type AdminDashboardData = {

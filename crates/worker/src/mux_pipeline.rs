@@ -9,6 +9,7 @@ use muxer::{remux_streams, MuxerError};
 use object_store::{StorageBackend, StoredArtifact, UploadStream};
 use proxy::anti_bot::AntiBotError;
 use proxy::Platform;
+use proxy::{global_proxy_pool, ProxyDownloadAccessEvent};
 use tracing::{info, warn};
 
 use crate::job_progress_publisher::JobProgressPublisher;
@@ -103,6 +104,13 @@ pub async fn upload_muxed_artifact(
         )
         .await
         .with_context(|| format!("failed to fetch streams for job {job_id}"))?;
+        record_mux_proxy_download_access(
+            job_id,
+            request.source_url.as_deref(),
+            request.video_format_id.as_deref(),
+            video_proxy.as_deref(),
+            audio_proxy.as_deref(),
+        );
         info!(
             job_id,
             artifact_key,
@@ -206,6 +214,50 @@ pub async fn upload_muxed_artifact(
     }
 
     Err(anyhow!("mux upload exhausted refresh attempts"))
+}
+
+fn record_mux_proxy_download_access(
+    job_id: &str,
+    source_url: Option<&str>,
+    format_id: Option<&str>,
+    video_proxy: Option<&str>,
+    audio_proxy: Option<&str>,
+) {
+    let Some(pool) = global_proxy_pool() else {
+        return;
+    };
+
+    let mut grouped_roles: Vec<(String, Vec<String>)> = Vec::new();
+    for (proxy_url, role) in [(video_proxy, "video"), (audio_proxy, "audio")] {
+        let Some(proxy_url) = proxy_url else {
+            continue;
+        };
+
+        if let Some((_, roles)) = grouped_roles
+            .iter_mut()
+            .find(|(grouped_proxy_url, _)| grouped_proxy_url == proxy_url)
+        {
+            roles.push(role.to_string());
+            continue;
+        }
+
+        grouped_roles.push((proxy_url.to_string(), vec![role.to_string()]));
+    }
+
+    for (proxy_url, roles) in grouped_roles {
+        pool.record_download_access(
+            &proxy_url,
+            ProxyDownloadAccessEvent {
+                kind: "mux_job".to_string(),
+                roles,
+                job_id: Some(job_id.to_string()),
+                source_url: source_url.map(str::to_string),
+                format_id: format_id.map(str::to_string),
+                range_start: None,
+                range_end: None,
+            },
+        );
+    }
 }
 
 fn build_refresh_options(request: &MuxJobRequest) -> FetchBothRefreshOptions {

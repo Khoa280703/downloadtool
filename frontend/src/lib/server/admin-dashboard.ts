@@ -24,6 +24,12 @@ const overviewQuery = `
 		(SELECT COUNT(*) FROM mux_job_events WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS "jobEventsLast24h"
 `;
 
+const auditOverviewQuery = `
+	SELECT COUNT(*)::int AS "auditEventsLast24h"
+	FROM audit_events
+	WHERE created_at >= NOW() - INTERVAL '24 hours'
+`;
+
 const proxyOverviewQuery = `
 	SELECT
 		(SELECT COUNT(*)::int FROM proxies WHERE status = 'active') AS "activeProxies",
@@ -43,9 +49,65 @@ const jobsQuery = `
 		a.backend,
 		j.last_error AS "lastError",
 		j.source_url AS "sourceUrl",
-		TO_TIMESTAMP(j.updated_at_ms / 1000.0) AS "updatedAt"
+		TO_TIMESTAMP(j.updated_at_ms / 1000.0) AS "updatedAt",
+		jsonb_build_object(
+			'userId', j.user_id,
+			'sessionId', j.session_id,
+			'requestHash', j.request_hash,
+			'dedupeKey', j.dedupe_key,
+			'sourceUrl', j.source_url,
+			'videoUrl', j.video_url,
+			'audioUrl', j.audio_url,
+			'videoFormatId', j.video_format_id,
+			'audioFormatId', j.audio_format_id,
+			'leaseOwner', j.lease_owner,
+			'leaseExpiresAtMs', j.lease_expires_at_ms,
+			'createdAtMs', j.created_at_ms,
+			'updatedAtMs', j.updated_at_ms,
+			'createdAt', j.created_at,
+			'updatedAt', j.updated_at,
+			'completedAt', j.completed_at,
+			'deleteAfterAt', j.delete_after_at,
+			'artifact', jsonb_build_object(
+				'id', a.id,
+				'dedupeKey', a.dedupe_key,
+				'artifactKey', a.artifact_key,
+				'backend', a.backend,
+				'localPath', a.local_path,
+				'storageBucket', a.storage_bucket,
+				'objectKey', a.object_key,
+				'contentType', a.content_type,
+				'status', a.status,
+				'sizeBytes', a.size_bytes,
+				'etag', a.etag,
+				'sha256', a.sha256,
+				'createdAt', a.created_at,
+				'readyAt', a.ready_at,
+				'expiresAt', a.expires_at,
+				'lastAccessedAt', a.last_accessed_at
+			),
+			'recentEvents', COALESCE(job_events.recent_events, '[]'::jsonb)
+		) AS "detailJson"
 	FROM mux_jobs j
 	LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
+	LEFT JOIN LATERAL (
+		SELECT jsonb_agg(
+			jsonb_build_object(
+				'id', e.id,
+				'eventType', e.event_type,
+				'payload', e.payload_json,
+				'createdAt', e.created_at
+			)
+			ORDER BY e.created_at DESC
+		) AS recent_events
+		FROM (
+			SELECT id, event_type, payload_json, created_at
+			FROM mux_job_events
+			WHERE job_id = j.id
+			ORDER BY created_at DESC
+			LIMIT 12
+		) e
+	) job_events ON TRUE
 	ORDER BY j.updated_at_ms DESC
 	LIMIT 20
 `;
@@ -79,7 +141,12 @@ const proxiesQuery = `
 		COALESCE(metrics.combined_360_only_hits_24h, 0)::int AS "combined360OnlyHits24h",
 		COALESCE(metrics.timeout_hits_24h, 0)::int AS "timeoutHits24h",
 		metrics.p95_extract_latency_ms::double precision AS "p95ExtractLatencyMs",
-		metrics.last_extract_outcome AS "lastExtractOutcome"
+		metrics.last_extract_outcome AS "lastExtractOutcome",
+		COALESCE(downloads.download_access_count, 0)::int AS "downloadAccessCount",
+		COALESCE(downloads.download_accesses_24h, 0)::int AS "downloadAccesses24h",
+		COALESCE(downloads.mux_job_accesses_24h, 0)::int AS "muxJobAccesses24h",
+		COALESCE(downloads.direct_stream_accesses_24h, 0)::int AS "directStreamAccesses24h",
+		downloads.last_download_access_at AS "lastDownloadAccessAt"
 	FROM proxies p
 	LEFT JOIN LATERAL (
 		SELECT
@@ -119,6 +186,25 @@ const proxiesQuery = `
 		  AND event_type = 'extract_result'
 		  AND created_at >= NOW() - INTERVAL '24 hours'
 	) metrics ON TRUE
+	LEFT JOIN LATERAL (
+		SELECT
+			COUNT(*)::bigint AS download_access_count,
+			COUNT(*) FILTER (
+				WHERE created_at >= NOW() - INTERVAL '24 hours'
+			)::bigint AS download_accesses_24h,
+			COUNT(*) FILTER (
+				WHERE created_at >= NOW() - INTERVAL '24 hours'
+				  AND COALESCE(payload_json->>'kind', '') = 'mux_job'
+			)::bigint AS mux_job_accesses_24h,
+			COUNT(*) FILTER (
+				WHERE created_at >= NOW() - INTERVAL '24 hours'
+				  AND COALESCE(payload_json->>'kind', '') LIKE 'direct_stream%'
+			)::bigint AS direct_stream_accesses_24h,
+			MAX(created_at) AS last_download_access_at
+		FROM proxy_health_events
+		WHERE proxy_id = p.id
+		  AND event_type = 'download_access'
+	) downloads ON TRUE
 	ORDER BY
 		CASE p.status
 			WHEN 'quarantined' THEN 0
@@ -138,39 +224,146 @@ function getProxyQuarantineTtlSecs(): number {
 const jobActivityQuery = `
 	SELECT
 		e.id,
+		'job'::text AS source,
 		'job'::text AS scope,
 		e.job_id AS "entityId",
 		COALESCE(j.title, j.id) AS label,
 		e.event_type AS "eventType",
 		LEFT(COALESCE(e.payload_json::text, ''), 180) AS detail,
-		e.created_at AS "createdAt"
+		NULL::text AS "actorLabel",
+		NULL::text AS "clientIp",
+		NULL::text AS "routePath",
+		NULL::text AS method,
+		NULL::int AS "statusCode",
+		NULL::text AS outcome,
+		e.created_at AS "createdAt",
+		jsonb_build_object(
+			'jobStatus', j.status,
+			'title', j.title,
+			'userId', j.user_id,
+			'sessionId', j.session_id,
+			'lastError', j.last_error,
+			'sourceUrl', j.source_url,
+			'payload', e.payload_json
+		) AS "detailJson"
 	FROM mux_job_events e
 	JOIN mux_jobs j ON j.id = e.job_id
 	ORDER BY e.created_at DESC
-	LIMIT 24
+	LIMIT 40
 `;
 
 const proxyActivityQuery = `
 	SELECT
 		e.id,
+		'proxy'::text AS source,
 		'proxy'::text AS scope,
 		p.id AS "entityId",
 		COALESCE(NULLIF(p.display_name, ''), p.proxy_url) AS label,
 		e.event_type AS "eventType",
 		e.reason AS detail,
-		e.created_at AS "createdAt"
+		NULL::text AS "actorLabel",
+		NULL::text AS "clientIp",
+		NULL::text AS "routePath",
+		NULL::text AS method,
+		NULL::int AS "statusCode",
+		NULL::text AS outcome,
+		e.created_at AS "createdAt",
+		jsonb_build_object(
+			'proxyUrl', p.proxy_url,
+			'displayName', p.display_name,
+			'status', p.status,
+			'source', p.source,
+			'notes', p.notes,
+			'healthScore', p.health_score,
+			'autoDisabledAt', p.auto_disabled_at,
+			'autoDisabledReason', p.auto_disabled_reason,
+			'lastQuarantinedAt', p.last_quarantined_at,
+			'lastQuarantineReason', p.last_quarantine_reason,
+			'reason', e.reason,
+			'payload', e.payload_json
+		) AS "detailJson"
 	FROM proxy_health_events e
 	JOIN proxies p ON p.id = e.proxy_id
 	ORDER BY e.created_at DESC
-	LIMIT 24
+	LIMIT 40
 `;
+
+const auditActivityQuery = `
+	SELECT
+		id,
+		'audit'::text AS source,
+		scope,
+		entity_id AS "entityId",
+		COALESCE(NULLIF(target_label, ''), NULLIF(route_path, ''), event_type) AS label,
+		event_type AS "eventType",
+		detail,
+		COALESCE(NULLIF(user_email, ''), NULLIF(user_id, ''), NULLIF(download_session_id, ''), NULLIF(client_ip, ''), actor_type) AS "actorLabel",
+		client_ip AS "clientIp",
+		route_path AS "routePath",
+		method,
+		status_code AS "statusCode",
+		outcome,
+		created_at AS "createdAt",
+		jsonb_build_object(
+			'scope', scope,
+			'entityId', entity_id,
+			'targetLabel', target_label,
+			'routePath', route_path,
+			'method', method,
+			'statusCode', status_code,
+			'outcome', outcome,
+			'actorType', actor_type,
+			'userId', user_id,
+			'userEmail', user_email,
+			'authSessionId', auth_session_id,
+			'downloadSessionId', download_session_id,
+			'clientIp', client_ip,
+			'userAgent', user_agent,
+			'detail', detail,
+			'payload', payload_json
+		) AS "detailJson"
+	FROM audit_events
+	ORDER BY created_at DESC
+	LIMIT 80
+`;
+
+type QueryError = Error & {
+	code?: string;
+};
+
+async function safeLoadAuditEventsLast24h(): Promise<number> {
+	const pool = getDatabasePool();
+	try {
+		const result = await pool.query<OverviewRow>(auditOverviewQuery);
+		return Number(result.rows[0]?.auditEventsLast24h ?? 0);
+	} catch (error) {
+		if ((error as QueryError)?.code !== '42P01') {
+			console.error('Failed to query audit event totals:', error);
+		}
+		return 0;
+	}
+}
+
+async function safeLoadAuditActivity(): Promise<AdminActivityRow[]> {
+	const pool = getDatabasePool();
+	try {
+		const result = await pool.query<AdminActivityRow>(auditActivityQuery);
+		return result.rows;
+	} catch (error) {
+		if ((error as QueryError)?.code !== '42P01') {
+			console.error('Failed to query audit activity:', error);
+		}
+		return [];
+	}
+}
 
 export async function loadAdminOverview(): Promise<AdminOverview> {
 	const appPool = getDatabasePool();
 	const proxyPool = getProxyDatabasePool();
-	const [overviewResult, proxyOverviewResult] = await Promise.all([
+	const [overviewResult, proxyOverviewResult, auditEventsLast24h] = await Promise.all([
 		appPool.query<OverviewRow>(overviewQuery),
-		proxyPool.query<OverviewRow>(proxyOverviewQuery)
+		proxyPool.query<OverviewRow>(proxyOverviewQuery),
+		safeLoadAuditEventsLast24h()
 	]);
 	const jobOverview = overviewResult.rows[0] ?? {};
 	const proxyOverview = proxyOverviewResult.rows[0] ?? {};
@@ -180,7 +373,10 @@ export async function loadAdminOverview(): Promise<AdminOverview> {
 		activeProxies: Number(proxyOverview.activeProxies ?? 0),
 		quarantinedProxies: Number(proxyOverview.quarantinedProxies ?? 0),
 		disabledProxies: Number(proxyOverview.disabledProxies ?? 0),
-		eventsLast24h: Number(jobOverview.jobEventsLast24h ?? 0) + Number(proxyOverview.proxyEventsLast24h ?? 0)
+		eventsLast24h:
+			Number(jobOverview.jobEventsLast24h ?? 0) +
+			auditEventsLast24h +
+			Number(proxyOverview.proxyEventsLast24h ?? 0)
 	} as AdminOverview;
 }
 
@@ -202,25 +398,27 @@ export async function loadAdminProxies(): Promise<AdminProxyRow[]> {
 		lastQuarantinedAt: normalizeDate(row.lastQuarantinedAt),
 		quarantineExpiresAt: normalizeDate(row.quarantineExpiresAt),
 		updatedAt: normalizeDate(row.updatedAt) ?? row.updatedAt,
-		lastEventAt: normalizeDate(row.lastEventAt)
+		lastEventAt: normalizeDate(row.lastEventAt),
+		lastDownloadAccessAt: normalizeDate(row.lastDownloadAccessAt)
 	}));
 }
 
 export async function loadAdminActivity(): Promise<AdminActivityRow[]> {
 	const appPool = getDatabasePool();
 	const proxyPool = getProxyDatabasePool();
-	const [jobActivityResult, proxyActivityResult] = await Promise.all([
+	const [jobActivityResult, auditActivityResult, proxyActivityResult] = await Promise.all([
 		appPool.query<AdminActivityRow>(jobActivityQuery),
+		safeLoadAuditActivity(),
 		proxyPool.query<AdminActivityRow>(proxyActivityQuery)
 	]);
 
-	return [...jobActivityResult.rows, ...proxyActivityResult.rows]
+	return [...jobActivityResult.rows, ...proxyActivityResult.rows, ...auditActivityResult]
 		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-		.slice(0, 24)
+		.slice(0, 80)
 		.map((row) => ({
-		...row,
-		createdAt: normalizeDate(row.createdAt) ?? row.createdAt
-	}));
+			...row,
+			createdAt: normalizeDate(row.createdAt) ?? row.createdAt
+		}));
 }
 
 export async function loadAdminDashboard(): Promise<AdminDashboardData> {

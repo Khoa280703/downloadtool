@@ -46,6 +46,16 @@
 				return 'neutral';
 			case 'proxy':
 				return 'amber';
+			case 'admin':
+				return 'sky';
+			case 'download':
+				return 'emerald';
+			case 'auth':
+				return 'sky';
+			case 'system':
+				return 'rose';
+			default:
+				return 'neutral';
 		}
 	}
 

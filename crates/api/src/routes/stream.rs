@@ -23,6 +23,7 @@ use proxy::client::ProxyError;
 use proxy::client::{parse_range_header, validate_stream_url, ProxyClient, Range};
 use proxy::stream::forward_stream_headers;
 use proxy::Platform;
+use proxy::{global_proxy_pool, ProxyDownloadAccessEvent};
 
 /// Chunk size for YouTube CDN throttle bypass: 9.5 MB.
 ///
@@ -364,7 +365,7 @@ async fn proxy_single_request(
     let mut refresh_attempts = 0usize;
     loop {
         let pinned_proxy = extractor::resolve_stream_proxy(&target_url).await;
-        let client = ProxyClient::new_with_proxy(platform, pinned_proxy).map_err(|e| ApiError {
+        let client = ProxyClient::new_with_proxy(platform, pinned_proxy.clone()).map_err(|e| ApiError {
             message: format!("Failed to create proxy client: {}", e),
             status: StatusCode::INTERNAL_SERVER_ERROR,
             retry_after_secs: None,
@@ -372,6 +373,13 @@ async fn proxy_single_request(
 
         match client.fetch_stream_with_headers(&target_url, range).await {
             Ok((source_headers, byte_stream)) => {
+                record_stream_proxy_access(
+                    pinned_proxy.as_deref(),
+                    "direct_stream",
+                    params.source_url.as_deref(),
+                    params.format_id.as_deref(),
+                    range.as_ref(),
+                );
                 let mut response_headers = forward_stream_headers(&source_headers);
                 let filename = build_filename(&params.title, &params.format);
                 add_content_disposition(&mut response_headers, &filename);
@@ -442,6 +450,19 @@ async fn proxy_chunked(
     permit: Option<OwnedSemaphorePermit>,
     patch_init_metadata: bool,
 ) -> Result<Response, ApiError> {
+    let pinned_proxy = extractor::resolve_stream_proxy(&params.url).await;
+    let full_range = Range {
+        start: 0,
+        end: Some(total_size.saturating_sub(1)),
+    };
+    record_stream_proxy_access(
+        pinned_proxy.as_deref(),
+        "direct_stream_chunked",
+        params.source_url.as_deref(),
+        params.format_id.as_deref(),
+        Some(&full_range),
+    );
+
     let content_type =
         extract_mime_type(parsed_url).unwrap_or_else(|| "application/octet-stream".to_string());
 
@@ -485,6 +506,34 @@ async fn proxy_chunked(
         status: StatusCode::INTERNAL_SERVER_ERROR,
         retry_after_secs: None,
     })
+}
+
+fn record_stream_proxy_access(
+    proxy_url: Option<&str>,
+    kind: &str,
+    source_url: Option<&str>,
+    format_id: Option<&str>,
+    range: Option<&Range>,
+) {
+    let Some(proxy_url) = proxy_url else {
+        return;
+    };
+    let Some(pool) = global_proxy_pool() else {
+        return;
+    };
+
+    pool.record_download_access(
+        proxy_url,
+        ProxyDownloadAccessEvent {
+            kind: kind.to_string(),
+            roles: vec!["stream".to_string()],
+            job_id: None,
+            source_url: source_url.map(str::to_string),
+            format_id: format_id.map(str::to_string),
+            range_start: range.map(|value| value.start),
+            range_end: range.and_then(|value| value.end),
+        },
+    );
 }
 
 /// Build a byte stream that downloads `url` in YOUTUBE_CHUNK_SIZE chunks.

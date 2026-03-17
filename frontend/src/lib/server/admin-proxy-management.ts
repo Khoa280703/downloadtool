@@ -7,6 +7,11 @@ type ProxyMutationInput = {
 	reason?: string;
 };
 
+type ProxyNotesInput = {
+	proxyId: string;
+	notes: string;
+};
+
 type ProxyStatusRow = {
 	status: ProxyStatus;
 };
@@ -110,5 +115,22 @@ export async function updateProxyStatus(input: ProxyMutationInput): Promise<Prox
 		throw error;
 	} finally {
 		client.release();
+	}
+}
+
+export async function updateProxyNotes(input: ProxyNotesInput): Promise<void> {
+	const pool = getProxyDatabasePool();
+	const result = await pool.query(
+		`
+			UPDATE proxies
+			SET notes = NULLIF($2, ''),
+				updated_at = NOW()
+			WHERE id = $1
+		`,
+		[input.proxyId, input.notes.trim()]
+	);
+
+	if (result.rowCount === 0) {
+		throw new Error('Proxy not found.');
 	}
 }

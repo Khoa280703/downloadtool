@@ -14,7 +14,9 @@ use sqlx::PgPool;
 use tracing::{debug, warn};
 
 use crate::proxy_health_store::{ProxyHealthStore, ProxyRuntimeHealth};
-use crate::proxy_inventory_store::{ProxyInventoryRecord, ProxyInventoryStore};
+use crate::proxy_inventory_store::{
+    ProxyDownloadAccessEvent, ProxyInventoryRecord, ProxyInventoryStore,
+};
 use crate::proxy_quarantine::append_quarantine_record;
 
 /// Maximum consecutive failures before marking proxy as unhealthy.
@@ -299,6 +301,20 @@ impl ProxyPool {
             let store = ProxyInventoryStore::new(inventory_pool);
             if let Err(error) = store.record_extract_result(&proxy_url, event).await {
                 warn!(err = %error, proxy = %proxy_url, "Failed to persist proxy extract-result event");
+            }
+        });
+    }
+
+    pub fn record_download_access(&self, proxy_url: &str, event: ProxyDownloadAccessEvent) {
+        let Some(inventory_pool) = self.inventory_pool.clone() else {
+            return;
+        };
+
+        let proxy_url = proxy_url.to_string();
+        tokio::spawn(async move {
+            let store = ProxyInventoryStore::new(inventory_pool);
+            if let Err(error) = store.record_download_access(&proxy_url, event).await {
+                warn!(err = %error, proxy = %proxy_url, "Failed to persist proxy download-access event");
             }
         });
     }

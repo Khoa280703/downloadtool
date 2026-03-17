@@ -23,6 +23,17 @@ pub struct ProxyExtractEvent {
     pub full_format_available: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct ProxyDownloadAccessEvent {
+    pub kind: String,
+    pub roles: Vec<String>,
+    pub job_id: Option<String>,
+    pub source_url: Option<String>,
+    pub format_id: Option<String>,
+    pub range_start: Option<u64>,
+    pub range_end: Option<u64>,
+}
+
 #[derive(Clone, Debug, Default)]
 struct ProxyQualitySnapshot {
     extract_attempts_24h: i64,
@@ -313,6 +324,54 @@ impl ProxyInventoryStore {
             .await
             .with_context(|| format!("failed to record auto-disabled event for {proxy_url}"))?;
         }
+
+        Ok(())
+    }
+
+    pub async fn record_download_access(
+        &self,
+        proxy_url: &str,
+        event: ProxyDownloadAccessEvent,
+    ) -> anyhow::Result<()> {
+        let maybe_proxy = sqlx::query(
+            r#"
+            SELECT id
+            FROM proxies
+            WHERE proxy_url = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(proxy_url)
+        .fetch_optional(&self.pool)
+        .await
+        .with_context(|| format!("failed to load proxy row for {proxy_url}"))?;
+
+        let Some(proxy_row) = maybe_proxy else {
+            return Ok(());
+        };
+
+        let proxy_id: String = proxy_row.get("id");
+
+        sqlx::query(
+            r#"
+            INSERT INTO proxy_health_events (proxy_id, event_type, reason, payload_json)
+            VALUES ($1, 'download_access', $2, $3::jsonb)
+            "#,
+        )
+        .bind(&proxy_id)
+        .bind(&event.kind)
+        .bind(json!({
+            "kind": event.kind,
+            "roles": event.roles,
+            "job_id": event.job_id,
+            "source_url": event.source_url,
+            "format_id": event.format_id,
+            "range_start": event.range_start,
+            "range_end": event.range_end,
+        }))
+        .execute(&self.pool)
+        .await
+        .with_context(|| format!("failed to record download-access event for {proxy_url}"))?;
 
         Ok(())
     }

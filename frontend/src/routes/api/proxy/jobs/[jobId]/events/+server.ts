@@ -6,8 +6,9 @@ import {
 	buildRustApiUrl,
 	ensureDownloadSessionId
 } from '$lib/server/rust-api-proxy';
+import { deriveAuditOutcome, logAuditEvent } from '$lib/server/audit-log';
 
-export const GET: RequestHandler = async ({ params, request, fetch, cookies }) => {
+export const GET: RequestHandler = async ({ params, request, fetch, cookies, locals, url }) => {
 	const downloadSessionId = ensureDownloadSessionId(cookies);
 	const upstream = await fetch(
 		buildRustApiUrl(`/api/jobs/${encodeURIComponent(params.jobId)}/events`),
@@ -15,6 +16,22 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies }) =
 			// Do not bind SSE proxy lifetime to request.signal here.
 			// SvelteKit/undici can abort long-lived upstream streams immediately.
 			headers: await buildRustApiHeaders(request, false, downloadSessionId)
+		}
+	);
+
+	await logAuditEvent(
+		{ request, locals, cookies, url },
+		{
+			scope: 'download',
+			eventType: 'job_events_stream',
+			entityId: params.jobId,
+			targetLabel: params.jobId,
+			statusCode: upstream.status,
+			outcome: deriveAuditOutcome(upstream.status),
+			payload: {
+				contentType: upstream.headers.get('content-type'),
+				downloadSessionId
+			}
 		}
 	);
 

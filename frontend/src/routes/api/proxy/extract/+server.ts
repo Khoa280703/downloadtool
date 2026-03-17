@@ -4,6 +4,7 @@ import type { RequestHandler } from './$types';
 
 import { auth } from '$lib/server/auth';
 import { getJwtForRequest } from '$lib/server/auth-utils';
+import { deriveAuditOutcome, logAuditEvent, sanitizeAuditUrl } from '$lib/server/audit-log';
 
 const RETRYABLE_UPSTREAM_STATUS = new Set([429, 502, 503, 504]);
 const MAX_UPSTREAM_ATTEMPTS = 4;
@@ -39,9 +40,17 @@ async function sleep(ms: number): Promise<void> {
 	await new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-export const POST: RequestHandler = async ({ request, locals, fetch }) => {
+export const POST: RequestHandler = async ({ request, locals, fetch, cookies, url }) => {
 	const body = await request.text();
 	const rustApiUrl = normalizeBaseUrl(env.RUST_API_URL ?? env.VITE_API_URL);
+	let requestUrl: string | null = null;
+
+	try {
+		const parsed = JSON.parse(body) as { url?: string };
+		requestUrl = sanitizeAuditUrl(parsed.url?.trim() ?? null);
+	} catch {
+		requestUrl = null;
+	}
 
 	const upstreamHeaders: Record<string, string> = {
 		'Content-Type': 'application/json'
@@ -92,6 +101,25 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 
 	if (!upstream) {
 		console.error('BFF proxy extract upstream error after retries:', lastUpstreamError);
+		await logAuditEvent(
+			{ request, locals, cookies, url },
+			{
+				scope: 'download',
+				eventType: 'extract',
+				targetLabel: requestUrl,
+				statusCode: 502,
+				outcome: 'error',
+				detail: 'Upstream API unavailable after retries',
+				payload: {
+					requestUrl,
+					attempts: MAX_UPSTREAM_ATTEMPTS,
+					error:
+						lastUpstreamError instanceof Error
+							? lastUpstreamError.message
+							: String(lastUpstreamError ?? 'unknown')
+				}
+			}
+		);
 		throw error(502, 'Upstream API unavailable after retries');
 	}
 
@@ -100,6 +128,21 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 	responseHeaders.set('content-type', contentType);
 
 	if (!upstream.body) {
+		await logAuditEvent(
+			{ request, locals, cookies, url },
+			{
+				scope: 'download',
+				eventType: 'extract',
+				targetLabel: requestUrl,
+				statusCode: 502,
+				outcome: 'error',
+				detail: 'Empty upstream response',
+				payload: {
+					requestUrl,
+					upstreamStatus: upstream.status
+				}
+			}
+		);
 		return json(
 			{
 				error: 'Empty upstream response'
@@ -107,6 +150,23 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			{ status: 502, headers: responseHeaders }
 		);
 	}
+
+	await logAuditEvent(
+		{ request, locals, cookies, url },
+		{
+			scope: 'download',
+			eventType: 'extract',
+			targetLabel: requestUrl,
+			statusCode: upstream.status,
+			outcome: deriveAuditOutcome(upstream.status),
+			payload: {
+				requestUrl,
+				upstreamStatus: upstream.status,
+				contentType,
+				authenticated: Boolean(locals.user?.id)
+			}
+		}
+	);
 
 	return new Response(upstream.body, {
 		status: upstream.status,
