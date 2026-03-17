@@ -288,8 +288,11 @@ async fn refresh_stream_url(
     expected_audio_only: Option<bool>,
     expected_has_audio: Option<bool>,
     expected_ext: Option<&str>,
+    preferred_proxy: Option<&str>,
 ) -> Option<String> {
-    let refreshed = extractor::extract(source_url).await.ok()?;
+    let refreshed = extractor::extract_with_options_and_proxy(source_url, true, preferred_proxy)
+        .await
+        .ok()?;
     find_refreshed_format_url(
         &refreshed.formats,
         format_id,
@@ -363,18 +366,19 @@ async fn proxy_single_request(
     let mut target_url = params.url.clone();
     let max_refresh_attempts = stream_url_refresh_max_attempts();
     let mut refresh_attempts = 0usize;
+    let mut forced_proxy = extractor::resolve_stream_proxy(&target_url).await;
     loop {
-        let pinned_proxy = extractor::resolve_stream_proxy(&target_url).await;
-        let client = ProxyClient::new_with_proxy(platform, pinned_proxy.clone()).map_err(|e| ApiError {
-            message: format!("Failed to create proxy client: {}", e),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            retry_after_secs: None,
-        })?;
+        let client =
+            ProxyClient::new_with_proxy(platform, forced_proxy.clone()).map_err(|e| ApiError {
+                message: format!("Failed to create proxy client: {}", e),
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                retry_after_secs: None,
+            })?;
 
         match client.fetch_stream_with_headers(&target_url, range).await {
             Ok((source_headers, byte_stream)) => {
                 record_stream_proxy_access(
-                    pinned_proxy.as_deref(),
+                    forced_proxy.as_deref(),
                     "direct_stream",
                     params.source_url.as_deref(),
                     params.format_id.as_deref(),
@@ -414,6 +418,7 @@ async fn proxy_single_request(
                             None,
                             None,
                             params.format.as_deref(),
+                            forced_proxy.as_deref(),
                         )
                         .await
                         {
@@ -423,6 +428,9 @@ async fn proxy_single_request(
                                 "Refreshed stream URL after upstream auth error"
                             );
                             target_url = new_url;
+                            if forced_proxy.is_none() {
+                                forced_proxy = extractor::resolve_stream_proxy(&target_url).await;
+                            }
                             continue;
                         }
                     }
@@ -607,6 +615,7 @@ fn chunked_stream(
                                 None,
                                 None,
                                 preferred_format.as_deref(),
+                                forced_proxy.as_deref(),
                             )
                             .await
                             {
@@ -621,10 +630,9 @@ fn chunked_stream(
                                         active_total_size = clen;
                                     }
                                 }
-                                let refreshed_proxy =
-                                    extractor::resolve_stream_proxy(&active_url).await;
-                                if refreshed_proxy.is_some() {
-                                    forced_proxy = refreshed_proxy;
+                                if forced_proxy.is_none() {
+                                    forced_proxy =
+                                        extractor::resolve_stream_proxy(&active_url).await;
                                 }
                                 client = match ProxyClient::new_with_proxy(
                                     platform,

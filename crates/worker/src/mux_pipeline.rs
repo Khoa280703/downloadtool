@@ -40,7 +40,13 @@ pub async fn resolve_mux_job_sources(request: &MuxJobRequest) -> ResolvedMuxJobS
                 Some(reason),
             ),
         };
-    let proxy_binding = resolve_mux_proxy_binding_for_urls(&video_url, &audio_url).await;
+    let proxy_binding = resolve_mux_proxy_binding_for_urls(
+        &video_url,
+        &audio_url,
+        request.preferred_video_proxy.as_deref(),
+        request.preferred_audio_proxy.as_deref(),
+    )
+    .await;
     ResolvedMuxJobSources {
         video_url,
         audio_url,
@@ -179,8 +185,17 @@ pub async fn upload_muxed_artifact(
                     );
                     video_url = next_video;
                     audio_url = next_audio;
-                    let refreshed =
-                        resolve_mux_proxy_binding_for_urls(&video_url, &audio_url).await;
+                    let refreshed = resolve_mux_proxy_binding_for_urls(
+                        &video_url,
+                        &audio_url,
+                        video_proxy
+                            .as_deref()
+                            .or(request.preferred_video_proxy.as_deref()),
+                        audio_proxy
+                            .as_deref()
+                            .or(request.preferred_audio_proxy.as_deref()),
+                    )
+                    .await;
                     video_proxy = refreshed.video_proxy;
                     audio_proxy = refreshed.audio_proxy;
                     info!(
@@ -273,6 +288,7 @@ fn build_refresh_options(request: &MuxJobRequest) -> FetchBothRefreshOptions {
             expected_has_audio: Some(false),
             expected_ext: Some("mp4".to_string()),
             max_refresh_attempts: 2,
+            preferred_proxy: request.preferred_video_proxy.clone(),
         }),
         audio: Some(StreamUrlRefreshContext {
             source_url,
@@ -281,6 +297,7 @@ fn build_refresh_options(request: &MuxJobRequest) -> FetchBothRefreshOptions {
             expected_has_audio: Some(true),
             expected_ext: Some("m4a".to_string()),
             max_refresh_attempts: 2,
+            preferred_proxy: request.preferred_audio_proxy.clone(),
         }),
     }
 }
@@ -291,7 +308,11 @@ async fn refresh_both_urls(
     current_audio_url: &str,
 ) -> Option<(String, String)> {
     let source_url = request.source_url.as_deref()?;
-    let info = extractor::extract(source_url).await.ok()?;
+    let preferred_proxy = preferred_extract_proxy(request);
+    let info =
+        extractor::extract_with_options_and_proxy(source_url, true, preferred_proxy.as_deref())
+            .await
+            .ok()?;
     let next_video = find_format_url(
         &info.formats,
         request.video_format_id.as_deref(),
@@ -326,10 +347,47 @@ async fn resolve_fresh_mux_urls(request: &MuxJobRequest) -> Result<(String, Stri
         .ok_or("late_extract_failed")
 }
 
-async fn resolve_mux_proxy_binding_for_urls(video_url: &str, audio_url: &str) -> MuxProxyBinding {
+async fn resolve_mux_proxy_binding_for_urls(
+    video_url: &str,
+    audio_url: &str,
+    preferred_video_proxy: Option<&str>,
+    preferred_audio_proxy: Option<&str>,
+) -> MuxProxyBinding {
     MuxProxyBinding {
-        video_proxy: extractor::resolve_stream_proxy(video_url).await,
-        audio_proxy: extractor::resolve_stream_proxy(audio_url).await,
+        video_proxy: preferred_proxy_if_usable(preferred_video_proxy)
+            .or(extractor::resolve_stream_proxy(video_url).await),
+        audio_proxy: preferred_proxy_if_usable(preferred_audio_proxy)
+            .or(extractor::resolve_stream_proxy(audio_url).await),
+    }
+}
+
+fn preferred_extract_proxy(request: &MuxJobRequest) -> Option<String> {
+    match (
+        request.preferred_video_proxy.as_deref(),
+        request.preferred_audio_proxy.as_deref(),
+    ) {
+        (Some(video), Some(audio)) if video == audio => Some(video.to_string()),
+        (Some(video), Some(audio)) => {
+            warn!(
+                video_proxy = sanitize_proxy_for_log(Some(video)),
+                audio_proxy = sanitize_proxy_for_log(Some(audio)),
+                "Mux job has mismatched preferred proxies; reusing video proxy for late extract"
+            );
+            Some(video.to_string())
+        }
+        (Some(video), None) => Some(video.to_string()),
+        (None, Some(audio)) => Some(audio.to_string()),
+        (None, None) => None,
+    }
+}
+
+fn preferred_proxy_if_usable(preferred_proxy: Option<&str>) -> Option<String> {
+    let proxy_url = preferred_proxy?;
+    match global_proxy_pool() {
+        Some(pool) => pool
+            .is_proxy_usable(proxy_url)
+            .then(|| proxy_url.to_string()),
+        None => Some(proxy_url.to_string()),
     }
 }
 

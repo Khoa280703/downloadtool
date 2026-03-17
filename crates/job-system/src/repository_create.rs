@@ -31,15 +31,16 @@ impl JobRepository {
             r#"
             INSERT INTO mux_jobs (
                 id, user_id, session_id, request_hash, dedupe_key, source_url, video_url, audio_url,
-                video_format_id, audio_format_id, title, status, attempt_count, max_attempts,
-                created_at_ms, updated_at_ms
+                video_format_id, audio_format_id, title, preferred_video_proxy, preferred_audio_proxy,
+                status, attempt_count, max_attempts, created_at_ms, updated_at_ms
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'queued', 0, $12, $13, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'queued', 0, $14, $15, $15)
             RETURNING
                 id, user_id, session_id, request_hash, dedupe_key, source_url, video_url,
-                audio_url, video_format_id, audio_format_id, title, status, artifact_id,
-                attempt_count, max_attempts, lease_owner, lease_expires_at_ms, last_error,
-                created_at_ms, updated_at_ms, NULL::bigint AS file_size_bytes
+                audio_url, video_format_id, audio_format_id, title, preferred_video_proxy,
+                preferred_audio_proxy, status, artifact_id, attempt_count, max_attempts,
+                lease_owner, lease_expires_at_ms, last_error, created_at_ms, updated_at_ms,
+                NULL::bigint AS file_size_bytes
             "#,
         )
         .bind(job_id)
@@ -53,6 +54,8 @@ impl JobRepository {
         .bind(request.video_format_id.as_deref())
         .bind(request.audio_format_id.as_deref())
         .bind(request.title.as_deref())
+        .bind(request.preferred_video_proxy.as_deref())
+        .bind(request.preferred_audio_proxy.as_deref())
         .bind(max_attempts)
         .bind(created_at_ms)
         .fetch_one(self.pool())
@@ -85,9 +88,9 @@ impl JobRepository {
                     SELECT
                         j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
                         j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
-                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
-                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
-                        a.size_bytes AS file_size_bytes
+                        j.preferred_video_proxy, j.preferred_audio_proxy, j.status, j.artifact_id,
+                        j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
+                        j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes
                     FROM mux_jobs j
                     LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
                     WHERE j.user_id = $1
@@ -109,9 +112,9 @@ impl JobRepository {
                     SELECT
                         j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
                         j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
-                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
-                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
-                        a.size_bytes AS file_size_bytes
+                        j.preferred_video_proxy, j.preferred_audio_proxy, j.status, j.artifact_id,
+                        j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
+                        j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes
                     FROM mux_jobs j
                     LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
                     WHERE j.session_id = $1

@@ -28,6 +28,7 @@ struct ProxyEntry {
     url: String,
     quarantined: AtomicBool,
     failed_count: AtomicUsize,
+    bot_check_streak: AtomicUsize,
     health_score: AtomicUsize,
     last_failed: RwLock<Option<Instant>>,
 }
@@ -38,6 +39,7 @@ impl ProxyEntry {
             url,
             quarantined: AtomicBool::new(quarantined),
             failed_count: AtomicUsize::new(0),
+            bot_check_streak: AtomicUsize::new(0),
             health_score: AtomicUsize::new(health_score.clamp(0, 100) as usize),
             last_failed: RwLock::new(None),
         }
@@ -71,6 +73,7 @@ impl ProxyEntry {
             return;
         }
 
+        self.bot_check_streak.store(0, Ordering::Relaxed);
         let count = self.failed_count.fetch_add(1, Ordering::Relaxed) + 1;
         if let Ok(mut last_failed) = self.last_failed.write() {
             *last_failed = Some(Instant::now());
@@ -88,6 +91,7 @@ impl ProxyEntry {
             return;
         }
 
+        self.bot_check_streak.store(0, Ordering::Relaxed);
         let previous = self.failed_count.swap(0, Ordering::Relaxed);
         if previous > 0 {
             if let Ok(mut last_failed) = self.last_failed.write() {
@@ -101,6 +105,7 @@ impl ProxyEntry {
         let was_quarantined = self.quarantined.swap(true, Ordering::Relaxed);
         if !was_quarantined {
             self.failed_count.store(MAX_FAILURES, Ordering::Relaxed);
+            self.bot_check_streak.store(0, Ordering::Relaxed);
             if let Ok(mut last_failed) = self.last_failed.write() {
                 *last_failed = Some(Instant::now());
             }
@@ -113,10 +118,19 @@ impl ProxyEntry {
         self.quarantined.store(quarantined, Ordering::Relaxed);
         if !quarantined {
             self.failed_count.store(0, Ordering::Relaxed);
+            self.bot_check_streak.store(0, Ordering::Relaxed);
             if let Ok(mut last_failed) = self.last_failed.write() {
                 *last_failed = None;
             }
         }
+    }
+
+    fn note_bot_check(&self) -> usize {
+        self.bot_check_streak.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    fn clear_bot_check_streak(&self) {
+        self.bot_check_streak.store(0, Ordering::Relaxed);
     }
 
     fn set_health_score(&self, health_score: i32) {
@@ -240,6 +254,39 @@ impl ProxyPool {
     pub fn mark_success(&self, proxy_url: &str) {
         if let Some(entry) = self.find_entry(proxy_url) {
             entry.mark_success();
+            self.clear_bot_check_streak(proxy_url);
+        }
+    }
+
+    pub async fn note_bot_check(&self, proxy_url: &str, reason: &str) -> bool {
+        let local_streak = self
+            .find_entry(proxy_url)
+            .map(|entry| entry.note_bot_check())
+            .unwrap_or(1);
+
+        if let Some(health_store) = self.health_store.clone() {
+            match health_store.record_bot_check(proxy_url, reason).await {
+                Ok(streak) => return streak >= 2,
+                Err(error) => {
+                    warn!(err = %error, "Failed to persist proxy bot-check streak to redis");
+                }
+            }
+        }
+
+        local_streak >= 2
+    }
+
+    pub fn clear_bot_check_streak(&self, proxy_url: &str) {
+        if let Some(entry) = self.find_entry(proxy_url) {
+            entry.clear_bot_check_streak();
+            if let Some(health_store) = self.health_store.clone() {
+                let proxy_url = proxy_url.to_string();
+                tokio::spawn(async move {
+                    if let Err(error) = health_store.clear_bot_check_streak(&proxy_url).await {
+                        warn!(err = %error, "Failed to clear proxy bot-check streak in redis");
+                    }
+                });
+            }
         }
     }
 
@@ -268,6 +315,7 @@ impl ProxyPool {
     /// a single failure is enough to know the proxy is currently dead.
     pub fn cooldown_now(&self, proxy_url: &str, reason: &str) {
         if let Some(entry) = self.find_entry(proxy_url) {
+            entry.clear_bot_check_streak();
             entry.failed_count.store(MAX_FAILURES, Ordering::Relaxed);
             if let Ok(mut last_failed) = entry.last_failed.write() {
                 *last_failed = Some(Instant::now());
@@ -587,6 +635,29 @@ mod tests {
         pool.mark_failed("http://proxy1:8080");
         pool.mark_success("http://proxy1:8080");
         assert_eq!(pool.next().unwrap(), "http://proxy1:8080");
+    }
+
+    #[tokio::test]
+    async fn test_bot_check_requires_two_consecutive_hits_without_health_store() {
+        let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
+
+        assert!(
+            !pool
+                .note_bot_check("http://proxy1:8080", "yt-dlp-bot-check")
+                .await
+        );
+        assert!(
+            pool.note_bot_check("http://proxy1:8080", "yt-dlp-bot-check")
+                .await
+        );
+
+        pool.mark_success("http://proxy1:8080");
+
+        assert!(
+            !pool
+                .note_bot_check("http://proxy1:8080", "yt-dlp-bot-check")
+                .await
+        );
     }
 
     #[test]

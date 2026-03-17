@@ -8,6 +8,8 @@ pub struct MuxJobRequest {
     pub video_format_id: Option<String>,
     pub audio_format_id: Option<String>,
     pub title: Option<String>,
+    pub preferred_video_proxy: Option<String>,
+    pub preferred_audio_proxy: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

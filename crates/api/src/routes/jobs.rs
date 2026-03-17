@@ -104,6 +104,9 @@ pub async fn create_job_handler(
     let owner = resolve_job_owner(&user, &headers)?;
     validate_create_payload(&payload)?;
 
+    let preferred_video_proxy = extractor::resolve_stream_proxy(&payload.video_url).await;
+    let preferred_audio_proxy = extractor::resolve_stream_proxy(&payload.audio_url).await;
+
     let request = MuxJobRequest {
         video_url: payload.video_url,
         audio_url: payload.audio_url,
@@ -111,6 +114,8 @@ pub async fn create_job_handler(
         video_format_id: payload.video_format_id,
         audio_format_id: payload.audio_format_id,
         title: payload.title,
+        preferred_video_proxy,
+        preferred_audio_proxy,
     };
 
     let created = state

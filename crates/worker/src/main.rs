@@ -23,16 +23,14 @@ use storage_factory::{build_storage_backend, init_extractor_bundle};
 use worker_config::WorkerConfig;
 
 async fn run_app_migrations(pool: &sqlx::PgPool) -> Result<()> {
-    let mut migrator = sqlx::migrate::Migrator::new(resolve_app_migrations_dir())
-        .await?;
+    let mut migrator = sqlx::migrate::Migrator::new(resolve_app_migrations_dir()).await?;
     migrator.set_ignore_missing(true);
     migrator.run(pool).await?;
     Ok(())
 }
 
 fn resolve_app_migrations_dir() -> PathBuf {
-    let compile_time_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../api/app-migrations");
+    let compile_time_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../api/app-migrations");
     if compile_time_dir.exists() {
         return compile_time_dir;
     }

@@ -109,6 +109,12 @@ pub async fn run_claimed_job(
                 "fallback_reason": resolved_sources.fallback_reason,
                 "video_url_refreshed": resolved_sources.video_url != job.request.video_url,
                 "audio_url_refreshed": resolved_sources.audio_url != job.request.audio_url,
+                "preferred_video_proxy": sanitize_proxy_for_event(
+                    job.request.preferred_video_proxy.as_deref()
+                ),
+                "preferred_audio_proxy": sanitize_proxy_for_event(
+                    job.request.preferred_audio_proxy.as_deref()
+                ),
                 "video_proxy": sanitize_proxy_for_event(
                     resolved_sources.proxy_binding.video_proxy.as_deref()
                 ),

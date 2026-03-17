@@ -42,6 +42,7 @@ pub struct StreamUrlRefreshContext {
     pub expected_has_audio: Option<bool>,
     pub expected_ext: Option<String>,
     pub max_refresh_attempts: usize,
+    pub preferred_proxy: Option<String>,
 }
 
 /// Refresh options for concurrent video/audio fetching.
@@ -218,7 +219,13 @@ async fn refresh_stream_url(
     context: &StreamUrlRefreshContext,
     fallback_url: &str,
 ) -> Option<String> {
-    let refreshed = extractor::extract(&context.source_url).await.ok()?;
+    let refreshed = extractor::extract_with_options_and_proxy(
+        &context.source_url,
+        true,
+        context.preferred_proxy.as_deref(),
+    )
+    .await
+    .ok()?;
     find_refreshed_format_url(
         &refreshed.formats,
         context.format_id.as_deref(),
@@ -296,10 +303,9 @@ async fn fetch_stream_chunked(
                                     max_refresh_attempts
                                 );
                                 active_url = new_url;
-                                let refreshed_proxy =
-                                    extractor::resolve_stream_proxy(&active_url).await;
-                                if refreshed_proxy.is_some() {
-                                    forced_proxy = refreshed_proxy;
+                                if forced_proxy.is_none() {
+                                    forced_proxy =
+                                        extractor::resolve_stream_proxy(&active_url).await;
                                 }
                                 client =
                                     AntiBotClient::new_with_proxy(platform, forced_proxy.clone())?;
@@ -419,10 +425,10 @@ async fn fetch_stream_chunked(
                                                 refresh_attempts, max_refresh_attempts
                                             );
                                             active_url = new_url;
-                                            let refreshed_proxy =
-                                                extractor::resolve_stream_proxy(&active_url).await;
-                                            if refreshed_proxy.is_some() {
-                                                forced_proxy = refreshed_proxy;
+                                            if forced_proxy.is_none() {
+                                                forced_proxy =
+                                                    extractor::resolve_stream_proxy(&active_url)
+                                                        .await;
                                             }
                                             task_client = match AntiBotClient::new_with_proxy(
                                                 platform,
@@ -502,10 +508,9 @@ async fn fetch_stream_chunked(
                                             max_refresh_attempts
                                         );
                                         active_url = new_url;
-                                        let refreshed_proxy =
-                                            extractor::resolve_stream_proxy(&active_url).await;
-                                        if refreshed_proxy.is_some() {
-                                            forced_proxy = refreshed_proxy;
+                                        if forced_proxy.is_none() {
+                                            forced_proxy =
+                                                extractor::resolve_stream_proxy(&active_url).await;
                                         }
                                         task_client = match AntiBotClient::new_with_proxy(
                                             platform,
@@ -594,10 +599,9 @@ async fn fetch_stream_chunked(
                                             refresh_attempts, max_refresh_attempts
                                         );
                                         active_url = new_url;
-                                        let refreshed_proxy =
-                                            extractor::resolve_stream_proxy(&active_url).await;
-                                        if refreshed_proxy.is_some() {
-                                            forced_proxy = refreshed_proxy;
+                                        if forced_proxy.is_none() {
+                                            forced_proxy =
+                                                extractor::resolve_stream_proxy(&active_url).await;
                                         }
                                         task_client = match AntiBotClient::new_with_proxy(
                                             platform,

@@ -1,6 +1,6 @@
 # Codebase Summary
 
-**Generated:** 2026-03-16
+**Generated:** 2026-03-17
 **Total Files:** 404 | **Total Tokens:** ~810,000 (repomix)
 
 ## Project Overview
@@ -79,6 +79,7 @@ A high-performance video downloader platform supporting YouTube and other platfo
 - `job_identity.rs` - Computes request hash / dedupe key for idempotent create
 - `storage_ticket_service.rs` - Builds LocalFs proxy ticket or S3-compatible presigned ticket
 - `/api/jobs/*` - Create job, poll status, fetch file ticket, stream/redirect ready file, send release hint
+- `mux_jobs` rows now persist `preferred_video_proxy` / `preferred_audio_proxy` so worker delivery can stay on the same proxy family used at extract time
 
 ### 3. **Extractor Engine** (`crates/extractor`)
 - **Purpose:** Dynamic extraction of video metadata from various platforms
@@ -90,6 +91,7 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `ytdlp.rs` - **NEW (2026-02-28):** yt-dlp subprocess extractor with moka cache (500 items, 300s TTL) and semaphore throttle (max 10 concurrent processes)
   - `types.rs` - Shared types (Stream, Platform, ExtractionResult)
 - **Key Feature:** Dual extraction strategy: yt-dlp for primary extraction, Deno fallback for playlists/channels
+- **Sticky Proxy Refresh (2026-03-17):** proxy-pinned refresh paths bypass the shared extract cache so refreshed signed URLs stay aligned with the proxy that will fetch them
 
 ### 4. **Proxy & Anti-Bot Layer** (`crates/proxy`)
 - **Purpose:** Evade YouTube/CDN bot detection and throttling
@@ -138,6 +140,7 @@ A high-performance video downloader platform supporting YouTube and other platfo
 - `crates/worker/` (**NEW 2026-03-16**)
   - Standalone mux worker process
   - Claims jobs, heartbeats leases, uploads artifacts, deletes expired storage objects
+  - Keeps sticky proxy affinity through `late_extract` and auth-like URL refresh, rotating only after the current proxy becomes unusable
   - **NEW:** `job_progress_publisher.rs` for 7-phase progress streaming
 
 ### 7. **GPU Worker** (`crates/gpu-worker`)

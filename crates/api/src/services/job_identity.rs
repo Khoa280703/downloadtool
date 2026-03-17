@@ -26,6 +26,8 @@ mod tests {
             video_format_id: Some("137".to_string()),
             audio_format_id: Some("140".to_string()),
             title: Some("Hello".to_string()),
+            preferred_video_proxy: None,
+            preferred_audio_proxy: None,
         };
 
         let identity = derive_job_identity(

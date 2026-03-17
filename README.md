@@ -101,7 +101,7 @@ pnpm dev:down  # stop docker compose services
 - `DATABASE_URL=postgres://downloadtool:...@postgres:5432/downloadtool`
 - `REDIS_URL=redis://redis:6379`
 - Proxy pool quarantine:
-- Khi extractor gặp lỗi bot-check (`Sign in to confirm you're not a bot`), proxy đó sẽ bị loại khỏi vòng xoay ngay lập tức.
+- Khi extractor gặp lỗi bot-check (`Sign in to confirm you're not a bot`) 2 lần liên tiếp, proxy đó mới bị đưa vào quarantine.
 - Danh sách proxy bị loại được ghi riêng vào `PROXY_QUARANTINE_FILE` (mặc định: `/tmp/downloadtool-quarantined-proxies.txt`) để dễ thay proxy mới.
 - Runtime limits are now managed in `config/runtime-limit-profiles.json` with `local` and `production` objects.
 - Trong `runtime-limit-profiles.json`, đặt field = `null` để tắt guard tương ứng.

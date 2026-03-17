@@ -80,9 +80,7 @@ fn spawn_background_sync(pool: Arc<ProxyPool>, quarantine_ttl_secs: u64) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(PROXY_SYNC_INTERVAL_SECS));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        let inventory_store = pool
-            .inventory_pool()
-            .map(ProxyInventoryStore::new);
+        let inventory_store = pool.inventory_pool().map(ProxyInventoryStore::new);
 
         loop {
             interval.tick().await;

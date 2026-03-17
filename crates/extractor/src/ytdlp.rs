@@ -99,8 +99,28 @@ fn select_proxy() -> Option<SelectedProxy> {
         })
 }
 
-fn require_proxy() -> Result<SelectedProxy, ExtractionError> {
-    select_proxy().ok_or_else(|| {
+fn select_proxy_with_preference(preferred_proxy: Option<&str>) -> Option<SelectedProxy> {
+    if let Some(preferred_proxy) = preferred_proxy {
+        if let Some(pool) = get_proxy_pool() {
+            if pool.is_proxy_usable(preferred_proxy) {
+                return Some(SelectedProxy {
+                    url: preferred_proxy.to_string(),
+                    from_pool: true,
+                });
+            }
+        } else {
+            return Some(SelectedProxy {
+                url: preferred_proxy.to_string(),
+                from_pool: false,
+            });
+        }
+    }
+
+    select_proxy()
+}
+
+fn require_proxy(preferred_proxy: Option<&str>) -> Result<SelectedProxy, ExtractionError> {
+    select_proxy_with_preference(preferred_proxy).ok_or_else(|| {
         ExtractionError::ScriptExecutionFailed(
             "proxy-only mode requires at least one healthy proxy".to_string(),
         )
@@ -114,7 +134,7 @@ enum ProxyFailureKind {
     /// Proxy should be cooled down immediately (1 fail = cooldown).
     TransportDead,
     /// Bot check detected: "sign in to confirm", "not a bot".
-    /// Proxy should be quarantined permanently.
+    /// Proxy should only be quarantined after repeated consecutive hits.
     BotCheck,
     /// Rate limit or soft block: 429, 403, too many requests.
     /// Use normal mark_failed() (needs MAX_FAILURES to cooldown).
@@ -249,13 +269,15 @@ fn extract_video_id(url: &str) -> Option<&str> {
 pub async fn extract_via_ytdlp(
     url: &str,
     bypass_cache: bool,
+    preferred_proxy: Option<&str>,
 ) -> Result<VideoInfo, ExtractionError> {
     debug!("yt-dlp extracting: {}", url);
 
     let cache_key = normalize_cache_key(url);
     let cache = get_cache();
+    let cache_allowed = preferred_proxy.is_none();
 
-    if !bypass_cache {
+    if cache_allowed && !bypass_cache {
         if let Some(cached_video_info) = cache.get(&cache_key).await {
             let hits = EXTRACT_CACHE_HITS.fetch_add(1, Ordering::Relaxed) + 1;
             debug!(
@@ -276,8 +298,14 @@ pub async fn extract_via_ytdlp(
         "extract cache miss"
     );
 
-    let video_info = extract_subprocess(url.to_string()).await?;
-    maybe_cache_extract_result(&cache_key, &video_info).await;
+    let video_info = extract_subprocess(
+        url.to_string(),
+        preferred_proxy.map(std::string::ToString::to_string),
+    )
+    .await?;
+    if cache_allowed {
+        maybe_cache_extract_result(&cache_key, &video_info).await;
+    }
     Ok((*video_info).clone())
 }
 
@@ -388,7 +416,10 @@ fn build_failed_extract_event(failure_kind: &str, elapsed_ms: u64) -> ProxyExtra
 /// Must be greater than --socket-timeout to cover DNS, proxy handshake, etc.
 const SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(8);
 
-async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionError> {
+async fn extract_subprocess(
+    url: String,
+    preferred_proxy: Option<String>,
+) -> Result<Arc<VideoInfo>, ExtractionError> {
     let _permit = get_semaphore().acquire().await.map_err(|error| {
         ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
     })?;
@@ -403,7 +434,7 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
     let mut last_error: Option<String> = None;
 
     for attempt in 0..max_attempts {
-        let selected_proxy = require_proxy()?;
+        let selected_proxy = require_proxy(preferred_proxy.as_deref())?;
         let attempt_started_at = Instant::now();
         debug!(
             url = %url,
@@ -560,7 +591,17 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
                 );
                 match failure_kind {
                     ProxyFailureKind::BotCheck => {
-                        pool.quarantine(&selected_proxy.url, "yt-dlp-bot-check");
+                        if pool
+                            .note_bot_check(&selected_proxy.url, "yt-dlp-bot-check")
+                            .await
+                        {
+                            pool.quarantine(&selected_proxy.url, "yt-dlp-bot-check-streak-2");
+                        } else {
+                            warn!(
+                                proxy = %selected_proxy.url,
+                                "Proxy hit bot-check once; waiting for one more consecutive bot-check before quarantine"
+                            );
+                        }
                     }
                     ProxyFailureKind::TransportDead => {
                         pool.cooldown_now(&selected_proxy.url, "yt-dlp-transport-dead");
@@ -569,7 +610,7 @@ async fn extract_subprocess(url: String) -> Result<Arc<VideoInfo>, ExtractionErr
                         pool.mark_failed(&selected_proxy.url);
                     }
                     ProxyFailureKind::NotProxyRelated => {
-                        // Do not penalize proxy for non-proxy errors
+                        pool.clear_bot_check_streak(&selected_proxy.url);
                     }
                 }
             }

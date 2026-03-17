@@ -70,6 +70,7 @@ impl ProxyHealthStore {
         let mut conn = self.connection().await?;
         let fail_key = fail_count_key(proxy_url);
         let cooldown_key = cooldown_key(proxy_url);
+        let bot_check_streak_key = bot_check_streak_key(proxy_url);
         let last_error_key = last_error_key(proxy_url);
 
         let failures: i64 = conn
@@ -84,6 +85,10 @@ impl ProxyHealthStore {
             .set_ex(&last_error_key, reason, LAST_ERROR_TTL_SECS)
             .await
             .with_context(|| format!("failed to write redis key {last_error_key}"))?;
+        let _: usize = conn
+            .del(&bot_check_streak_key)
+            .await
+            .with_context(|| format!("failed to clear redis key {bot_check_streak_key}"))?;
 
         if failures >= MAX_FAILURES as i64 {
             let _: () = conn
@@ -107,6 +112,7 @@ impl ProxyHealthStore {
         let mut conn = self.connection().await?;
         let cooldown_key = cooldown_key(proxy_url);
         let fail_key = fail_count_key(proxy_url);
+        let bot_check_streak_key = bot_check_streak_key(proxy_url);
         let last_error_key = last_error_key(proxy_url);
 
         let _: () = conn
@@ -125,6 +131,39 @@ impl ProxyHealthStore {
             .set_ex(&last_error_key, reason, ttl_secs * 2)
             .await
             .with_context(|| format!("failed to write redis key {last_error_key}"))?;
+        let _: usize = conn
+            .del(&bot_check_streak_key)
+            .await
+            .with_context(|| format!("failed to clear redis key {bot_check_streak_key}"))?;
+
+        Ok(())
+    }
+
+    pub async fn record_bot_check(&self, proxy_url: &str, reason: &str) -> anyhow::Result<usize> {
+        let mut conn = self.connection().await?;
+        let bot_check_streak_key = bot_check_streak_key(proxy_url);
+        let last_error_key = last_error_key(proxy_url);
+
+        let streak: i64 = conn
+            .incr(&bot_check_streak_key, 1)
+            .await
+            .with_context(|| format!("failed to increment redis key {bot_check_streak_key}"))?;
+        let _: () = conn
+            .set_ex(&last_error_key, reason, LAST_ERROR_TTL_SECS)
+            .await
+            .with_context(|| format!("failed to write redis key {last_error_key}"))?;
+
+        Ok(streak.max(0) as usize)
+    }
+
+    pub async fn clear_bot_check_streak(&self, proxy_url: &str) -> anyhow::Result<()> {
+        let mut conn = self.connection().await?;
+        let bot_check_streak_key = bot_check_streak_key(proxy_url);
+
+        let _: usize = conn
+            .del(&bot_check_streak_key)
+            .await
+            .with_context(|| format!("failed to clear redis key {bot_check_streak_key}"))?;
 
         Ok(())
     }
@@ -148,6 +187,10 @@ fn last_error_key(proxy_url: &str) -> String {
     format!("proxy:last-error:{}", proxy_key_suffix(proxy_url))
 }
 
+fn bot_check_streak_key(proxy_url: &str) -> String {
+    format!("proxy:bot-check-streak:{}", proxy_key_suffix(proxy_url))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,6 +199,13 @@ mod tests {
     fn proxy_health_keys_are_hashed() {
         let key = fail_count_key("socks5h://user:pass@127.0.0.1:1080");
         assert!(key.starts_with("proxy:fail-count:"));
+        assert!(!key.contains("user:pass"));
+    }
+
+    #[test]
+    fn bot_check_streak_keys_are_hashed() {
+        let key = bot_check_streak_key("socks5h://user:pass@127.0.0.1:1080");
+        assert!(key.starts_with("proxy:bot-check-streak:"));
         assert!(!key.contains("user:pass"));
     }
 

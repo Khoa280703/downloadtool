@@ -16,9 +16,9 @@ impl JobRepository {
                     SELECT
                         j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
                         j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
-                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
-                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
-                        a.size_bytes AS file_size_bytes
+                        j.preferred_video_proxy, j.preferred_audio_proxy, j.status, j.artifact_id,
+                        j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
+                        j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes
                     FROM mux_jobs j
                     LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
                     WHERE j.id = $1 AND j.user_id = $2
@@ -35,9 +35,9 @@ impl JobRepository {
                     SELECT
                         j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
                         j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
-                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
-                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
-                        a.size_bytes AS file_size_bytes
+                        j.preferred_video_proxy, j.preferred_audio_proxy, j.status, j.artifact_id,
+                        j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
+                        j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes
                     FROM mux_jobs j
                     LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
                     WHERE j.id = $1 AND j.session_id = $2
@@ -61,9 +61,9 @@ impl JobRepository {
             SELECT
                 j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
                 j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
-                j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
-                j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
-                a.size_bytes AS file_size_bytes
+                j.preferred_video_proxy, j.preferred_audio_proxy, j.status, j.artifact_id,
+                j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
+                j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes
             FROM mux_jobs j
             LEFT JOIN mux_artifacts a ON a.id = j.artifact_id
             WHERE j.id = $1
@@ -89,9 +89,9 @@ impl JobRepository {
                     SELECT
                         j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
                         j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
-                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
-                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
-                        a.size_bytes AS file_size_bytes, a.id AS artifact_id,
+                        j.preferred_video_proxy, j.preferred_audio_proxy, j.status, j.artifact_id,
+                        j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
+                        j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes, a.id AS artifact_id,
                         a.dedupe_key AS artifact_dedupe_key, a.backend, a.local_path,
                         a.storage_bucket, a.object_key, a.status AS artifact_status,
                         a.size_bytes AS artifact_size_bytes, a.content_type, a.etag
@@ -111,9 +111,9 @@ impl JobRepository {
                     SELECT
                         j.id, j.user_id, j.session_id, j.request_hash, j.dedupe_key, j.source_url,
                         j.video_url, j.audio_url, j.video_format_id, j.audio_format_id, j.title,
-                        j.status, j.artifact_id, j.attempt_count, j.max_attempts, j.lease_owner,
-                        j.lease_expires_at_ms, j.last_error, j.created_at_ms, j.updated_at_ms,
-                        a.size_bytes AS file_size_bytes, a.id AS artifact_id,
+                        j.preferred_video_proxy, j.preferred_audio_proxy, j.status, j.artifact_id,
+                        j.attempt_count, j.max_attempts, j.lease_owner, j.lease_expires_at_ms,
+                        j.last_error, j.created_at_ms, j.updated_at_ms, a.size_bytes AS file_size_bytes, a.id AS artifact_id,
                         a.dedupe_key AS artifact_dedupe_key, a.backend, a.local_path,
                         a.storage_bucket, a.object_key, a.status AS artifact_status,
                         a.size_bytes AS artifact_size_bytes, a.content_type, a.etag

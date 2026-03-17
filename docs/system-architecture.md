@@ -1,6 +1,6 @@
 # System Architecture
 
-**Last Updated:** 2026-03-16
+**Last Updated:** 2026-03-17
 
 ## High-Level Architecture
 
@@ -34,6 +34,8 @@ Rust Worker (`crates/worker`, **NEW 2026-03-16**)
    • Heartbeat lease while mux/upload runs
    • Publish job progress via Redis pub/sub (7 phases)
    • Reuse ready artifact by dedupe key when possible
+   • Persist sticky preferred proxy on each mux job and reuse it during `late_extract`
+   • Keep the same proxy across URL refresh unless that proxy is no longer usable
    • Stream muxed bytes into LocalFs or S3 multipart upload
    • Mark artifact/job ready or failed
    • Periodic TTL cleanup deletes expired artifacts from storage
@@ -42,6 +44,7 @@ PostgreSQL
    • `mux_jobs` = user request lifecycle
    • `mux_artifacts` = dedupable physical output metadata
    • `mux_job_events` = auditable state/event trail
+   • `mux_jobs.preferred_video_proxy` / `preferred_audio_proxy` preserve extract-time proxy affinity for worker delivery
 ```
 
 ```
@@ -58,6 +61,8 @@ Internet
    │ • Moka cache: 500 items, 300s TTL              │
    │ • Semaphore: max 10 concurrent processes       │
    │ • Fallback: alternate player client on error   │
+   │ • Proxy-pinned refresh paths bypass shared     │
+   │   cache to avoid cross-proxy signed URL reuse  │
    │ • Returns: JSON (video_id, formats[])         │
    └────────┬─────────────────────────────────────────┘
             │

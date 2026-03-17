@@ -74,11 +74,25 @@ pub async fn extract_with_options(
     url: &str,
     bypass_cache: bool,
 ) -> Result<VideoInfo, ExtractionError> {
+    extract_with_options_and_proxy(url, bypass_cache, None).await
+}
+
+/// Extract video information from a URL with cache control options and a preferred proxy.
+///
+/// When `preferred_proxy` is set, extraction bypasses the shared extract cache so the
+/// returned stream URLs stay aligned with the proxy that will later fetch them.
+pub async fn extract_with_options_and_proxy(
+    url: &str,
+    bypass_cache: bool,
+    preferred_proxy: Option<&str>,
+) -> Result<VideoInfo, ExtractionError> {
     debug!(
-        "Extracting via yt-dlp: {} (bypass_cache={})",
-        url, bypass_cache
+        "Extracting via yt-dlp: {} (bypass_cache={}, preferred_proxy={})",
+        url,
+        bypass_cache,
+        preferred_proxy.is_some()
     );
-    ytdlp::extract_via_ytdlp(url, bypass_cache).await
+    ytdlp::extract_via_ytdlp(url, bypass_cache, preferred_proxy).await
 }
 
 /// Resolve pinned proxy URL for a direct stream URL, if previously extracted.

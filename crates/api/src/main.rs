@@ -56,8 +56,7 @@ static RATE_LIMIT_429_TOTAL: AtomicU64 = AtomicU64::new(0);
 static RATE_LIMIT_403_TOTAL: AtomicU64 = AtomicU64::new(0);
 
 async fn run_app_migrations(pool: &sqlx::PgPool) -> anyhow::Result<()> {
-    let mut migrator = sqlx::migrate::Migrator::new(resolve_app_migrations_dir())
-        .await?;
+    let mut migrator = sqlx::migrate::Migrator::new(resolve_app_migrations_dir()).await?;
     migrator.set_ignore_missing(true);
     migrator.run(pool).await?;
     Ok(())

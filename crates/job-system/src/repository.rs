@@ -33,6 +33,8 @@ impl JobRepository {
                 video_format_id: row.get("video_format_id"),
                 audio_format_id: row.get("audio_format_id"),
                 title: row.get("title"),
+                preferred_video_proxy: row.get("preferred_video_proxy"),
+                preferred_audio_proxy: row.get("preferred_audio_proxy"),
             },
             status: JobStatus::from_str(&row.get::<String, _>("status")),
             artifact_id: row.get("artifact_id"),
