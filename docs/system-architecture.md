@@ -1,8 +1,51 @@
 # System Architecture
 
-**Last Updated:** 2026-03-17
+**Last Updated:** 2026-03-18 (Phase 4 complete)
 
 ## High-Level Architecture
+
+### Playlist Backend Orchestration (2026-03-18 — NEW)
+
+```
+Browser (SvelteKit)
+   │
+   ├─► POST /api/proxy/playlist-jobs
+   │    └─► Rust API creates playlist job
+   │         • Extract playlist items from source URL (just once)
+   │         • Store in playlist_jobs + playlist_job_items tables
+   │         • Enqueue job for worker processing
+   │
+   ├─► GET /api/proxy/playlist-jobs/{id}
+   │    └─► Fetch current job + item status, counts, download URLs
+   │
+   ├─► SSE GET /api/proxy/playlist-jobs/{id}/events
+   │    └─► Real-time status snapshots as items progress
+   │         • Item extract → stream selection → mux (if needed) → ready
+   │         • Aggregate progress: total/completed/failed counts
+   │
+   ├─► POST /api/proxy/playlist-jobs/{id}/cancel
+   │    └─► Cancel all pending items in playlist
+   │
+   └─► POST /api/proxy/playlist-jobs/{id}/items/{item_id}/retry
+        └─► Manually retry one failed item
+
+Backend Processor (`crates/api/src/services/playlist_processor.rs`)
+   │
+   ├─► Discover phase
+   │    └─► Extract playlist membership once, store item records
+   │
+   └─► Processing phase (per item)
+        ├─► Extract stream URLs (just-in-time, not upfront)
+        ├─► Auto-select codec/quality per requested_mode
+        ├─► Route to direct download OR durable mux job
+        └─► Update item status, store download_url on ready
+
+PostgreSQL
+   • `playlist_jobs` = orchestration state + metadata
+   • `playlist_job_items` = individual video status + results
+   • Links to existing `mux_jobs` for items requiring muxing
+   • Reuses existing durable artifact system for ready files
+```
 
 ### Job Control Plane / Worker Pipeline (2026-03-16 — ENHANCED)
 
@@ -95,6 +138,10 @@ Internet
    │   - WS /stream → stream data                   │
    │   - POST /transcode → GPU job                  │
    │   - POST /whop-webhook → subscription update   │
+   │   - POST /playlist-jobs → create (NEW 2026-03) │
+   │   - GET /playlist-jobs/{id} → status + items   │
+   │   - GET /playlist-jobs/{id}/events → SSE       │
+   │   - POST /playlist-jobs/{id}/cancel            │
    │ • Request validation & rate limiting           │
    │ • PostgreSQL connection pool (subscriptions)   │
    │ • API access tracing (all requests logged)     │
@@ -644,45 +691,6 @@ Browser SSE connect → /api/proxy/jobs/{id}/events
 
 ---
 
-## Recent Changes (2026-03-06 — Runtime Config & Proxy Quarantine)
-
-### 1. Runtime Limits Configuration Activated
-**File:** `config/runtime-limit-profiles.json`
-
-**Integration Points:**
-- API startup reads local/production profile
-- All limits applied at runtime (no code recompilation)
-- Frontend components respect `frontend.*` limits
-- Backend routes enforce `backend.*` limits
-
-**Example:** Lower `backend.stream_max_concurrent` in production profile to shed load on `/api/stream` without redeploying the API
-
-### 2. Proxy Quarantine System Enhanced
-**File:** `crates/proxy/src/proxy_pool.rs`
-
-**Workflow:**
-1. Request fails with 403 (bot detection)
-2. Proxy marked unhealthy
-3. IP written to `PROXY_QUARANTINE_FILE`
-4. Next request uses different proxy
-5. Quarantine file persists across restarts
-
-**Impact:** Reduced manual proxy management
-
-### 3. API Access Tracing Documented
-**Location:** `crates/api/src/main.rs`
-
-**Logged per request:**
-- User ID (from JWT claims)
-- Subscription tier
-- Endpoint & HTTP method
-- Response status & latency
-- Error details (if any)
-
-**Use:** Debugging, observability, SLA monitoring
-
----
-
 ## Performance Characteristics (Updated 2026-03-06)
 
 | Metric | Value | Notes |
@@ -778,4 +786,4 @@ hooks.server.ts runs (check better-auth cookie)
 
 ---
 
-**Version:** 2.4 (Updated 2026-03-16 with i18n, mux job flow, SSE progress, job system)
+**Version:** 2.5 (Updated 2026-03-18 with playlist backend orchestration, i18n, mux job flow, SSE progress, job system)

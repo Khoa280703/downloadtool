@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use tokio::task::JoinSet;
 use job_system::JobRepository;
 use proxy::init_global_proxy_pool;
 use queue::redis_streams::RedisStreamsQueue;
@@ -85,7 +86,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    let repo = JobRepository::new(db_pool);
+    let repo = Arc::new(JobRepository::new(db_pool));
     let queue = Arc::new(RedisStreamsQueue::new(
         &config.redis_url,
         &config.queue_stream,
@@ -102,12 +103,14 @@ async fn main() -> Result<()> {
 
     info!(
         worker_id = config.worker_id,
+        concurrency = config.concurrency,
         artifact_backend = config.artifact_backend,
         queue_stream = config.queue_stream,
         "Mux worker started"
     );
     let mut last_cleanup_at =
         std::time::Instant::now() - Duration::from_secs(config.cleanup_interval_secs.max(1) as u64);
+    let mut in_flight = JoinSet::new();
 
     loop {
         if let Err(error) = republish_reclaimed_jobs(&repo, queue_publisher.clone(), &config).await
@@ -125,25 +128,51 @@ async fn main() -> Result<()> {
             last_cleanup_at = std::time::Instant::now();
         }
 
-        match queue_consumer.consume(1_000).await {
-            Ok(Some(claimed)) => {
-                let should_ack = run_claimed_job(
-                    &repo,
-                    queue_publisher.clone(),
-                    storage.clone(),
-                    progress_store.clone(),
-                    &config,
-                    claimed.clone(),
-                )
-                .await?;
-                if should_ack {
-                    queue_consumer.ack(&claimed.stream_id).await?;
+        while in_flight.len() < config.concurrency {
+            match queue_consumer.consume(250).await {
+                Ok(Some(claimed)) => {
+                    let repo = repo.clone();
+                    let queue_publisher = queue_publisher.clone();
+                    let queue_consumer = queue_consumer.clone();
+                    let storage = storage.clone();
+                    let progress_store = progress_store.clone();
+                    let config = config.clone();
+
+                    in_flight.spawn(async move {
+                        let should_ack = run_claimed_job(
+                            repo.as_ref(),
+                            queue_publisher,
+                            storage,
+                            progress_store,
+                            &config,
+                            claimed.clone(),
+                        )
+                        .await?;
+                        if should_ack {
+                            queue_consumer.ack(&claimed.stream_id).await?;
+                        }
+                        Ok::<(), anyhow::Error>(())
+                    });
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    error!(err = %error, "Worker consume loop failed");
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    break;
                 }
             }
-            Ok(None) => tokio::time::sleep(Duration::from_millis(250)).await,
-            Err(error) => {
-                error!(err = %error, "Worker consume loop failed");
-                tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+
+        if in_flight.is_empty() {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            continue;
+        }
+
+        if let Some(result) = in_flight.join_next().await {
+            match result {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => return Err(error),
+                Err(error) => return Err(error.into()),
             }
         }
     }

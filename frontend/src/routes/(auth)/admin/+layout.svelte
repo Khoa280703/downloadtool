@@ -22,6 +22,8 @@
 				return 'dashboard';
 			case 'jobs':
 				return 'work_history';
+			case 'playlists':
+				return 'queue_music';
 			case 'proxies':
 				return 'hub';
 			case 'activity':

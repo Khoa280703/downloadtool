@@ -1,6 +1,5 @@
 <script lang="ts">
 	import AppIcon from '$components/AppIcon.svelte';
-	import { onMount } from 'svelte';
 	import * as m from '$lib/paraglide/messages';
 	import {
 		batchQueue,
@@ -9,9 +8,6 @@
 		setAllPendingBatchItemsSelected,
 		setBatchItemSelected
 	} from '$stores/batch';
-	import { getStatus } from '$lib/playlist-download-worker';
-
-	let workerStatus = $state(getStatus());
 
 	const selectedCount = $derived.by(
 		() => $batchQueue.filter((item) => item.selected !== false).length
@@ -31,7 +27,10 @@
 	const pendingCount = $derived.by(
 		() => $batchQueue.filter((item) => item.selected !== false && item.status === 'pending').length
 	);
-	const canEditSelection = $derived.by(() => !$isBatchActive && workerStatus.active === 0);
+	const downloadingCount = $derived.by(
+		() => $batchQueue.filter((item) => item.status === 'downloading').length
+	);
+	const canEditSelection = $derived.by(() => !$isBatchActive && downloadingCount === 0);
 	const progressTotal = $derived.by(() => (selectedCount > 0 ? selectedCount : $batchProgress.total));
 	const progressDone = $derived.by(() => (selectedCount > 0 ? settledCount : $batchProgress.received));
 	const progressPercent = $derived.by(() => {
@@ -50,29 +49,16 @@
 		return `${value.toFixed(2)}%`;
 	}
 
-	function formatCooldown(ms: number): string {
-		const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
-		const minutes = Math.floor(totalSeconds / 60);
-		const seconds = totalSeconds % 60;
-		return `${minutes}:${String(seconds).padStart(2, '0')}`;
-	}
-
 	function formatSummary(): string {
-		const waiting = workerStatus.pending + workerStatus.ready;
-		if (workerStatus.active > 0) {
+		if (downloadingCount > 0) {
 			return m.playlist_progress_summary_active_waiting({
-				active: String(workerStatus.active),
-				waiting: String(waiting)
+				active: String(downloadingCount),
+				waiting: String(pendingCount)
 			});
 		}
 		if (pendingCount > 0) {
 			return m.playlist_progress_summary_queued({
 				pending: String(pendingCount)
-			});
-		}
-		if (waiting > 0) {
-			return m.playlist_progress_summary_waiting({
-				waiting: String(waiting)
 			});
 		}
 		return m.playlist_progress_summary_finalizing();
@@ -109,12 +95,31 @@
 		return 'status-pending';
 	}
 
-	onMount(() => {
-		const interval = setInterval(() => {
-			workerStatus = getStatus();
-		}, 500);
-		return () => clearInterval(interval);
-	});
+	function getDisplayPriority(item: {
+		status: string;
+		selected?: boolean;
+		progressLabel?: string;
+	}): number {
+		if (item.status === 'downloading' || item.progressLabel) return 0;
+		if (item.selected !== false && item.status === 'pending') return 1;
+		if (item.selected === false) return 2;
+		if (item.status === 'error') return 3;
+		if (item.status === 'completed') return 4;
+		return 5;
+	}
+
+	const orderedBatchQueue = $derived.by(() =>
+		$batchQueue
+			.map((item, index) => ({ item, index }))
+			.sort((left, right) => {
+				const priorityDiff =
+					getDisplayPriority(left.item) - getDisplayPriority(right.item);
+				if (priorityDiff !== 0) return priorityDiff;
+				return left.index - right.index;
+			})
+			.map(({ item }) => item)
+	);
+
 </script>
 
 <div class="batch-progress" class:is-idle={!$isBatchActive && $batchQueue.length === 0}>
@@ -133,22 +138,8 @@
 
 	{#if $batchQueue.length > 0}
 		<div class="pool-indicator">
-			<div class="slots">
-				{#each Array(workerStatus.max) as _, i}
-					<span
-						class="slot"
-						class:active={i < workerStatus.active}
-						title={m.playlist_progress_download_slot({ index: String(i + 1) })}
-					></span>
-				{/each}
-			</div>
 			<span class="pool-text">{formatSummary()}</span>
 		</div>
-		{#if workerStatus.circuitOpen}
-			<div class="cooldown-note">
-				{m.playlist_progress_rate_limited({ cooldown: formatCooldown(workerStatus.cooldownMs) })}
-			</div>
-		{/if}
 
 		<div class="summary-row">
 			<span class="summary-pill neutral">{m.playlist_progress_selected({ count: String(selectedCount) })}</span>
@@ -164,7 +155,7 @@
 		{/if}
 
 		<div class="queue-list" role="list">
-			{#each $batchQueue as item}
+			{#each orderedBatchQueue as item}
 				<div class="queue-item" role="listitem">
 					{#if item.status === 'pending' && !item.progressLabel}
 						<button

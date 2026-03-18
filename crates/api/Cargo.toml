@@ -42,6 +42,9 @@ bytes = "1"
 futures = "0.3"
 async-stream = "0.3"
 
+# URL encoding
+urlencoding = "2"
+
 # OpenAPI spec generation
 utoipa = { workspace = true }
 

@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 const ROBOTS_CONTENT = `User-agent: *
 Disallow:
 
-Sitemap: https://download.khoadangbui.online/sitemap.xml
+Sitemap: https://snapvie.com/sitemap.xml
 `;
 
 export const GET: RequestHandler = async () =>

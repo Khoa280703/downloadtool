@@ -20,6 +20,7 @@
     "logs:fe": "docker logs -f downloadtool-frontend",
     "dev:web": "bash -lc 'set -a; source .env; set +a; pnpm --filter frontend dev'",
     "build:web": "bash -lc 'set -a; source .env; set +a; pnpm --filter frontend build'",
+    "stress:single:e2e": "node scripts/stress-test-single-end-to-end.mjs",
     "build:injector": "pnpm --filter @downloadtool/injector build",
     "build:extension": "pnpm --filter @downloadtool/extension build",
     "build:all": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build && pnpm --filter frontend build",

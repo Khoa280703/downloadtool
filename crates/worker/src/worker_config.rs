@@ -12,6 +12,7 @@ pub struct WorkerConfig {
     pub queue_stream: String,
     pub queue_group: String,
     pub worker_id: String,
+    pub concurrency: usize,
     pub lease_secs: i64,
     pub reclaim_limit: i64,
     pub max_attempts: i32,
@@ -226,6 +227,11 @@ impl WorkerConfig {
             queue_stream: Self::env_or_default("MUX_QUEUE_STREAM", || "mux_jobs".to_string()),
             queue_group: Self::env_or_default("MUX_QUEUE_GROUP", || "mux-workers".to_string()),
             worker_id: Self::env_or_default("MUX_WORKER_ID", || format!("{host}-{pid}")),
+            concurrency: env::var("MUX_WORKER_CONCURRENCY")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .filter(|value: &usize| *value > 0)
+                .unwrap_or(16),
             lease_secs: env::var("MUX_WORKER_LEASE_SECS")
                 .ok()
                 .and_then(|v| v.parse().ok())

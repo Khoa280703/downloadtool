@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-const ORIGIN = process.env.ORIGIN ?? 'https://download.khoadangbui.online';
+const ORIGIN = process.env.ORIGIN ?? 'https://snapvie.com';
 const LANGUAGES = [
 	'ar',
 	'bg',

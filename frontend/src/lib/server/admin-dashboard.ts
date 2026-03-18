@@ -1,7 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { getDatabasePool, getProxyDatabasePool } from './auth-utils';
 import { maskProxyUrl } from './admin-proxy-management';
-import type { AdminActivityRow, AdminDashboardData, AdminJobRow, AdminOverview, AdminProxyRow } from '$lib/admin/types';
+import type { AdminActivityRow, AdminDashboardData, AdminJobRow, AdminOverview, AdminPlaylistJobRow, AdminProxyRow } from '$lib/admin/types';
 
 type OverviewRow = Record<string, number>;
 
@@ -22,6 +22,32 @@ const overviewQuery = `
 		(SELECT COUNT(*)::int FROM mux_artifacts WHERE status = 'building') AS "buildingArtifacts",
 		(SELECT COUNT(*)::int FROM mux_artifacts WHERE status = 'ready') AS "readyArtifacts",
 		(SELECT COUNT(*) FROM mux_job_events WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS "jobEventsLast24h"
+`;
+
+const playlistOverviewQuery = `
+	SELECT
+		(SELECT COUNT(*)::int FROM playlist_jobs WHERE status IN ('queued', 'discovering', 'processing')) AS "playlistActiveJobs",
+		(SELECT COUNT(*)::int FROM playlist_jobs WHERE status = 'completed' AND updated_at >= NOW() - INTERVAL '24 hours') AS "playlistCompletedJobs24h",
+		(SELECT COUNT(*)::int FROM playlist_jobs WHERE status = 'failed' AND updated_at >= NOW() - INTERVAL '24 hours') AS "playlistFailedJobs24h"
+`;
+
+const playlistJobsQuery = `
+	SELECT
+		id,
+		source_url AS "sourceUrl",
+		title,
+		status,
+		total_items AS "totalItems",
+		completed_items AS "completedItems",
+		failed_items AS "failedItems",
+		requested_quality AS "requestedQuality",
+		requested_mode AS "requestedMode",
+		COALESCE(NULLIF(user_id, ''), NULLIF(session_id, ''), NULLIF(request_ip, ''), 'guest') AS "ownerLabel",
+		TO_CHAR(TO_TIMESTAMP(created_at_ms / 1000.0), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt",
+		TO_CHAR(TO_TIMESTAMP(updated_at_ms / 1000.0), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "updatedAt"
+	FROM playlist_jobs
+	ORDER BY updated_at_ms DESC
+	LIMIT 50
 `;
 
 const auditOverviewQuery = `
@@ -331,6 +357,19 @@ type QueryError = Error & {
 	code?: string;
 };
 
+async function safeLoadPlaylistOverview(): Promise<Record<string, number>> {
+	const pool = getDatabasePool();
+	try {
+		const result = await pool.query<OverviewRow>(playlistOverviewQuery);
+		return result.rows[0] ?? {};
+	} catch (error) {
+		if ((error as QueryError)?.code !== '42P01') {
+			console.error('Failed to query playlist overview:', error);
+		}
+		return {};
+	}
+}
+
 async function safeLoadAuditEventsLast24h(): Promise<number> {
 	const pool = getDatabasePool();
 	try {
@@ -360,10 +399,11 @@ async function safeLoadAuditActivity(): Promise<AdminActivityRow[]> {
 export async function loadAdminOverview(): Promise<AdminOverview> {
 	const appPool = getDatabasePool();
 	const proxyPool = getProxyDatabasePool();
-	const [overviewResult, proxyOverviewResult, auditEventsLast24h] = await Promise.all([
+	const [overviewResult, proxyOverviewResult, auditEventsLast24h, playlistOverviewResult] = await Promise.all([
 		appPool.query<OverviewRow>(overviewQuery),
 		proxyPool.query<OverviewRow>(proxyOverviewQuery),
-		safeLoadAuditEventsLast24h()
+		safeLoadAuditEventsLast24h(),
+		safeLoadPlaylistOverview()
 	]);
 	const jobOverview = overviewResult.rows[0] ?? {};
 	const proxyOverview = proxyOverviewResult.rows[0] ?? {};
@@ -376,7 +416,10 @@ export async function loadAdminOverview(): Promise<AdminOverview> {
 		eventsLast24h:
 			Number(jobOverview.jobEventsLast24h ?? 0) +
 			auditEventsLast24h +
-			Number(proxyOverview.proxyEventsLast24h ?? 0)
+			Number(proxyOverview.proxyEventsLast24h ?? 0),
+		playlistActiveJobs: Number(playlistOverviewResult.playlistActiveJobs ?? 0),
+		playlistCompletedJobs24h: Number(playlistOverviewResult.playlistCompletedJobs24h ?? 0),
+		playlistFailedJobs24h: Number(playlistOverviewResult.playlistFailedJobs24h ?? 0)
 	} as AdminOverview;
 }
 
@@ -401,6 +444,19 @@ export async function loadAdminProxies(): Promise<AdminProxyRow[]> {
 		lastEventAt: normalizeDate(row.lastEventAt),
 		lastDownloadAccessAt: normalizeDate(row.lastDownloadAccessAt)
 	}));
+}
+
+export async function loadAdminPlaylistJobs(): Promise<AdminPlaylistJobRow[]> {
+	const pool = getDatabasePool();
+	try {
+		const result = await pool.query<AdminPlaylistJobRow>(playlistJobsQuery);
+		return result.rows;
+	} catch (error) {
+		if ((error as QueryError)?.code !== '42P01') {
+			console.error('Failed to query playlist jobs:', error);
+		}
+		return [];
+	}
 }
 
 export async function loadAdminActivity(): Promise<AdminActivityRow[]> {

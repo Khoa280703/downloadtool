@@ -18,6 +18,20 @@
 		return ` · ${Math.max(0, Math.min(100, Math.round(percent)))}%`;
 	}
 
+	function resolveQueuedMuxDetail(update: MuxJobStatusUpdate, percentSuffix: string): string {
+		const queuePosition = update.queuePosition ?? null;
+		if (typeof queuePosition === 'number' && queuePosition > 1) {
+			return `${m.mux_job_detail_queued_position({
+				jobId: update.jobId,
+				count: String(queuePosition - 1)
+			})}${percentSuffix}`;
+		}
+		if (queuePosition === 1) {
+			return `${m.mux_job_detail_queued_front({ jobId: update.jobId })}${percentSuffix}`;
+		}
+		return `${m.mux_job_detail_queued_waiting({ jobId: update.jobId })}${percentSuffix}`;
+	}
+
 	function describeMuxStatus(update: MuxJobStatusUpdate): { stage: string; detail: string } {
 		const elapsedSeconds = Math.floor(update.elapsedMs / 1000);
 		const percentSuffix = formatPercentSuffix(update.percent);
@@ -53,7 +67,7 @@
 		if (update.phase === 'retrying') {
 			return {
 				stage: m.mux_job_stage_queued(),
-				detail: `${m.mux_job_detail_queued_waiting({ jobId: update.jobId })}${percentSuffix}`
+				detail: resolveQueuedMuxDetail(update, percentSuffix)
 			};
 		}
 
@@ -62,7 +76,7 @@
 				stage: m.mux_job_stage_queued(),
 				detail:
 					elapsedSeconds >= 8
-						? `${m.mux_job_detail_queued_waiting({ jobId: update.jobId })}${percentSuffix}`
+						? resolveQueuedMuxDetail(update, percentSuffix)
 						: `${m.mux_job_detail_queued_received({ jobId: update.jobId })}${percentSuffix}`
 			};
 		}

@@ -1,6 +1,6 @@
 # Codebase Summary
 
-**Generated:** 2026-03-17
+**Generated:** 2026-03-18
 **Total Files:** 404 | **Total Tokens:** ~810,000 (repomix)
 
 ## Project Overview
@@ -56,7 +56,16 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `FormatPicker.svelte` - Stream quality/format selection
   - `CookieConsent.svelte` - Privacy compliance
   - `AdBanner.svelte` & `InterstitialAd.svelte` - Ad integration
-- **Features:** Responsive design, i18n support, real-time progress, ad monetization
+  - `PlaylistProgress.svelte` - Playlist job status + item list (**NEW 2026-03-18**)
+- **API Modules:**
+  - `lib/api.ts` - Extraction & download API client
+  - `lib/playlist-job-api.ts` - **NEW (2026-03-18):** Client for playlist job orchestration (create, status, SSE events, cancel)
+- **Routes:**
+  - `routes/api/proxy/playlist-jobs/+server.ts` - BFF proxy for POST create (NEW 2026-03-18)
+  - `routes/api/proxy/playlist-jobs/[jobId]/+server.ts` - BFF proxy for GET status (NEW 2026-03-18)
+  - `routes/api/proxy/playlist-jobs/[jobId]/events/+server.ts` - SSE event proxy (NEW 2026-03-18)
+  - `routes/api/proxy/playlist-jobs/[jobId]/cancel/+server.ts` - BFF proxy for POST cancel (NEW 2026-03-18)
+- **Features:** Responsive design, i18n support, real-time progress, ad monetization, backend playlist orchestration
 
 ### 2. **API Layer** (`crates/api`)
 - **Entry Point:** `main.rs` - HTTP server (Tokio-based), PostgreSQL pool setup
@@ -80,6 +89,25 @@ A high-performance video downloader platform supporting YouTube and other platfo
 - `storage_ticket_service.rs` - Builds LocalFs proxy ticket or S3-compatible presigned ticket
 - `/api/jobs/*` - Create job, poll status, fetch file ticket, stream/redirect ready file, send release hint
 - `mux_jobs` rows now persist `preferred_video_proxy` / `preferred_audio_proxy` so worker delivery can stay on the same proxy family used at extract time
+
+### 2.2 **Playlist Backend Orchestration** (`crates/api/src/routes/playlist_jobs.rs`, `crates/api/src/services/playlist_processor.rs`, `crates/job-system/src/playlist_job_*`) — **NEW (2026-03-18)**
+- **Purpose:** Move playlist download from client-orchestrated queue to durable backend orchestration
+- **Routes:**
+  - `POST /api/proxy/playlist-jobs` - Create playlist job from URL, discover items once, queue processor
+  - `GET /api/proxy/playlist-jobs/{id}` - Fetch job status + items + download URLs
+  - `GET /api/proxy/playlist-jobs/{id}/events` - SSE stream of real-time status snapshots
+  - `POST /api/proxy/playlist-jobs/{id}/cancel` - Cancel all pending items
+  - `POST /api/proxy/playlist-jobs/{id}/items/{item_id}/retry` - Retry single failed item
+- **Models & Storage:**
+  - `playlist_job_models.rs` - Rust types (PlaylistJobStatus, PlaylistItemStatus, records)
+  - `playlist_jobs` table - Orchestration metadata (source_url, status, counts, quality/mode preference)
+  - `playlist_job_items` table - Per-item state (video_id, status, mux_job_id, download_url)
+- **Processor:**
+  - `playlist_processor.rs` - Discovers items, routes to direct or mux, updates item status
+  - Just-in-time stream extraction: no upfront URL collection
+  - Auto-selects codec/quality per requested_mode before routing
+  - Reuses existing mux job + artifact system for muxing
+  - Publishes SSE snapshots as items progress
 
 ### 3. **Extractor Engine** (`crates/extractor`)
 - **Purpose:** Dynamic extraction of video metadata from various platforms
@@ -221,6 +249,34 @@ The platform now reaches users via 4 independent channels:
 - `GET /bm.js`: Serves bookmarklet (compile-time embed via `include_str!`)
 - `GET /userscript`: Serves userscript (compile-time embed via `include_str!`)
 - External clients use `POST /api/extract` plus app-domain launcher `/download/mux-job`, which then drives durable `/api/jobs/*`
+
+## Recent Changes (2026-03-18 — Playlist Backend Orchestration)
+
+### 1. **Backend Playlist Orchestration** ✅
+**Files:** `crates/api/src/routes/playlist_jobs.rs`, `crates/api/src/services/playlist_processor.rs`, `crates/job-system/src/playlist_job_*`, `frontend/src/lib/playlist-job-api.ts`
+
+**New API Endpoints:**
+- `POST /api/proxy/playlist-jobs` - Create playlist job, discover items, queue processor
+- `GET /api/proxy/playlist-jobs/{id}` - Fetch job + item status, counts, download URLs
+- `GET /api/proxy/playlist-jobs/{id}/events` - SSE stream of real-time status snapshots
+- `POST /api/proxy/playlist-jobs/{id}/cancel` - Cancel all pending items
+- `POST /api/proxy/playlist-jobs/{id}/items/{item_id}/retry` - Retry single failed item
+
+**New Database Tables:**
+- `playlist_jobs` - Orchestration metadata (source_url, status, completed/failed counts, quality/mode)
+- `playlist_job_items` - Per-item state (video_id, status, mux_job_id, artifact_key, download_url)
+
+**Key Architecture Decisions:**
+- Playlist items discovered once at job creation time
+- Just-in-time stream extraction per item (not upfront bulk extraction)
+- Routes to direct download OR durable mux job based on auto-selected codec
+- Reuses existing `mux_jobs` + artifact system for muxing items
+- SSE provides real-time progress for browser + auto-save when items ready
+- Backend survives tab close; browser can refresh and recover state
+
+**Impact:** Durable playlist downloads, per-item retry/cancel, background processing
+
+---
 
 ## Recent Changes (2026-03-16 — i18n Complete + Mux Job Flow + Job System)
 
@@ -548,5 +604,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-03-16
-**Status:** Complete & Operational (i18n ✅ | Mux Job Flow ✅ | Job System ✅ | Runtime Config ✅ | Frontend Auth Modal ✅)
+**Last Updated:** 2026-03-18 (Phase 4 complete)
+**Status:** Complete & Operational (i18n ✅ | Mux Job Flow ✅ | Job System ✅ | Runtime Config ✅ | Frontend Auth Modal ✅ | Playlist Backend Orchestration ✅ | Admin Visibility ✅ | Reload Resume ✅ | Server Recovery ✅)

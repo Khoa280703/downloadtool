@@ -22,6 +22,7 @@ pub struct JobCreationResult {
 pub struct JobStatusRecord {
     pub job_id: String,
     pub status: JobStatus,
+    pub queue_position: Option<u64>,
     pub error: Option<String>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
@@ -143,6 +144,16 @@ impl JobControlPlaneService {
         let Some(job) = self.durable_repository.get_user_job(job_id, owner).await? else {
             return Ok(None);
         };
+        let queue_position = if job.status == JobStatus::Queued {
+            Some(
+                self.durable_repository
+                    .count_queued_jobs_ahead(&job.id, job.created_at_ms)
+                    .await?
+                    + 1,
+            )
+        } else {
+            None
+        };
 
         if job.status == JobStatus::Ready {
             if let Some(download) = self
@@ -150,11 +161,11 @@ impl JobControlPlaneService {
                 .get_ready_artifact_for_user_job(job_id, owner)
                 .await?
             {
-                return Ok(Some(map_durable_download(download)));
+                return Ok(Some(map_durable_download(download, queue_position)));
             }
         }
 
-        Ok(Some(map_durable_job(job)))
+        Ok(Some(map_durable_job(job, queue_position)))
     }
 
     pub async fn touch_release(&self, job_id: &str, owner: &JobOwner) -> anyhow::Result<bool> {
@@ -180,10 +191,11 @@ impl JobControlPlaneService {
     }
 }
 
-fn map_durable_job(job: DurableJobRecord) -> JobStatusRecord {
+fn map_durable_job(job: DurableJobRecord, queue_position: Option<u64>) -> JobStatusRecord {
     JobStatusRecord {
         job_id: job.id,
         status: job.status,
+        queue_position,
         error: job.last_error,
         created_at_ms: job.created_at_ms as u64,
         updated_at_ms: job.updated_at_ms as u64,
@@ -198,10 +210,14 @@ fn map_durable_job(job: DurableJobRecord) -> JobStatusRecord {
     }
 }
 
-fn map_durable_download(download: JobArtifactDownload) -> JobStatusRecord {
+fn map_durable_download(
+    download: JobArtifactDownload,
+    queue_position: Option<u64>,
+) -> JobStatusRecord {
     JobStatusRecord {
         job_id: download.job.id,
         status: download.job.status,
+        queue_position,
         error: download.job.last_error,
         created_at_ms: download.job.created_at_ms as u64,
         updated_at_ms: download.job.updated_at_ms as u64,

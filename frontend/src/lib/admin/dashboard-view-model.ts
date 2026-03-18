@@ -1,7 +1,7 @@
 import type { AdminOverview } from './types';
 
 export type StatTone = 'neutral' | 'sky' | 'emerald' | 'amber' | 'rose';
-export type AdminSectionId = 'overview' | 'jobs' | 'proxies' | 'activity' | 'capacity';
+export type AdminSectionId = 'overview' | 'jobs' | 'playlists' | 'proxies' | 'activity' | 'capacity';
 export type AdminSectionGroup = 'Monitor' | 'Operations';
 
 export type AdminSectionItem = {
@@ -36,6 +36,14 @@ export const adminSectionItems: AdminSectionItem[] = [
 		icon: 'work_history',
 		description: 'Queue và tiến trình mux',
 		href: '/admin/jobs'
+	},
+	{
+		id: 'playlists',
+		group: 'Operations',
+		label: 'Playlists',
+		icon: 'playlist_play',
+		description: 'Playlist jobs và item progress',
+		href: '/admin/playlists'
 	},
 	{
 		id: 'proxies',
@@ -151,6 +159,8 @@ export function getAdminSectionBadge(sectionId: AdminSectionId, overview: AdminO
 			const queueBacklog = overview.queuedJobs + overview.leasedJobs;
 			return queueBacklog || null;
 		}
+		case 'playlists':
+			return overview.playlistActiveJobs || null;
 		case 'proxies':
 			return overview.quarantinedProxies || null;
 		case 'activity':

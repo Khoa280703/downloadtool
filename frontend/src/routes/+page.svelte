@@ -7,7 +7,17 @@
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
-	import { extract, extractYouTubeVideoId, isValidVideoUrl, subscribeBatch } from '$lib/api';
+	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
+	import {
+		createPlaylistJob,
+		cancelPlaylistJob,
+		getPlaylistJob,
+		startPlaylistJob,
+		subscribePlaylistJobEvents,
+		resolvePlaylistItemDownloadUrl,
+		type PlaylistJobSnapshot,
+		type PlaylistJobEventSubscription
+	} from '$lib/playlist-job-api';
 	import mikeAvatar from '$lib/assets/testimonials/mike.webp';
 	import * as m from '$lib/paraglide/messages';
 	import {
@@ -19,23 +29,21 @@
 		getStoredPlaylistQuality
 	} from '$lib/playlist-download-stream-selection';
 	import {
-		type QueueEntry,
-		enqueueDownload,
 		pickSaveDirectory,
-		resetWorkerState,
-		setPreferredDownloadMode,
-		setPreferredQuality
-	} from '$lib/playlist-download-worker';
+		saveDownload
+	} from '$lib/playlist-download-file-saver';
 	import sarahAvatar from '$lib/assets/testimonials/sarah.webp';
 	import {
 		addBatchItem,
 		batchProgress,
 		batchQueue,
+		clearBatchItemProgressByVideoId,
 		completeBatch,
 		resetBatch,
 		setBatchProgress,
-		setEventSource,
-		startBatch
+		startBatch,
+		updateBatchItemByVideoId,
+		updateBatchItemProgressByVideoId
 	} from '$stores/batch';
 	import type { ExtractResult, Stream } from '$lib/types';
 	import user1Avatar from '$lib/assets/testimonials/user-1.webp';
@@ -65,12 +73,15 @@
 	let dirPicked = $state(false);
 	let selectedDownloadMode = $state<PlaylistDownloadMode>(getStoredPlaylistDownloadMode());
 	let selectedQuality = $state<PlaylistQuality>(getStoredPlaylistQuality());
-	let stagedEntries = $state<QueueEntry[]>([]);
+	let playlistJobId = $state<string | null>(null);
+	let playlistJobSub = $state<PlaylistJobEventSubscription | null>(null);
+	let playlistSnapshot = $state<PlaylistJobSnapshot | null>(null);
+	let playlistSavedVideoIds = $state<Set<string>>(new Set());
 	let playlistCompletionNotified = $state(false);
 	/** undefined = loading skeleton, null = unauthenticated, object = authenticated */
 	let authUser = $state<AuthUser | null | undefined>(undefined);
 	let redirectTo = $state('/');
-	const SEO_ORIGIN = 'https://download.khoadangbui.online';
+	const SEO_ORIGIN = 'https://snapvie.com';
 	const SEO_LOCALES = [
 		'ar',
 		'bg',
@@ -206,6 +217,12 @@
 		const picker = (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker;
 		fsaaSupported = typeof picker === 'function';
 
+		// Resume persisted playlist job after page reload
+		const savedJobId = getPersistedPlaylistJobId();
+		if (savedJobId) {
+			void resumePlaylistJob(savedJobId);
+		}
+
 		void (async () => {
 			await refreshAuthUser();
 
@@ -243,7 +260,8 @@
 	});
 
 	onDestroy(() => {
-		resetWorkerState();
+		playlistJobSub?.close();
+		playlistJobSub = null;
 		resetBatch();
 	});
 
@@ -251,8 +269,8 @@
 		if (playlistPhase !== 'downloading' || playlistCompletionNotified) return;
 		if ($batchQueue.length === 0) return;
 
-		const selectedItems = $batchQueue.filter((item) => item.selected !== false);
-		const settled = selectedItems.every(
+		const allItems = $batchQueue.filter((item) => item.selected !== false);
+		const settled = allItems.every(
 			(item) => item.status === 'completed' || item.status === 'error'
 		);
 		if (!settled) return;
@@ -308,19 +326,264 @@
 		}
 	}
 
-	function pushStagedEntry(entry: QueueEntry): void {
-		if (stagedEntries.some((item) => item.videoId === entry.videoId)) return;
-		stagedEntries = [...stagedEntries, entry];
+	const PLAYLIST_JOB_STORAGE_KEY = 'fetchtube.playlist-job-id.v1';
+
+	function persistPlaylistJobId(jobId: string | null): void {
+		if (!browser) return;
+		try {
+			if (jobId) {
+				window.localStorage.setItem(PLAYLIST_JOB_STORAGE_KEY, jobId);
+			} else {
+				window.localStorage.removeItem(PLAYLIST_JOB_STORAGE_KEY);
+			}
+		} catch {
+			// Ignore localStorage failures.
+		}
+	}
+
+	function getPersistedPlaylistJobId(): string | null {
+		if (!browser) return null;
+		try {
+			return window.localStorage.getItem(PLAYLIST_JOB_STORAGE_KEY);
+		} catch {
+			return null;
+		}
 	}
 
 	function resetPlaylistComposer(options: { preserveQueue?: boolean } = {}): void {
-		resetWorkerState();
+		playlistJobSub?.close();
+		playlistJobSub = null;
 		if (!options.preserveQueue) {
 			resetBatch();
-			stagedEntries = [];
 		}
+		playlistJobId = null;
+		playlistSnapshot = null;
+		persistPlaylistJobId(null);
+		playlistSavedVideoIds = new Set();
 		playlistPhase = 'idle';
 		playlistCompletionNotified = false;
+	}
+
+	function startReadyPlaylistDownloads(snapshot: PlaylistJobSnapshot): void {
+		if (playlistPhase !== 'downloading') return;
+
+		for (const item of snapshot.items) {
+			if (item.status !== 'ready') continue;
+			if (playlistSavedVideoIds.has(item.video_id)) continue;
+			if ($batchQueue.find((queued) => queued.videoId === item.video_id)?.selected === false) continue;
+
+			const downloadUrl = resolvePlaylistItemDownloadUrl(item);
+			if (!downloadUrl) continue;
+
+			playlistSavedVideoIds = new Set([...playlistSavedVideoIds, item.video_id]);
+			updateBatchItemByVideoId(item.video_id, 'downloading');
+			updateBatchItemProgressByVideoId(item.video_id, {
+				label: m.download_btn_progress_preparing_browser(),
+				percent: null,
+				indeterminate: true
+			});
+			void saveDownload(downloadUrl, `${item.title ?? item.video_id}.mp4`, new AbortController().signal, {
+				onProgress: (progress) => {
+					updateBatchItemProgressByVideoId(item.video_id, {
+						label: m.download_btn_progress_starting_browser(),
+						percent: progress.percent,
+						indeterminate: progress.percent === null
+					});
+				}
+			})
+				.then(() => {
+					updateBatchItemByVideoId(item.video_id, 'completed');
+					clearBatchItemProgressByVideoId(item.video_id);
+				})
+				.catch((err) =>
+					updateBatchItemByVideoId(
+						item.video_id,
+						'error',
+						err instanceof Error ? err.message : 'Download failed'
+					)
+				);
+		}
+	}
+
+	function handlePlaylistSnapshot(snapshot: PlaylistJobSnapshot): void {
+		playlistSnapshot = snapshot;
+		setBatchProgress(snapshot.completed_items + snapshot.failed_items, snapshot.total_items);
+
+		for (const item of snapshot.items) {
+			const existingStatus = $batchQueue.find((queued) => queued.videoId === item.video_id)?.status;
+			const batchStatus = mapBackendItemStatus(item.status, item.selected, existingStatus);
+			addBatchItem({
+				videoId: item.video_id,
+				title: item.title ?? item.video_id,
+				thumbnail: item.thumbnail ?? undefined,
+				status: batchStatus,
+				selected: item.selected,
+				error: item.last_error ?? undefined
+			});
+			if (batchStatus !== 'pending' && batchStatus !== 'completed' && batchStatus !== 'error') {
+				updateBatchItemByVideoId(item.video_id, batchStatus, item.last_error ?? undefined);
+			}
+			syncPlaylistItemProgress(item, existingStatus);
+		}
+
+		startReadyPlaylistDownloads(snapshot);
+
+		if (snapshot.status === 'completed' || snapshot.status === 'failed' || snapshot.status === 'cancelled') {
+			playlistJobSub?.close();
+			playlistJobSub = null;
+			persistPlaylistJobId(null);
+			if (playlistPhase === 'fetching') {
+				playlistPhase = snapshot.items.length > 0 ? 'ready' : 'idle';
+			}
+		} else if (playlistPhase === 'fetching' && snapshot.items.length > 0) {
+			playlistPhase = 'ready';
+		}
+	}
+
+	function mapBackendItemStatus(
+		status: string,
+		selected: boolean,
+		existingStatus?: 'pending' | 'downloading' | 'completed' | 'error'
+	): 'pending' | 'downloading' | 'completed' | 'error' {
+		if (existingStatus === 'completed' || existingStatus === 'error') {
+			return existingStatus;
+		}
+
+		if (existingStatus === 'downloading' && status === 'ready') {
+			return 'downloading';
+		}
+
+		switch (status) {
+			case 'completed':
+				return 'completed';
+			case 'ready':
+				return playlistPhase === 'downloading' ? existingStatus ?? 'pending' : 'pending';
+			case 'failed':
+				return 'error';
+			case 'cancelled':
+				return selected ? 'error' : 'pending';
+			case 'pending':
+				return 'pending';
+			default:
+				return 'downloading';
+		}
+	}
+
+	function syncPlaylistItemProgress(
+		item: PlaylistJobSnapshot['items'][number],
+		existingStatus?: 'pending' | 'downloading' | 'completed' | 'error'
+	): void {
+		const { status, video_id: videoId, selected, progress } = item;
+
+		if (!selected) {
+			clearBatchItemProgressByVideoId(videoId);
+			return;
+		}
+
+		if (existingStatus === 'completed' || existingStatus === 'error') {
+			clearBatchItemProgressByVideoId(videoId);
+			return;
+		}
+
+		if (existingStatus === 'downloading' && status === 'ready') {
+			return;
+		}
+
+		if (progress) {
+			switch (progress.phase) {
+				case 'starting':
+				case 'fetching_streams':
+					updateBatchItemProgressByVideoId(videoId, {
+						label: m.download_btn_mux_status_processing_fetching(),
+						percent: progress.percent,
+						indeterminate: progress.percent === null
+					});
+					return;
+				case 'retrying':
+					updateBatchItemProgressByVideoId(videoId, {
+						label: m.download_btn_mux_status_queued(),
+						percent: progress.percent,
+						indeterminate: progress.percent === null
+					});
+					return;
+				case 'muxing_uploading':
+				case 'completing_upload':
+					updateBatchItemProgressByVideoId(videoId, {
+						label: m.download_btn_mux_status_processing_muxing(),
+						percent: progress.percent,
+						indeterminate: progress.percent === null
+					});
+					return;
+				case 'ready':
+				case 'failed':
+					clearBatchItemProgressByVideoId(videoId);
+					return;
+			}
+		}
+
+		switch (status) {
+			case 'extracting':
+				updateBatchItemProgressByVideoId(videoId, {
+					label: m.download_btn_mux_status_processing_fetching(),
+					percent: null,
+					indeterminate: true
+				});
+				return;
+			case 'queued_mux':
+				updateBatchItemProgressByVideoId(videoId, {
+					label: m.download_btn_mux_status_queued(),
+					percent: null,
+					indeterminate: true
+				});
+				return;
+			case 'muxing':
+				updateBatchItemProgressByVideoId(videoId, {
+					label: m.download_btn_mux_status_processing_muxing(),
+					percent: null,
+					indeterminate: true
+				});
+				return;
+			case 'pending':
+			case 'ready':
+			case 'completed':
+			case 'failed':
+			case 'cancelled':
+			default:
+				clearBatchItemProgressByVideoId(videoId);
+		}
+	}
+
+	async function resumePlaylistJob(jobId: string): Promise<void> {
+		try {
+			const snapshot = await getPlaylistJob(jobId);
+			// If terminal, clear storage and skip
+			if (snapshot.status === 'completed' || snapshot.status === 'failed' || snapshot.status === 'cancelled') {
+				persistPlaylistJobId(null);
+				return;
+			}
+
+			// Restore UI state
+			playlistModeEnabled = true;
+			playlistJobId = jobId;
+			playlistPhase = snapshot.status === 'ready' ? 'ready' : 'downloading';
+			if (snapshot.status !== 'ready') {
+				startBatch();
+			}
+			handlePlaylistSnapshot(snapshot);
+
+			// Re-subscribe to SSE for ongoing updates
+			playlistJobSub = subscribePlaylistJobEvents(
+				jobId,
+				(snap) => handlePlaylistSnapshot(snap),
+				() => {
+					extractError = m.home_playlist_error_sse_failed();
+					if ($batchQueue.length === 0) playlistPhase = 'idle';
+				}
+			);
+		} catch {
+			// Job not found or access denied — clear stale storage
+			persistPlaylistJobId(null);
+		}
 	}
 
 	async function handleFetchPlaylist(): Promise<void> {
@@ -345,70 +608,34 @@
 		selectedAudioStream = null;
 		currentDownload.update((state) => ({ ...state, selectedStream: null, error: null }));
 		playlistCompletionNotified = false;
-		stagedEntries = [];
-		resetWorkerState();
-		resetBatch();
-		startBatch();
+		resetPlaylistComposer();
 		playlistPhase = 'fetching';
 
-		const es = subscribeBatch(
-			url,
-			(data) => {
-				if (data.type === 'link') {
-					if (!data.videoId || !data.title) return;
+		try {
+			const job = await createPlaylistJob(url);
+			playlistJobId = job.job_id;
+			persistPlaylistJobId(job.job_id);
 
-					const entry: QueueEntry = {
-						videoId: data.videoId,
-						title: data.title,
-						thumbnail: data.thumbnail
-					};
+			persistPlaylistDownloadMode(selectedDownloadMode);
+			persistPlaylistQuality(selectedQuality);
 
-					pushStagedEntry(entry);
-					addBatchItem({
-						videoId: entry.videoId,
-						title: entry.title,
-						thumbnail: entry.thumbnail,
-						status: 'pending'
-					});
-
-					if (data.index != null && data.total != null) {
-						setBatchProgress(data.index, data.total);
+			const sub = subscribePlaylistJobEvents(
+				job.job_id,
+				(snapshot) => handlePlaylistSnapshot(snapshot),
+				() => {
+					extractError = m.home_playlist_error_sse_failed();
+					if ($batchQueue.length === 0) {
+						playlistPhase = 'idle';
 					}
-					return;
 				}
+			);
+			playlistJobSub = sub;
+		} catch (err) {
+			extractError = err instanceof Error ? err.message : m.home_playlist_error_process_failed();
+			completeBatch();
+			playlistPhase = 'idle';
+		}
 
-				if (data.type === 'progress') {
-					if (data.current != null && data.total != null) {
-						setBatchProgress(data.current, data.total);
-					}
-					return;
-				}
-
-				if (data.type === 'done') {
-					es.close();
-					completeBatch();
-					playlistPhase = stagedEntries.length > 0 ? 'ready' : 'idle';
-					if (stagedEntries.length === 0) {
-						extractError = m.home_playlist_error_no_videos();
-					}
-					return;
-				}
-
-				if (data.type === 'error') {
-					extractError = data.message || m.home_playlist_error_process_failed();
-					es.close();
-					completeBatch();
-					playlistPhase = stagedEntries.length > 0 ? 'ready' : 'idle';
-				}
-			},
-			() => {
-				extractError = m.home_playlist_error_sse_failed();
-				completeBatch();
-				playlistPhase = stagedEntries.length > 0 ? 'ready' : 'idle';
-			}
-		);
-
-		setEventSource(es);
 		queueMicrotask(() => {
 			document
 				.getElementById('playlist-panel')
@@ -416,35 +643,33 @@
 		});
 	}
 
-	function handleStartPlaylistDownload(): void {
+	async function handleStartPlaylistDownload(): Promise<void> {
+		if (!playlistJobId) return;
 		if (playlistPhase === 'downloading') return;
-
-		if (stagedEntries.length === 0) {
-			extractError = m.home_playlist_error_empty();
+		const selectedVideoIds = $batchQueue
+			.filter((item) => item.selected !== false)
+			.map((item) => item.videoId);
+		if (selectedVideoIds.length === 0) {
+			extractError = m.home_playlist_error_process_failed();
 			return;
 		}
 
-		const selectedVideoIds = new Set(
-			$batchQueue.filter((item) => item.selected !== false).map((item) => item.videoId)
-		);
-		const selectedEntries = stagedEntries.filter((entry) => selectedVideoIds.has(entry.videoId));
-		if (selectedEntries.length === 0) {
-			extractError = m.home_playlist_error_select_one();
-			return;
-		}
-
-		extractError = '';
-		playlistCompletionNotified = false;
-		resetWorkerState();
-		setPreferredDownloadMode(selectedDownloadMode);
-		setPreferredQuality(selectedQuality);
-		persistPlaylistDownloadMode(selectedDownloadMode);
-		persistPlaylistQuality(selectedQuality);
-		startBatch();
-		playlistPhase = 'downloading';
-
-		for (const entry of selectedEntries) {
-			enqueueDownload(entry);
+		try {
+			await startPlaylistJob(
+				playlistJobId,
+				selectedVideoIds,
+				selectedDownloadMode === 'audio' ? undefined : selectedQuality,
+				selectedDownloadMode
+			);
+			startBatch();
+			playlistPhase = 'downloading';
+			if (playlistSnapshot) {
+				startReadyPlaylistDownloads(playlistSnapshot);
+			}
+		} catch (error) {
+			extractError =
+				error instanceof Error ? error.message : m.home_playlist_error_process_failed();
+			playlistPhase = 'ready';
 		}
 	}
 
@@ -456,6 +681,9 @@
 	}
 
 	function handleCancelPlaylist(): void {
+		if (playlistJobId) {
+			void cancelPlaylistJob(playlistJobId);
+		}
 		playlistModeEnabled = false;
 		resetPlaylistComposer();
 		extractError = '';
@@ -967,6 +1195,11 @@
 			box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 		}
 
+		.playlist-inline-loading-bar {
+			animation: playlist-inline-loading-sweep 1.15s ease-in-out infinite;
+			will-change: transform;
+		}
+
 		.playlist-result-control-grid {
 			align-items: end;
 		}
@@ -1004,6 +1237,16 @@
 
 		.page-root.theme-dark .playlist-field span {
 			color: rgba(224, 208, 245, 0.72);
+		}
+
+		@keyframes playlist-inline-loading-sweep {
+			0% {
+				transform: translateX(-120%);
+			}
+
+			100% {
+				transform: translateX(320%);
+			}
 		}
 
 		.page-root.theme-dark .playlist-result-toolbar {
@@ -1131,7 +1374,7 @@
 								</span>
 								<AppIcon
 									name={isExtracting || playlistBusy ? 'progress_activity' : 'bolt'}
-									class="text-base font-bold md:text-lg"
+									class={`text-base font-bold md:text-lg ${isExtracting || playlistBusy ? 'animate-spin' : ''}`}
 								/>
 							</button>
 						</div>
@@ -1140,7 +1383,17 @@
 							<p class="mt-3 text-sm font-bold text-red-500">{extractError}</p>
 						{/if}
 
-						{#if isExtracting}
+						{#if playlistPhase === 'fetching'}
+							<div class="mt-3 overflow-hidden rounded-2xl border border-pink-100 bg-white/95 shadow-sm">
+								<div class="h-1.5 w-full overflow-hidden bg-pink-100">
+									<div class="playlist-inline-loading-bar h-full w-1/3 rounded-full bg-gradient-primary"></div>
+								</div>
+								<div class="flex items-center gap-2 px-4 py-3 text-sm font-bold text-primary">
+									<AppIcon name="progress_activity" class="animate-spin text-base" />
+									<span>{m.home_playlist_discovery_reading()}</span>
+								</div>
+							</div>
+						{:else if isExtracting}
 							<p class="mt-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-bold text-primary shadow-sm">
 								<AppIcon name="progress_activity" class="animate-spin text-base" />
 								{m.home_analyzing_link()}

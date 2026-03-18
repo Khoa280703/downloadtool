@@ -24,9 +24,9 @@ const DOWNLOAD_SESSION_HEADER: &str = "x-download-session-id";
 
 #[derive(Debug)]
 pub struct JobsApiError {
-    message: String,
-    status: StatusCode,
-    retry_after_secs: Option<u64>,
+    pub message: String,
+    pub status: StatusCode,
+    pub retry_after_secs: Option<u64>,
 }
 
 impl IntoResponse for JobsApiError {
@@ -68,6 +68,7 @@ pub struct CreateJobResponse {
 pub struct JobStatusResponse {
     pub job_id: String,
     pub status: String,
+    pub queue_position: Option<u64>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
     pub file_size_bytes: Option<u64>,
@@ -237,6 +238,7 @@ fn build_job_status_response(
     JobStatusResponse {
         job_id: job_id.clone(),
         status: status.as_str().to_string(),
+        queue_position: snapshot.queue_position,
         created_at_ms: snapshot.created_at_ms,
         updated_at_ms: snapshot.updated_at_ms,
         file_size_bytes: snapshot.file_size_bytes,
@@ -252,6 +254,7 @@ fn build_job_status_event(snapshot: JobProgressSnapshot) -> JobStatusResponse {
     JobStatusResponse {
         job_id: snapshot.job_id.clone(),
         status: status.as_str().to_string(),
+        queue_position: None,
         created_at_ms: updated_at_ms,
         updated_at_ms,
         file_size_bytes: None,

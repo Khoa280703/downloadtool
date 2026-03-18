@@ -38,6 +38,7 @@ type CreateMuxJobApiResponse = {
 type MuxJobStatusApiResponse = {
 	job_id: string;
 	status: 'queued' | 'leased' | 'processing' | 'ready' | 'failed' | 'expired';
+	queue_position?: number | null;
 	error?: string | null;
 	file_ticket_url?: string | null;
 	file_url?: string | null;
@@ -55,6 +56,7 @@ export type MuxJobLifecycleStatus = MuxJobStatusApiResponse['status'];
 export type MuxJobStatusUpdate = {
 	jobId: string;
 	status: MuxJobLifecycleStatus;
+	queuePosition?: number | null;
 	elapsedMs: number;
 	pollCount: number;
 	phase?: string | null;
@@ -184,7 +186,7 @@ function toAbsoluteApiUrl(url: string): string {
 	return `${normalizeApiBase(RAW_API_BASE)}/${url}`;
 }
 
-function toAbsoluteDownloadUrl(url: string): string {
+export function toAbsoluteDownloadUrl(url: string): string {
 	if (url.startsWith('http://') || url.startsWith('https://')) return url;
 	if (url.startsWith('/api/proxy/')) {
 		if (typeof window !== 'undefined') return `${window.location.origin}${url}`;
@@ -603,6 +605,7 @@ function emitMuxJobStatusUpdate(
 	onStatus?.({
 		jobId: status.job_id,
 		status: status.status,
+		queuePosition: status.queue_position ?? null,
 		elapsedMs: Date.now() - startedAt,
 		pollCount,
 		phase: status.progress?.phase ?? null,

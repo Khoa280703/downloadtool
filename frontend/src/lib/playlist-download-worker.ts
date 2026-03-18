@@ -530,8 +530,6 @@ function resolveMuxPhaseLabel(update: MuxJobStatusUpdate): string | null {
 			return m.download_btn_mux_status_processing_muxing();
 		case 'completing_upload':
 			return m.download_btn_mux_status_processing_finalizing();
-		case 'retrying':
-			return m.download_btn_mux_status_queued_waiting();
 		case 'ready':
 			return m.download_btn_mux_status_ready();
 		case 'failed':
@@ -539,6 +537,19 @@ function resolveMuxPhaseLabel(update: MuxJobStatusUpdate): string | null {
 		default:
 			return null;
 	}
+}
+
+function resolveQueuedMuxLabel(update: MuxJobStatusUpdate, elapsedSeconds: number): string {
+	const queuePosition = update.queuePosition ?? null;
+	if (typeof queuePosition === 'number' && queuePosition > 1) {
+		return m.download_btn_mux_status_queued_position({ count: String(queuePosition - 1) });
+	}
+	if (queuePosition === 1) {
+		return m.download_btn_mux_status_queued_front();
+	}
+	return elapsedSeconds >= 8
+		? m.download_btn_mux_status_queued_waiting()
+		: m.download_btn_mux_status_queued();
 }
 
 function formatMuxStatus(
@@ -563,10 +574,7 @@ function formatMuxStatus(
 
 	if (update.status === 'queued') {
 		return {
-			label:
-				elapsedSeconds >= 8
-					? m.download_btn_mux_status_queued_waiting()
-					: m.download_btn_mux_status_queued(),
+			label: resolveQueuedMuxLabel(update, elapsedSeconds),
 			value: livePercent,
 			indeterminate: livePercent === null
 		};

@@ -4,6 +4,31 @@ use crate::job_models::{ArtifactRecord, JobArtifactDownload, JobOwner, JobRecord
 use crate::repository::JobRepository;
 
 impl JobRepository {
+    pub async fn count_queued_jobs_ahead(
+        &self,
+        job_id: &str,
+        created_at_ms: i64,
+    ) -> anyhow::Result<u64> {
+        let count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*)::bigint
+            FROM mux_jobs
+            WHERE status = 'queued'
+              AND (
+                    created_at_ms < $2
+                    OR (created_at_ms = $2 AND id < $1)
+                  )
+            "#,
+        )
+        .bind(job_id)
+        .bind(created_at_ms)
+        .fetch_one(self.pool())
+        .await
+        .with_context(|| format!("failed to count queued jobs ahead of {job_id}"))?;
+
+        Ok(count.max(0) as u64)
+    }
+
     pub async fn get_user_job(
         &self,
         job_id: &str,

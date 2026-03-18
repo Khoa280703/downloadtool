@@ -3,7 +3,9 @@
     "backend": {
       "extract_rate_limit_enabled": false,
       "stream_max_concurrent": 128,
-      "stream_url_refresh_max_attempts": 3
+      "stream_url_refresh_max_attempts": 3,
+      "playlist_mux_idle_timeout_secs": 300,
+      "playlist_job_max_concurrent_items": 4
     },
     "frontend": {
       "extract_max_retry_attempts": 4,
@@ -14,7 +16,7 @@
       "batch_reconnect_max_delay_ms": 12000,
       "mux_job_poll_interval_ms": 1200,
       "mux_job_max_wait_ms": null,
-      "playlist_worker_max_concurrent": 1,
+      "playlist_worker_max_concurrent": 4,
       "playlist_worker_ready_queue_max": 1,
       "playlist_worker_extract_jitter_min_ms": 2000,
       "playlist_worker_extract_jitter_range_ms": 3000,
@@ -25,7 +27,9 @@
     "backend": {
       "extract_rate_limit_enabled": false,
       "stream_max_concurrent": null,
-      "stream_url_refresh_max_attempts": null
+      "stream_url_refresh_max_attempts": null,
+      "playlist_mux_idle_timeout_secs": 300,
+      "playlist_job_max_concurrent_items": 4
     },
     "frontend": {
       "extract_max_retry_attempts": 4,
@@ -36,7 +40,7 @@
       "batch_reconnect_max_delay_ms": 12000,
       "mux_job_poll_interval_ms": 1000,
       "mux_job_max_wait_ms": null,
-      "playlist_worker_max_concurrent": 1,
+      "playlist_worker_max_concurrent": 4,
       "playlist_worker_ready_queue_max": 1,
       "playlist_worker_extract_jitter_min_ms": 0,
       "playlist_worker_extract_jitter_range_ms": 0,

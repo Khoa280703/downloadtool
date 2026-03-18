@@ -14,6 +14,9 @@ export type AdminOverview = {
 	quarantinedProxies: number;
 	disabledProxies: number;
 	eventsLast24h: number;
+	playlistActiveJobs: number;
+	playlistCompletedJobs24h: number;
+	playlistFailedJobs24h: number;
 };
 
 export type AdminJobRow = {
@@ -78,6 +81,21 @@ export type AdminActivityRow = {
 	outcome: string | null;
 	createdAt: string;
 	detailJson: Record<string, unknown> | null;
+};
+
+export type AdminPlaylistJobRow = {
+	id: string;
+	sourceUrl: string;
+	title: string | null;
+	status: string;
+	totalItems: number;
+	completedItems: number;
+	failedItems: number;
+	requestedQuality: string;
+	requestedMode: string;
+	ownerLabel: string;
+	createdAt: string;
+	updatedAt: string;
 };
 
 export type AdminDashboardData = {

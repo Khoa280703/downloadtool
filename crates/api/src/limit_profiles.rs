@@ -17,6 +17,8 @@ pub struct BackendLimitProfile {
     pub extract_rate_limit_enabled: Option<bool>,
     pub stream_max_concurrent: Option<usize>,
     pub stream_url_refresh_max_attempts: Option<usize>,
+    pub playlist_mux_idle_timeout_secs: Option<u64>,
+    pub playlist_job_max_concurrent_items: Option<usize>,
 }
 
 static LIMIT_PROFILES: OnceLock<RuntimeLimitProfiles> = OnceLock::new();
@@ -58,5 +60,17 @@ impl BackendLimitProfile {
     pub fn stream_url_refresh_max_attempts_value(&self) -> Option<usize> {
         self.stream_url_refresh_max_attempts
             .filter(|value| *value > 0)
+    }
+
+    pub fn playlist_mux_idle_timeout_secs_value(&self) -> u64 {
+        self.playlist_mux_idle_timeout_secs
+            .filter(|value| *value > 0)
+            .unwrap_or(300)
+    }
+
+    pub fn playlist_job_max_concurrent_items_value(&self) -> usize {
+        self.playlist_job_max_concurrent_items
+            .filter(|value| *value > 0)
+            .unwrap_or(1)
     }
 }

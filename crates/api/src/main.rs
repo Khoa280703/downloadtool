@@ -37,7 +37,7 @@ mod routes;
 mod services;
 
 use config::{Config, MuxArtifactBackend};
-use job_system::JobProgressStore;
+use job_system::{JobProgressStore, PlaylistJobRepository};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -47,6 +47,7 @@ pub struct AppState {
     pub job_control_plane: Arc<services::job_control_plane::JobControlPlaneService>,
     pub job_progress_store: Arc<JobProgressStore>,
     pub storage_ticket_service: Arc<services::storage_ticket_service::StorageTicketService>,
+    pub playlist_job_repository: Arc<PlaylistJobRepository>,
     pub mux_direct_download: bool,
 }
 
@@ -153,11 +154,20 @@ fn build_app(
 ) -> Router {
     let extract_route = if extract_rate_limit_enabled {
         post(routes::extract_handler).route_layer(middleware::from_fn_with_state(
-            limiter,
+            limiter.clone(),
             rate_limit_middleware,
         ))
     } else {
         post(routes::extract_handler)
+    };
+
+    let playlist_create_route = if extract_rate_limit_enabled {
+        post(routes::create_playlist_job_handler).route_layer(middleware::from_fn_with_state(
+            limiter,
+            rate_limit_middleware,
+        ))
+    } else {
+        post(routes::create_playlist_job_handler)
     };
 
     let protected_api = Router::new()
@@ -176,6 +186,23 @@ fn build_app(
             post(routes::release_job_handler),
         )
         .route("/api/batch", get(routes::batch_handler))
+        .route("/api/playlist-jobs", playlist_create_route)
+        .route(
+            "/api/playlist-jobs/{job_id}",
+            get(routes::get_playlist_job_handler),
+        )
+        .route(
+            "/api/playlist-jobs/{job_id}/events",
+            get(routes::playlist_job_events_handler),
+        )
+        .route(
+            "/api/playlist-jobs/{job_id}/start",
+            post(routes::start_playlist_job_handler),
+        )
+        .route(
+            "/api/playlist-jobs/{job_id}/cancel",
+            post(routes::cancel_playlist_job_handler),
+        )
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             auth::jwt_middleware::jwt_auth_middleware,
@@ -304,6 +331,7 @@ async fn main() -> anyhow::Result<()> {
         config.mux_file_ticket_ttl_secs,
     );
     let job_progress_store = Arc::new(JobProgressStore::new(&config.redis_url)?);
+    let playlist_job_repository = Arc::new(PlaylistJobRepository::new(db_pool.clone()));
     let app_state = AppState {
         db_pool,
         jwt_secret: config.jwt_secret,
@@ -311,8 +339,17 @@ async fn main() -> anyhow::Result<()> {
         job_control_plane,
         job_progress_store,
         storage_ticket_service,
+        playlist_job_repository,
         mux_direct_download: config.mux_direct_download,
     };
+
+    // Recover orphaned playlist jobs from previous server instance
+    services::playlist_processor::recover_orphaned_playlist_jobs(
+        app_state.playlist_job_repository.clone(),
+        app_state.job_control_plane.clone(),
+        app_state.job_progress_store.clone(),
+    )
+    .await;
 
     info!("Starting API server on port {}", config.port);
     let limiter = make_rate_limiter();
@@ -369,7 +406,7 @@ mod tests {
         );
 
         AppState {
-            db_pool,
+            db_pool: db_pool.clone(),
             jwt_secret: "test-secret".to_string(),
             whop_webhook_secret: "test-whop-secret".to_string(),
             job_control_plane,
@@ -380,6 +417,7 @@ mod tests {
             storage_ticket_service: services::storage_ticket_service::StorageTicketService::new(
                 None, 900,
             ),
+            playlist_job_repository: Arc::new(PlaylistJobRepository::new(db_pool)),
             mux_direct_download: false,
         }
     }
