@@ -295,6 +295,50 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
+## Phase 5.2: UI-Preserving SEO (In Progress)
+
+**Status:** 🔄 In Progress | **Estimated Completion:** Q2 2026
+
+### Objectives
+- [x] Phase 01: Homepage SEO foundation (brand rename, metadata, JSON-LD, cache-control)
+- [x] Phase 02: Homepage content blocks (Why Snapvie, quality, FAQ with schema)
+- [x] Phase 03: 5 EN landing pages (8k-hdr, playlist, shorts, 4k, mp3) + BreadcrumbList
+- [x] Phase 04: Sitemap, robots.txt, internal links, indexability
+- [ ] Phase 05: Measurement, rollout, expansion gate
+- [ ] Phase 06: Supporting content cluster
+- [ ] Phase 07: Authority, distribution, link acquisition
+- [ ] Phase 08: SERP CTR optimization loop
+- [ ] Phase 09: Technical renderability, CWV, crawl efficiency
+- [x] Phase 10: Trust pages (about, contact, terms, dmca)
+
+### Completed Deliverables
+- Brand rename: FetchTube → Snapvie (39 files)
+- Canonical, OG, Twitter, JSON-LD tags (Organization → WebSite → WebApplication schema)
+- Cache-control split (public for SEO pages, private for auth pages)
+- hreflang fix, localStorage keys migration
+- Homepage content blocks (Why Snapvie, Quality badges, FAQ)
+- 5 EN landing pages: `/download-youtube-{8k-hdr, playlist, shorts, 4k, mp3}`
+- BreadcrumbList structured data
+- Sitemap + robots.txt Disallow rules
+- Public trust surface: `/about`, `/contact`, `/terms`, `/privacy`, `/dmca`
+- Internal linking structure
+
+### In Progress
+- Phase 05: Measurement baseline & expansion gate
+- Phases 06-09: Supporting content, authority, CTR optimization, technical refinements
+
+### Success Metrics
+- 5 EN landing pages indexed and tracked in Search Console
+- Keyword clusters: playlist, shorts, 4K, 8K HDR showing impressions
+- Core Web Vitals performance maintained
+- Trust pages providing entity signals
+- Multilingual technical SEO ready for VI/PT-BR expansion
+
+### Related Plan
+- Full details: `plans/260319-0929-ui-preserving-seo-snapvie/plan.md`
+
+---
+
 ## Phase 6: Advanced Features (Backlog)
 
 **Status:** 📋 Planned | **Target:** Q3 2026+
