@@ -7,7 +7,7 @@
 
 ## Overview
 - Priority: P1
-- Status: complete (framework ready, execution post-deploy)
+- Status: partial (code framework ready, execution needs post-deploy data)
 - Brief: Đo đúng hiệu quả SEO và khóa chặt điều kiện trước khi mở rộng VI/PT-BR sau EN.
 
 ## Key Insights

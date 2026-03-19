@@ -6,7 +6,7 @@
 
 ## Overview
 - Priority: P1
-- Status: complete (checklist ready, execution ongoing)
+- Status: partial (checklist ready, execution ongoing post-deploy)
 - Brief: Bổ sung lớp authority ngoài on-site SEO để cạnh tranh thực sự trong ngách downloader.
 
 ## Key Insights

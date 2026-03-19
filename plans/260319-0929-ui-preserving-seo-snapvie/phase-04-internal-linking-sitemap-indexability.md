@@ -78,7 +78,7 @@
 ## Todo List
 - [ ] Khai báo public SEO pages source
 - [ ] Update sitemap (thêm landing + trust pages)
-- [ ] Update robots.txt (Disallow admin/account/mux-job/api)
+- [ ] Update robots.txt (Disallow /api/ only — no Disallow for pages with noindex)
 - [ ] Add noindex meta cho admin/account/mux-job pages
 - [ ] Add homepage internal links
 - [ ] Add landing-page peer links

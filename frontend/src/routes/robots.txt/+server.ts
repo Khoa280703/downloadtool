@@ -4,9 +4,6 @@ import { SITE_URL } from '$lib/seo/public-pages';
 function buildRobotsContent(): string {
 	return `User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /account
-Disallow: /download/mux-job
 Disallow: /api/
 
 Sitemap: ${SITE_URL}/sitemap.xml

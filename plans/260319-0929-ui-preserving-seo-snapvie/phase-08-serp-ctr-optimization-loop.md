@@ -6,7 +6,7 @@
 
 ## Overview
 - Priority: P1
-- Status: complete (framework ready, testing post-deploy)
+- Status: partial (framework ready, CTR testing needs Search Console data)
 - Brief: Tối ưu liên tục title/meta/snippet/proof blocks để tăng CTR mà không làm clickbait.
 
 ## Key Insights
@@ -25,7 +25,7 @@
 
 ## Optimization Surface
 - Homepage
-- 4 EN landing pages
+- 5 EN landing pages
 - Supporting content pages có impression cao
 
 ## Candidate Tests

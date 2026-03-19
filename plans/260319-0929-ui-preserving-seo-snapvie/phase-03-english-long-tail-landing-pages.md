@@ -42,7 +42,7 @@
   - faq items
   - internal links
 - Reuse homepage shell qua shared component hoặc page template tối giản.
-- Chỉ build 4 pages cụ thể, không dynamic catch-all.
+- Chỉ build 5 pages cụ thể, không dynamic catch-all.
 
 ## Related Code Files
 - Modify:
