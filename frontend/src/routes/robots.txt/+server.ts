@@ -1,12 +1,15 @@
 import type { RequestHandler } from './$types';
-
-const ORIGIN = process.env.ORIGIN ?? 'https://snapvie.com';
+import { SITE_URL } from '$lib/seo/public-pages';
 
 function buildRobotsContent(): string {
 	return `User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /account
+Disallow: /download/mux-job
+Disallow: /api/
 
-Sitemap: ${ORIGIN}/sitemap.xml
+Sitemap: ${SITE_URL}/sitemap.xml
 `;
 }
 

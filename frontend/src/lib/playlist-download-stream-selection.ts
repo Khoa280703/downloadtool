@@ -20,9 +20,9 @@ export const PLAYLIST_DOWNLOAD_MODE_OPTIONS = [
 export type PlaylistQuality = (typeof PLAYLIST_QUALITY_OPTIONS)[number]['value'];
 export type PlaylistDownloadMode = (typeof PLAYLIST_DOWNLOAD_MODE_OPTIONS)[number]['value'];
 
-const PLAYLIST_QUALITY_KEY = 'fetchtube.playlist-quality.v1';
-const PLAYLIST_DOWNLOAD_MODE_KEY = 'fetchtube.playlist-download-mode.v1';
-const PREFERRED_FORMAT_KEY = 'fetchtube.preferred-format.v1';
+const PLAYLIST_QUALITY_KEY = 'snapvie.playlist-quality.v1';
+const PLAYLIST_DOWNLOAD_MODE_KEY = 'snapvie.playlist-download-mode.v1';
+const PREFERRED_FORMAT_KEY = 'snapvie.preferred-format.v1';
 
 interface StoredPreferredFormat {
 	mode?: 'video' | 'videoOnly' | 'audio';

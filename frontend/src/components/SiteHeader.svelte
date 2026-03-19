@@ -27,7 +27,7 @@
 			<div class="flex size-10 items-center justify-center rounded-full bg-gradient-primary text-white shadow-candy group-hover:rotate-12 transition-transform">
 				<AppIcon name="smart_toy" class="text-2xl" />
 			</div>
-			<h2 class="text-plum text-2xl font-bold tracking-tight">FetchTube</h2>
+			<h2 class="text-plum text-2xl font-bold tracking-tight">Snapvie</h2>
 		</div>
 		<div class="hidden md:flex items-center gap-8">
 			<nav class="flex gap-6">

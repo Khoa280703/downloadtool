@@ -29,12 +29,12 @@
 	function syncThemeFromStorage(): void {
 		if (!browser) return;
 
-		isDarkMode = window.localStorage.getItem('fetchtube-theme') === 'dark';
+		isDarkMode = window.localStorage.getItem('snapvie-theme') === 'dark';
 	}
 
 	function broadcastThemeChange(): void {
 		if (!browser) return;
-		window.dispatchEvent(new CustomEvent('fetchtube-theme-change', { detail: { isDarkMode } }));
+		window.dispatchEvent(new CustomEvent('snapvie-theme-change', { detail: { isDarkMode } }));
 	}
 
 	function normalizeRedirectTo(value: string | null): string {
@@ -164,7 +164,7 @@
 		}
 
 		const storageHandler = (event: StorageEvent) => {
-			if (event.key !== 'fetchtube-theme') return;
+			if (event.key !== 'snapvie-theme') return;
 
 			isDarkMode = event.newValue === 'dark';
 		};
@@ -180,7 +180,7 @@
 		};
 
 		window.addEventListener('storage', storageHandler);
-		window.addEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+		window.addEventListener('snapvie-theme-change', themeChangeHandler as EventListener);
 
 		// Clipboard auto-read: detect YouTube URL when user returns to tab
 		const visibilityHandler = async () => {
@@ -202,7 +202,7 @@
 
 			return () => {
 				window.removeEventListener('storage', storageHandler);
-				window.removeEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+				window.removeEventListener('snapvie-theme-change', themeChangeHandler as EventListener);
 				document.removeEventListener('visibilitychange', visibilityHandler);
 
 			if (serviceWorkerMessageHandler && 'serviceWorker' in navigator) {
@@ -224,7 +224,7 @@
 
 		if (!browser) return;
 
-		window.localStorage.setItem('fetchtube-theme', isDarkMode ? 'dark' : 'light');
+		window.localStorage.setItem('snapvie-theme', isDarkMode ? 'dark' : 'light');
 		broadcastThemeChange();
 	}
 
@@ -256,7 +256,7 @@ async function handleAuthSuccess(target: string): Promise<void> {
 	<link rel="icon" href={favicon} />
 	<link
 		rel="stylesheet"
-		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
 	/>
 	<meta name="theme-color" content="#3b82f6" />
 	<meta name="color-scheme" content="light dark" />
@@ -329,12 +329,6 @@ async function handleAuthSuccess(target: string): Promise<void> {
 {#if !isAdminPath($page.url.pathname)}
 	<CookieConsent />
 {/if}
-
-<div style="display:none">
-	{#each locales as locale}
-		<a href={localizeHref($page.url.pathname, { locale })}>{locale}</a>
-	{/each}
-</div>
 
 <style>
 	:global(body) {

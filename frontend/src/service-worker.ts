@@ -45,11 +45,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((res) => {
-        // Cache fresh navigation responses
-        if (res.ok && event.request.mode === 'navigate') {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
+        // Do NOT cache HTML navigation responses — Googlebot and users must always get fresh HTML
+        // (caching stale HTML breaks SEO canonical/hreflang and auth-sensitive UI state)
         return res;
       })
       .catch(async () => {

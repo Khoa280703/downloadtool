@@ -11,6 +11,15 @@
 
 		<meta name="theme-color" content="#3b82f6" />
 		<link rel="manifest" href="/manifest.json" />
+
+		<!-- Preconnect to Google Fonts CDN for icon font -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+
+		<!-- Preload self-hosted critical fonts (Nunito body, Fredoka heading) -->
+		<link rel="preload" href="/fonts/nunito-normal-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+		<link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+
 		%sveltekit.head%
 	</head>
 

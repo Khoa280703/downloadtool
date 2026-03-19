@@ -8,6 +8,7 @@
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
+	import { buildHomepageJsonLd, buildFaqSchema } from '$lib/seo/structured-data';
 	import {
 		createPlaylistJob,
 		cancelPlaylistJob,
@@ -82,51 +83,6 @@
 	let authUser = $state<AuthUser | null | undefined>(undefined);
 	let redirectTo = $state('/');
 	const SEO_ORIGIN = 'https://snapvie.com';
-	const SEO_LOCALES = [
-		'ar',
-		'bg',
-		'cs',
-		'da',
-		'de',
-		'el',
-		'en',
-		'es',
-		'et',
-		'fi',
-		'fr',
-		'hu',
-		'id',
-		'it',
-		'ja',
-		'ko',
-		'lt',
-		'lv',
-		'nb',
-		'nl',
-		'pl',
-		'pt',
-		'pt-BR',
-		'ro',
-		'ru',
-		'sk',
-		'sl',
-		'sv',
-		'tr',
-		'uk',
-		'vi',
-		'zh',
-		'zh-TW'
-	] as const;
-	const HOMEPAGE_HREFLANG_LINKS = [
-		{
-			hreflang: 'x-default',
-			href: `${SEO_ORIGIN}/`
-		},
-		...SEO_LOCALES.map((locale) => ({
-			hreflang: locale === 'nb' ? 'no' : locale,
-			href: locale === 'en' ? `${SEO_ORIGIN}/` : `${SEO_ORIGIN}/${locale}/`
-		}))
-	];
 
 	const showPlaylistPanel = $derived.by(
 		() => playlistPhase !== 'idle' || $batchQueue.length > 0
@@ -204,12 +160,12 @@
 
 	function syncThemeFromStorage(): void {
 		if (!browser) return;
-		isDarkMode = window.localStorage.getItem('fetchtube-theme') === 'dark';
+		isDarkMode = window.localStorage.getItem('snapvie-theme') === 'dark';
 	}
 
 	function broadcastThemeChange(): void {
 		if (!browser) return;
-		window.dispatchEvent(new CustomEvent('fetchtube-theme-change', { detail: { isDarkMode } }));
+		window.dispatchEvent(new CustomEvent('snapvie-theme-change', { detail: { isDarkMode } }));
 	}
 
 	onMount(() => {
@@ -236,7 +192,7 @@
 		})();
 
 		const storageHandler = (event: StorageEvent) => {
-			if (event.key !== 'fetchtube-theme') return;
+			if (event.key !== 'snapvie-theme') return;
 			isDarkMode = event.newValue === 'dark';
 		};
 
@@ -251,11 +207,11 @@
 		};
 
 		window.addEventListener('storage', storageHandler);
-		window.addEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+		window.addEventListener('snapvie-theme-change', themeChangeHandler as EventListener);
 
 		return () => {
 			window.removeEventListener('storage', storageHandler);
-			window.removeEventListener('fetchtube-theme-change', themeChangeHandler as EventListener);
+			window.removeEventListener('snapvie-theme-change', themeChangeHandler as EventListener);
 		};
 	});
 
@@ -311,7 +267,7 @@
 	function persistPlaylistQuality(quality: PlaylistQuality): void {
 		if (!browser) return;
 		try {
-			window.localStorage.setItem('fetchtube.playlist-quality.v1', quality);
+			window.localStorage.setItem('snapvie.playlist-quality.v1', quality);
 		} catch {
 			// Ignore localStorage failures.
 		}
@@ -320,13 +276,13 @@
 	function persistPlaylistDownloadMode(mode: PlaylistDownloadMode): void {
 		if (!browser) return;
 		try {
-			window.localStorage.setItem('fetchtube.playlist-download-mode.v1', mode);
+			window.localStorage.setItem('snapvie.playlist-download-mode.v1', mode);
 		} catch {
 			// Ignore localStorage failures.
 		}
 	}
 
-	const PLAYLIST_JOB_STORAGE_KEY = 'fetchtube.playlist-job-id.v1';
+	const PLAYLIST_JOB_STORAGE_KEY = 'snapvie.playlist-job-id.v1';
 
 	function persistPlaylistJobId(jobId: string | null): void {
 		if (!browser) return;
@@ -772,7 +728,7 @@
 	function toggleTheme(): void {
 		isDarkMode = !isDarkMode;
 		if (!browser) return;
-		window.localStorage.setItem('fetchtube-theme', isDarkMode ? 'dark' : 'light');
+		window.localStorage.setItem('snapvie-theme', isDarkMode ? 'dark' : 'light');
 		broadcastThemeChange();
 	}
 
@@ -794,15 +750,44 @@
 		await refreshAuthUser();
 		await goto(target, { invalidateAll: true, replaceState: true });
 	}
+
+	const SEO_CANONICAL = 'https://snapvie.com/';
+	const SEO_OG_IMAGE = 'https://snapvie.com/og-image.png';
+	const homepageJsonLd = buildHomepageJsonLd();
+	const faqJsonLd = JSON.stringify(buildFaqSchema([
+		{ q: m.home_faq_q1(), a: m.home_faq_a1() },
+		{ q: m.home_faq_q2(), a: m.home_faq_a2() },
+		{ q: m.home_faq_q3(), a: m.home_faq_a3() },
+		{ q: m.home_faq_q4(), a: m.home_faq_a4() },
+		{ q: m.home_faq_q5(), a: m.home_faq_a5() }
+	]), null, 0);
 </script>
 
 <svelte:head>
 	<title>{m.home_meta_title()}</title>
-	<meta name="description" content={m.home_hero_subtitle()} />
+	<meta name="description" content={m.home_meta_description()} />
+	<link rel="canonical" href={SEO_CANONICAL} />
 
-	{#each HOMEPAGE_HREFLANG_LINKS as link}
-		<link rel="alternate" hreflang={link.hreflang} href={link.href} />
-	{/each}
+	<!-- Open Graph -->
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Snapvie" />
+	<meta property="og:title" content={m.home_meta_title()} />
+	<meta property="og:description" content={m.home_meta_description()} />
+	<meta property="og:url" content={SEO_CANONICAL} />
+	<meta property="og:image" content={SEO_OG_IMAGE} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Snapvie - Free YouTube Video Downloader" />
+
+	<!-- Twitter -->
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={m.home_meta_title()} />
+	<meta name="twitter:description" content={m.home_meta_description()} />
+	<meta name="twitter:image" content={SEO_OG_IMAGE} />
+
+	<!-- JSON-LD Structured Data -->
+	{@html `<script type="application/ld+json">${homepageJsonLd}<\/script>`}
+	{@html `<script type="application/ld+json">${faqJsonLd}<\/script>`}
 
 	<style>
 		body {
@@ -1768,6 +1753,123 @@
 							<div class="w-12 h-12 ml-4 animate-wiggle"><span class="text-4xl">🎉</span></div>
 						</div>
 					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Why Snapvie -->
+		<section class="py-10 px-6 lg:px-20 bg-white border-t border-pink-50">
+			<div class="max-w-7xl mx-auto">
+				<h2 class="text-2xl font-bold text-plum mb-6 text-center">{m.home_why_title()}</h2>
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
+						<AppIcon name="smart_display" class="text-xl text-primary mt-0.5 shrink-0" />
+						<div>
+							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp1_title()}</p>
+							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp1_desc()}</p>
+						</div>
+					</div>
+					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
+						<AppIcon name="playlist_play" class="text-xl text-primary mt-0.5 shrink-0" />
+						<div>
+							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp2_title()}</p>
+							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp2_desc()}</p>
+						</div>
+					</div>
+					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
+						<AppIcon name="smartphone" class="text-xl text-primary mt-0.5 shrink-0" />
+						<div>
+							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp3_title()}</p>
+							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp3_desc()}</p>
+						</div>
+					</div>
+					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
+						<AppIcon name="graphic_eq" class="text-xl text-primary mt-0.5 shrink-0" />
+						<div>
+							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp4_title()}</p>
+							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp4_desc()}</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Supported Qualities & Formats -->
+		<section class="py-10 px-6 lg:px-20 border-t border-pink-50">
+			<div class="max-w-7xl mx-auto">
+				<h2 class="text-2xl font-bold text-plum mb-5 text-center">{m.home_quality_title()}</h2>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+					<div class="rounded-2xl bg-white border border-pink-50 p-4 shadow-sm">
+						<p class="text-xs font-bold text-primary uppercase tracking-wide mb-2">{m.home_quality_label_resolutions()}</p>
+						<p class="text-plum text-sm font-medium leading-relaxed">{m.home_quality_res_list()}</p>
+					</div>
+					<div class="rounded-2xl bg-white border border-pink-50 p-4 shadow-sm">
+						<p class="text-xs font-bold text-primary uppercase tracking-wide mb-2">{m.home_quality_label_hdr()}</p>
+						<p class="text-plum text-sm font-medium leading-relaxed">{m.home_quality_hdr_list()}</p>
+					</div>
+					<div class="rounded-2xl bg-white border border-pink-50 p-4 shadow-sm">
+						<p class="text-xs font-bold text-primary uppercase tracking-wide mb-2">{m.home_quality_label_modes()}</p>
+						<p class="text-plum text-sm font-medium leading-relaxed">{m.home_quality_modes_list()}</p>
+					</div>
+				</div>
+				<p class="text-center text-plum/50 text-xs mt-4">{m.home_quality_note()}</p>
+			</div>
+		</section>
+
+		<!-- FAQ -->
+		<section class="py-10 px-6 lg:px-20 bg-white border-t border-pink-50">
+			<div class="max-w-3xl mx-auto">
+				<h2 class="text-2xl font-bold text-plum mb-6 text-center">{m.home_faq_title()}</h2>
+				<div class="divide-y divide-pink-50">
+					<details class="py-3 group">
+						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
+							{m.home_faq_q1()}
+							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
+						</summary>
+						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a1()}</p>
+					</details>
+					<details class="py-3 group">
+						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
+							{m.home_faq_q2()}
+							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
+						</summary>
+						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a2()}</p>
+					</details>
+					<details class="py-3 group">
+						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
+							{m.home_faq_q3()}
+							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
+						</summary>
+						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a3()}</p>
+					</details>
+					<details class="py-3 group">
+						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
+							{m.home_faq_q4()}
+							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
+						</summary>
+						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a4()}</p>
+					</details>
+					<details class="py-3 group">
+						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
+							{m.home_faq_q5()}
+							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
+						</summary>
+						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a5()}</p>
+					</details>
+				</div>
+			</div>
+		</section>
+
+		<!-- Related Tools — internal links to SEO landing pages -->
+		<section class="py-8 px-6 lg:px-20 border-t border-pink-50">
+			<div class="max-w-7xl mx-auto text-center">
+				<h2 class="text-lg font-bold text-plum mb-4">Explore More Download Options</h2>
+				<div class="flex flex-wrap justify-center gap-3">
+					<a href="/download-youtube-8k-hdr" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">8K HDR Videos</a>
+					<a href="/download-youtube-playlist" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">Playlist Download</a>
+					<a href="/download-youtube-shorts" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">YouTube Shorts</a>
+					<a href="/download-youtube-4k" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">4K Videos</a>
+					<a href="/download-youtube-mp3" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">YouTube to MP3</a>
 				</div>
 			</div>
 		</section>

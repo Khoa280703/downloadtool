@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
+import { PUBLIC_PAGES, SITE_URL } from '$lib/seo/public-pages';
 
-const ORIGIN = process.env.ORIGIN ?? 'https://snapvie.com';
 const LANGUAGES = [
 	'ar',
 	'bg',
@@ -36,16 +36,16 @@ const LANGUAGES = [
 	'zh',
 	'zh-TW'
 ] as const;
+
 const HREFLANG_MAP: Record<string, string> = { nb: 'no' };
-const PAGES = ['/', '/privacy'] as const;
 
 function localizedHref(pathname: string, locale: string): string {
-	if (locale === 'en') return `${ORIGIN}${pathname}`;
-	if (pathname === '/') return `${ORIGIN}/${locale}/`;
-	return `${ORIGIN}/${locale}${pathname}`;
+	if (locale === 'en') return `${SITE_URL}${pathname}`;
+	if (pathname === '/') return `${SITE_URL}/${locale}/`;
+	return `${SITE_URL}/${locale}${pathname}`;
 }
 
-function buildEntry(pathname: string): string {
+function buildEntry(pathname: string, priority: number, changefreq: string, lastmod?: string): string {
 	const links = LANGUAGES.map((locale) => {
 		const hreflang = HREFLANG_MAP[locale] ?? locale;
 		return `    <xhtml:link rel="alternate" hreflang="${hreflang}" href="${localizedHref(pathname, locale)}" />`;
@@ -53,19 +53,25 @@ function buildEntry(pathname: string): string {
 
 	const xDefault = `    <xhtml:link rel="alternate" hreflang="x-default" href="${localizedHref(pathname, 'en')}" />`;
 
+	const lastmodTag = lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : '';
+
 	return `<url>
     <loc>${localizedHref(pathname, 'en')}</loc>
-    <changefreq>weekly</changefreq>
-    <priority>${pathname === '/' ? '1.0' : '0.7'}</priority>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority.toFixed(1)}</priority>${lastmodTag}
 ${links}
 ${xDefault}
   </url>`;
 }
 
 export const GET: RequestHandler = () => {
+	const entries = PUBLIC_PAGES.map((page) =>
+		buildEntry(page.path, page.priority, page.changefreq, page.lastmod)
+	);
+
 	const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${PAGES.map(buildEntry).join('\n')}
+${entries.join('\n')}
 </urlset>`;
 
 	return new Response(body, {

@@ -6,8 +6,18 @@ import { paraglideMiddleware } from '$lib/paraglide/server';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { auth } from '$lib/server/auth';
 
-const HTML_CACHE_CONTROL = 'private, no-store';
+const PUBLIC_SEO_CACHE_CONTROL = 'public, s-maxage=3600, stale-while-revalidate=86400';
+const PRIVATE_CACHE_CONTROL = 'private, no-store';
 const AUTH_API_CACHE_CONTROL = 'private, no-store, max-age=0, must-revalidate';
+
+/** Paths that are public SEO pages — gets CDN-cacheable headers */
+const PUBLIC_SEO_PATHS = ['/', '/privacy', '/about', '/terms', '/contact', '/dmca'];
+
+function isPublicSeoPage(pathname: string): boolean {
+	if (PUBLIC_SEO_PATHS.includes(pathname)) return true;
+	if (pathname.startsWith('/download-youtube-')) return true;
+	return false;
+}
 const LANGUAGE_TAGS = [
 	'ar',
 	'bg',
@@ -122,8 +132,11 @@ const existingHandle: Handle = async ({ event, resolve }) => {
 	const response = await svelteKitHandler({ auth, event, resolve, building });
 
 	if ((event.request.method === 'GET' || event.request.method === 'HEAD') && !event.url.pathname.startsWith('/api/') && response.headers.get('content-type')?.startsWith('text/html')) {
-		response.headers.set('cache-control', HTML_CACHE_CONTROL);
-		response.headers.set('vary', 'cookie');
+		const isPublic = isPublicSeoPage(event.url.pathname);
+		response.headers.set('cache-control', isPublic ? PUBLIC_SEO_CACHE_CONTROL : PRIVATE_CACHE_CONTROL);
+		if (!isPublic) {
+			response.headers.set('vary', 'cookie');
+		}
 	}
 
 	if (event.url.pathname.startsWith('/api/auth/')) {
@@ -147,9 +160,12 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 					.replace('%paraglide.dir%', getTextDirection(locale));
 
 				if (!withLocaleAttrs.includes('</head>')) return withLocaleAttrs;
-				if (event.url.origin.includes('sveltekit-prerender')) return withLocaleAttrs;
 
-				const hreflangTags = buildHreflangTags(event.url.origin, event.url.pathname);
+				// During prerender, use production origin instead of the internal sveltekit-prerender origin
+				const origin = event.url.origin.includes('sveltekit-prerender')
+					? 'https://snapvie.com'
+					: event.url.origin;
+				const hreflangTags = buildHreflangTags(origin, event.url.pathname);
 				return withLocaleAttrs.replace(
 					'</head>',
 					`  ${hreflangTags

@@ -17,7 +17,7 @@
 		bitrate?: number;
 	};
 
-	const PREFERRED_FORMAT_KEY = 'fetchtube.preferred-format.v1';
+	const PREFERRED_FORMAT_KEY = 'snapvie.preferred-format.v1';
 	const IS_BROWSER = typeof window !== 'undefined';
 
 	let { streams, onSelect }: Props = $props();

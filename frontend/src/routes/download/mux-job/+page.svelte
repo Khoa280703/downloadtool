@@ -227,6 +227,7 @@
 
 <svelte:head>
 	<title>{m.mux_job_page_title()}</title>
+	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <div class="launcher-shell">

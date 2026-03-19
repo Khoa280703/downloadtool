@@ -34,7 +34,7 @@
 		});
 
 		const storageHandler = (event: StorageEvent) => {
-			if (event.key !== 'fetchtube-theme') return;
+			if (event.key !== 'snapvie-theme') return;
 			syncThemeFromDom();
 		};
 
