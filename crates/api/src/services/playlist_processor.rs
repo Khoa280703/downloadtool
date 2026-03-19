@@ -283,13 +283,31 @@ async fn process_single_item(
         .await
         .map_err(|e| anyhow::anyhow!("Extract failed for {video_id}: {e}"))?;
 
-    // 2. Pick best streams
-    let (video, audio) = pick_best_streams(&info.formats, &job.requested_quality);
+    // 2. Pick best streams based on mode
+    let (video, audio) =
+        pick_best_streams(&info.formats, &job.requested_quality, &job.requested_mode);
 
-    // 3. Build download URL
+    // 3. Audio-only mode: direct download, no mux
+    if video.is_none() {
+        if let Some(ref a) = audio {
+            let download_url = build_stream_download_url(&a.url, &info.title, &a.ext);
+            repo.update_item_status(
+                item_id,
+                PlaylistItemStatus::Ready,
+                None,
+                None,
+                Some(&download_url),
+            )
+            .await?;
+            return Ok(());
+        }
+        anyhow::bail!("No suitable audio stream found for {video_id}");
+    }
+
+    // 4. Build download URL
     if let Some(ref v) = video {
         if v.has_audio || audio.is_none() {
-            // Direct combined stream
+            // Direct combined or video-only stream
             let download_url = build_stream_download_url(&v.url, &info.title, &v.ext);
             repo.update_item_status(
                 item_id,
@@ -303,7 +321,7 @@ async fn process_single_item(
         }
     }
 
-    // 4. Need mux: video-only + audio
+    // 5. Need mux: video-only + audio
     let v = video.context("No suitable video stream found")?;
     let a = audio.context("No suitable audio stream found for mux")?;
 
@@ -421,11 +439,29 @@ async fn wait_for_mux_ready(
     }
 }
 
-/// Simple stream selection: pick best video + best audio for requested quality.
+/// Stream selection based on quality and mode.
+///
+/// - `mode = "audio"`: returns `(None, best_audio)` — all formats allowed (WebM opus is often
+///   highest quality; direct download, not mux).
+/// - `mode = "video-only"`: returns `(best_video, None)` — all formats allowed (direct
+///   download, not mux).
+/// - `mode = "video"` (default): returns `(best_video, best_audio)` — WebM filtered out
+///   because output goes through fMP4 muxer which rejects WebM containers.
 fn pick_best_streams(
     formats: &[extractor::VideoFormat],
     quality: &str,
+    mode: &str,
 ) -> (Option<extractor::VideoFormat>, Option<extractor::VideoFormat>) {
+    // Audio-only mode: direct download — allow all formats including WebM
+    if mode == "audio" {
+        let best_audio = formats
+            .iter()
+            .filter(|f| f.is_audio_only)
+            .max_by_key(|f| f.bitrate.unwrap_or(0))
+            .cloned();
+        return (None, best_audio);
+    }
+
     let target_height: Option<u32> = match quality {
         "best" => None,
         "2160p" | "4k" => Some(2160),
@@ -437,7 +473,30 @@ fn pick_best_streams(
         _ => quality.trim_end_matches('p').parse().ok(),
     };
 
-    // Filter out WebM (can't mux to fMP4)
+    // Video-only mode: direct download — allow all formats including WebM
+    if mode == "video-only" {
+        let all_videos: Vec<&extractor::VideoFormat> =
+            formats.iter().filter(|f| !f.is_audio_only).collect();
+
+        let best_video = if let Some(target) = target_height {
+            all_videos
+                .iter()
+                .filter(|f| f.height.unwrap_or(0) <= target)
+                .max_by_key(|f| f.height.unwrap_or(0))
+                .or_else(|| all_videos.iter().min_by_key(|f| f.height.unwrap_or(u32::MAX)))
+                .cloned()
+                .cloned()
+        } else {
+            all_videos
+                .iter()
+                .max_by_key(|f| f.height.unwrap_or(0))
+                .cloned()
+                .cloned()
+        };
+        return (best_video, None);
+    }
+
+    // Default "video" mode: filter out WebM — output goes through fMP4 muxer
     let mp4_videos: Vec<&extractor::VideoFormat> = formats
         .iter()
         .filter(|f| !f.is_audio_only && f.ext != "webm")
@@ -529,4 +588,107 @@ struct PlaylistVideoEntry {
     title: String,
     thumbnail: Option<String>,
     index: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a minimal VideoFormat for testing.
+    fn make_video(ext: &str, height: u32, has_audio: bool) -> extractor::VideoFormat {
+        extractor::VideoFormat {
+            format_id: format!("{ext}-{height}"),
+            quality: format!("{height}p"),
+            vcodec: None,
+            acodec: None,
+            codec_label: None,
+            has_audio,
+            is_audio_only: false,
+            width: None,
+            height: Some(height),
+            fps: None,
+            bitrate: None,
+            ext: ext.to_string(),
+            url: format!("https://example.com/{ext}-{height}.{ext}"),
+            filesize: None,
+        }
+    }
+
+    fn make_audio(ext: &str, bitrate: u64) -> extractor::VideoFormat {
+        extractor::VideoFormat {
+            format_id: format!("{ext}-audio-{bitrate}"),
+            quality: format!("{bitrate}kbps"),
+            vcodec: None,
+            acodec: None,
+            codec_label: None,
+            has_audio: true,
+            is_audio_only: true,
+            width: None,
+            height: None,
+            fps: None,
+            bitrate: Some(bitrate),
+            ext: ext.to_string(),
+            url: format!("https://example.com/audio-{bitrate}.{ext}"),
+            filesize: None,
+        }
+    }
+
+    fn sample_formats() -> Vec<extractor::VideoFormat> {
+        vec![
+            make_video("mp4", 1080, false),
+            make_video("mp4", 720, false),
+            make_video("webm", 1080, false),
+            make_audio("m4a", 128_000),
+            make_audio("webm", 160_000), // WebM opus — higher bitrate
+        ]
+    }
+
+    #[test]
+    fn audio_mode_returns_best_audio_including_webm() {
+        let formats = sample_formats();
+        let (video, audio) = pick_best_streams(&formats, "best", "audio");
+        assert!(video.is_none(), "audio mode must not return a video stream");
+        let a = audio.expect("audio mode must return an audio stream");
+        // WebM opus has higher bitrate — should be selected (no WebM filter in audio mode)
+        assert_eq!(a.ext, "webm");
+        assert_eq!(a.bitrate, Some(160_000));
+    }
+
+    #[test]
+    fn video_only_mode_returns_best_video_no_audio_allows_webm() {
+        let formats = sample_formats();
+        let (video, audio) = pick_best_streams(&formats, "best", "video-only");
+        assert!(audio.is_none(), "video-only mode must not return an audio stream");
+        let v = video.expect("video-only mode must return a video stream");
+        // Both mp4 and webm 1080p exist — pick highest resolution (webm allowed)
+        assert_eq!(v.height, Some(1080));
+    }
+
+    #[test]
+    fn video_mode_filters_webm_from_audio() {
+        let formats = sample_formats();
+        let (video, audio) = pick_best_streams(&formats, "best", "video");
+        let v = video.expect("video mode must have video");
+        let a = audio.expect("video mode must have audio");
+        // WebM filtered out for mux compatibility
+        assert_ne!(v.ext, "webm", "video stream must not be webm in video mode");
+        assert_ne!(a.ext, "webm", "audio stream must not be webm in video mode");
+        assert_eq!(v.ext, "mp4");
+        assert_eq!(a.ext, "m4a");
+    }
+
+    #[test]
+    fn video_mode_default_applies_quality_ceiling() {
+        let formats = sample_formats();
+        let (video, _) = pick_best_streams(&formats, "720p", "video");
+        let v = video.expect("must select a video stream");
+        assert_eq!(v.height, Some(720));
+    }
+
+    #[test]
+    fn audio_mode_empty_formats_returns_none() {
+        let (video, audio) = pick_best_streams(&[], "best", "audio");
+        assert!(video.is_none());
+        assert!(audio.is_none());
+    }
 }
