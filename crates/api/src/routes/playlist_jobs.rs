@@ -122,6 +122,15 @@ pub async fn create_playlist_job_handler(
         });
     }
 
+    // Host-based validation prevents SSRF — substring checks are insufficient.
+    if !crate::validation::is_valid_youtube_url(&payload.url) {
+        return Err(JobsApiError {
+            message: "Invalid YouTube URL".to_string(),
+            status: StatusCode::BAD_REQUEST,
+            retry_after_secs: None,
+        });
+    }
+
     let request_ip = headers
         .get("cf-connecting-ip")
         .and_then(|v| v.to_str().ok())

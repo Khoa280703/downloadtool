@@ -130,8 +130,8 @@ pub async fn extract_handler(
 ) -> Result<Response, ApiError> {
     info!("Extracting video from URL: {}", body.url);
 
-    // Validate URL against allowed platforms
-    if !is_valid_video_url(&body.url) {
+    // Validate URL against allowed platforms (host-based check prevents SSRF)
+    if !crate::validation::is_valid_youtube_url(&body.url) {
         warn!("Invalid or unsupported URL: {}", body.url);
         return Err(ApiError {
             error: "Invalid or unsupported URL. Only YouTube URLs are supported.".to_string(),
@@ -204,12 +204,6 @@ pub async fn extract_handler(
             })
         }
     }
-}
-
-/// Check if URL is a valid YouTube URL.
-fn is_valid_video_url(url: &str) -> bool {
-    let url_lower = url.to_lowercase();
-    url_lower.contains("youtube.com") || url_lower.contains("youtu.be")
 }
 
 /// Convert VideoFormat to StreamFormat for response.
@@ -318,13 +312,7 @@ fn select_best_stream(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_is_valid_video_url() {
-        assert!(is_valid_video_url("https://youtube.com/watch?v=abc123"));
-        assert!(is_valid_video_url("https://youtu.be/abc123"));
-        assert!(!is_valid_video_url("https://vimeo.com/123456"));
-        assert!(!is_valid_video_url("https://example.com/video"));
-    }
+    // URL validation tests live in crate::validation (validation.rs).
 
     #[test]
     fn test_select_best_stream() {

@@ -35,6 +35,7 @@ mod config;
 mod limit_profiles;
 mod routes;
 mod services;
+mod validation;
 
 use config::{Config, MuxArtifactBackend};
 use job_system::{JobProgressStore, PlaylistJobRepository};

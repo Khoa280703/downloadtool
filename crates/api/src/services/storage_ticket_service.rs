@@ -154,6 +154,7 @@ mod tests {
             error: None,
             created_at_ms: 1,
             updated_at_ms: 2,
+            queue_position: None,
             file_size_bytes: Some(42),
             title: Some("demo".to_string()),
             backend: Some("localfs".to_string()),
