@@ -7,7 +7,7 @@
 
 ## Overview
 - Priority: P1
-- Status: complete
+- Status: partial (trust pages shipped, brand/schema/internal-link consistency still open)
 - Brief: Xây lớp trust công khai để Snapvie trông như một product thật, không giống thin downloader page.
 
 ## Key Insights

@@ -1,7 +1,7 @@
 {
-  "name": "VideoDL – YouTube Downloader",
-  "short_name": "VideoDL",
-  "description": "Download YouTube videos in the best quality",
+  "name": "Snapvie",
+  "short_name": "Snapvie",
+  "description": "Download YouTube videos, playlists, and audio in the best quality",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",

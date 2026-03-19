@@ -26,6 +26,32 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+  # Check frontend build and types
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm --filter frontend check
+
+      - name: Build
+        run: pnpm --filter frontend build
+
   # Run Clippy lints
   clippy:
     name: Clippy

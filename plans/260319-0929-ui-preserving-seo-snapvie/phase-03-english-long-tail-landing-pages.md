@@ -8,12 +8,12 @@
 ## Overview
 - Priority: P1
 - Status: complete
-- Brief: Tạo 4 landing pages EN nhắm long-tail intent, tái sử dụng gần như toàn bộ UI homepage.
+- Brief: Tạo 5 landing pages EN nhắm long-tail intent, tái sử dụng gần như toàn bộ UI homepage.
 
 ## Key Insights
 - Head term khó, landing pages là nơi đánh cụm intent sâu.
 - 8K HDR là moat nhưng không đủ volume để làm chiến lược duy nhất.
-- 4 page đầu đủ để test cluster trước khi scale.
+- 5 page đầu đủ để test cluster trước khi scale.
 
 ## Requirements
 - Functional:

@@ -19,16 +19,21 @@
 		howItWorksHref: string;
 		toolsHref: string;
 	} = $props();
+
 </script>
 
 <header class="glass-header sticky top-0 z-50 border-b border-white/50 px-6 py-3 lg:px-20 transition-all duration-300">
 	<div class="max-w-7xl mx-auto flex items-center justify-between">
-		<div class="flex items-center gap-3 group cursor-pointer">
-			<div class="flex size-10 items-center justify-center rounded-full bg-gradient-primary text-white shadow-candy group-hover:rotate-12 transition-transform">
-				<AppIcon name="smart_toy" class="text-2xl" />
-			</div>
+		<a href={homeHref} class="flex items-center gap-3 group min-w-0">
+			<img
+				src="/logo.svg"
+				alt="Snapvie"
+				class="h-10 w-auto shrink-0 drop-shadow-sm transition-transform duration-300 group-hover:scale-105"
+				loading="eager"
+				decoding="async"
+			/>
 			<h2 class="text-plum text-2xl font-bold tracking-tight">Snapvie</h2>
-		</div>
+		</a>
 		<div class="hidden md:flex items-center gap-8">
 			<nav class="flex gap-6">
 				<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href={homeHref}>{m.header_nav_home()}</a>

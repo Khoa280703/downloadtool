@@ -6,7 +6,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
-	import favicon from '$lib/assets/favicon.svg';
 	import AppIcon from '$components/AppIcon.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
@@ -77,6 +76,16 @@
 
 	function isAdminPath(pathname: string): boolean {
 		return pathname === '/admin' || pathname.startsWith('/admin/');
+	}
+
+	function isWideMarketingPath(pathname: string): boolean {
+		return [
+			'/download-youtube-8k-hdr',
+			'/download-youtube-playlist',
+			'/download-youtube-shorts',
+			'/download-youtube-4k',
+			'/download-youtube-mp3'
+		].includes(pathname);
 	}
 
 	function isKnownLocale(value: string): value is (typeof locales)[number] {
@@ -253,12 +262,10 @@ async function handleAuthSuccess(target: string): Promise<void> {
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
 	<link
 		rel="stylesheet"
 		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
 	/>
-	<meta name="theme-color" content="#3b82f6" />
 	<meta name="color-scheme" content="light dark" />
 </svelte:head>
 
@@ -283,7 +290,9 @@ async function handleAuthSuccess(target: string): Promise<void> {
 			? 'main-home'
 			: isAdminPath($page.url.pathname)
 				? 'main-admin'
-				: 'main'}
+				: isWideMarketingPath($page.url.pathname)
+					? 'main-home'
+					: 'main'}
 	>
 		{#key $page.url.pathname}
 			{@render children()}
@@ -294,7 +303,13 @@ async function handleAuthSuccess(target: string): Promise<void> {
 		<footer class="bg-white border-t border-pink-100 py-6 px-6">
 			<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
 				<div class="flex items-center gap-2 transition-all">
-					<AppIcon name="smart_toy" class="text-xl text-plum/75 grayscale hover:grayscale-0" />
+					<img
+						src="/logo.svg"
+						alt="Snapvie"
+						class="h-7 w-7 rounded-md object-contain"
+						loading="eager"
+						decoding="async"
+					/>
 					<span class="font-bold text-sm text-plum/90">{m.footer_copyright({ year: String(new Date().getFullYear()) })}</span>
 				</div>
 				<div class="flex gap-4 text-plum/80 font-semibold text-xs">

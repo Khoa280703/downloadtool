@@ -93,7 +93,7 @@
 - [ ] Thêm canonical + OG + Twitter tags
 - [ ] Thêm `WebSite` + `Organization` + `WebApplication` schema
 - [ ] Cân nhắc `SearchAction` nếu phản ánh đúng homepage flow
-- [ ] OG image: dùng `public/logo.svg` làm base, tạo OG image 1200x630px
+- [ ] OG image: dùng `frontend/static/logo.svg` làm base, tạo OG image 1200x630px
 - [ ] Validate schema bằng Rich Results Test / Schema validator
 
 ## Success Criteria

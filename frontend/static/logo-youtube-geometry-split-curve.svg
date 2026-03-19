@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="602.187" height="515.868" viewBox="0 0 602.187 515.868" fill="none">
+  <defs>
+    <linearGradient id="snapvie-brand-gradient" x1="140" y1="120" x2="460" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF4D8C" />
+      <stop offset="100%" stop-color="#FFB938" />
+    </linearGradient>
+    <path
+      id="youtube-shape"
+      d="M146.078 388.18C129.012 383.551 115.707 369.957 110.789 353.18 102.688 322.227 102.688 257.723 102.688 257.723 102.688 257.723 102.688 193.219 110.789 162.559 115.707 145.492 129.012 132.184 146.078 127.555 176.738 119.168 300.543 119.168 300.543 119.168 300.543 119.168 424.637 119.168 455.297 127.555 472.652 132.184 485.668 145.492 490.297 162.559 498.688 193.219 498.688 257.723 498.688 257.723 498.688 257.723 498.688 322.227 490.297 353.18 485.668 369.957 472.652 383.551 455.297 388.18 424.637 396.57 300.543 396.57 300.543 396.57 300.543 396.57 176.738 396.57 146.078 388.18Z"
+    />
+    <clipPath id="youtube-shape-clip">
+      <use href="#youtube-shape" />
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#youtube-shape-clip)">
+    <rect width="602.187" height="515.868" fill="url(#snapvie-brand-gradient)" />
+  </g>
+
+  <g clip-path="url(#youtube-shape-clip)">
+    <path
+      d="M300.543 119.168C244 142 250 198 288 242C324 280 320 320 300.543 356"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="12"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M279 334L300.543 356L322 334"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="12"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

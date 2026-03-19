@@ -93,13 +93,13 @@ created: 2026-03-19
 | 1 | Homepage SEO foundation | [phase-01-homepage-seo-foundation.md](./phase-01-homepage-seo-foundation.md) | complete |
 | 2 | Homepage search-intent content blocks | [phase-02-homepage-search-intent-content-blocks.md](./phase-02-homepage-search-intent-content-blocks.md) | complete |
 | 3 | EN long-tail landing pages | [phase-03-english-long-tail-landing-pages.md](./phase-03-english-long-tail-landing-pages.md) | complete |
-| 4 | Internal linking, sitemap, indexability | [phase-04-internal-linking-sitemap-indexability.md](./phase-04-internal-linking-sitemap-indexability.md) | complete |
+| 4 | Internal linking, sitemap, indexability | [phase-04-internal-linking-sitemap-indexability.md](./phase-04-internal-linking-sitemap-indexability.md) | partial |
 | 5 | Measurement, rollout, expansion gate | [phase-05-measurement-rollout-expansion-gate.md](./phase-05-measurement-rollout-expansion-gate.md) | partial |
 | 6 | Supporting content cluster | [phase-06-supporting-content-cluster.md](./phase-06-supporting-content-cluster.md) | partial |
 | 7 | Authority, distribution, link acquisition | [phase-07-authority-distribution-link-acquisition.md](./phase-07-authority-distribution-link-acquisition.md) | partial |
 | 8 | SERP CTR optimization loop | [phase-08-serp-ctr-optimization-loop.md](./phase-08-serp-ctr-optimization-loop.md) | partial |
 | 9 | Technical renderability, CWV, crawl efficiency | [phase-09-technical-renderability-cwv-crawl-efficiency.md](./phase-09-technical-renderability-cwv-crawl-efficiency.md) | partial |
-| 10 | Entity trust, legal surface, brand consistency | [phase-10-entity-trust-legal-surface.md](./phase-10-entity-trust-legal-surface.md) | complete |
+| 10 | Entity trust, legal surface, brand consistency | [phase-10-entity-trust-legal-surface.md](./phase-10-entity-trust-legal-surface.md) | partial |
 
 ## Non-goals
 - Không redesign homepage.
@@ -134,7 +134,7 @@ Từ phân tích code thực tế, phát hiện các lỗi SEO cần fix xuyên 
 - Thiếu canonical tag toàn site
 - Thiếu OG/Twitter tags
 - Thiếu JSON-LD
-- Admin/account/mux-job pages đang indexable (cần noindex + robots Disallow)
+- Admin/account/mux-job pages đang indexable (cần `noindex`; `robots.txt` chỉ nên Disallow `/api/`, không chặn crawl các HTML pages cần bot thấy thẻ noindex)
 - Hidden locale links `display:none` trong `+layout.svelte` — anti-pattern
 
 **Bổ sung plan thiếu (tích hợp vào phase tương ứng):**
@@ -143,7 +143,7 @@ Từ phân tích code thực tế, phát hiện các lỗi SEO cần fix xuyên 
 - Breadcrumb structured data → Phase 03
 - Font optimization: 3 families (Material Symbols + Nunito + Fredoka) = bottleneck → Phase 09
 - SW HTML cache exclusion → Phase 09
-- robots.txt Disallow cho /admin, /account, /download/mux-job, /api/ → Phase 04
+- robots.txt strategy: chỉ Disallow `/api/`; admin/account/mux-job dùng `noindex` để deindex đúng cách → Phase 04
 
 **Bổ sung từ SEO plan review (2026-03-19):**
 
@@ -169,7 +169,7 @@ Should-do (đã tích hợp):
 - Tool thật sự support 8K HDR ✓
 - Google Search Console đã verify ✓
 - Không có domain cũ fetchtube cần redirect
-- Logo SVG đã có tại `public/logo.svg` — dùng làm base cho OG image
+- Logo SVG đã có tại `frontend/static/logo.svg` — dùng làm base cho OG image
 
 ## Key Risks
 - Nhồi copy quá nhiều làm trang mất chất clean.
@@ -213,7 +213,7 @@ Should-do (đã tích hợp):
 - Public trust surface sẽ được triển khai luôn: `/about`, `/contact`, `/terms`, `/privacy`, `/dmca`.
 - SEO execution vẫn giữ EN-first; VI và PT-BR chỉ mở sau khi EN template có traction thật.
 - Phase rollout đầu sẽ dùng EN-only slugs (`/download-*`); localized slugs chỉ mở khi qua expansion gate.
-- Logo SVG đã có (`public/logo.svg`), dùng làm base để tạo OG image 1200x630px cho social/SEO.
+- Logo SVG đã có (`frontend/static/logo.svg`), dùng làm base để tạo OG image 1200x630px cho social/SEO.
 - Authority execution sẽ theo hướng white-hat core + controlled distribution:
   - directories/listings sạch
   - community seeding có kiểm soát

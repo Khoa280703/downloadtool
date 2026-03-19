@@ -33,6 +33,7 @@
 		pickSaveDirectory,
 		saveDownload
 	} from '$lib/playlist-download-file-saver';
+
 	import sarahAvatar from '$lib/assets/testimonials/sarah.webp';
 	import {
 		addBatchItem,
@@ -1887,7 +1888,13 @@
 	<footer class="bg-white border-t border-pink-100 py-6 px-6">
 		<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
 			<div class="flex items-center gap-2 transition-all">
-				<AppIcon name="smart_toy" class="text-xl text-plum/75 grayscale hover:grayscale-0" />
+				<img
+					src="/logo.svg"
+					alt="Snapvie"
+					class="h-7 w-7 rounded-md object-contain"
+					loading="eager"
+					decoding="async"
+				/>
 				<span class="font-bold text-sm text-plum/90">{m.footer_copyright({ year: String(new Date().getFullYear()) })}</span>
 			</div>
 			<div class="flex gap-4 text-plum/80 font-semibold text-xs">

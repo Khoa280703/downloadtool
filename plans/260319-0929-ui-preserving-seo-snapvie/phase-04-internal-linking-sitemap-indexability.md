@@ -8,7 +8,7 @@
 
 ## Overview
 - Priority: P1
-- Status: complete
+- Status: partial (wiring mostly done, several indexability/sitemap items still open)
 - Brief: Đảm bảo crawler tìm thấy, hiểu và ưu tiên đúng homepage + landing pages.
 
 ## Key Insights
@@ -32,7 +32,7 @@
   - Không tạo crawl noise bằng pages không cần index.
 
 ## Architecture
-- Homepage có 1 khu vực link gọn đến 4 SEO pages.
+- Homepage có 1 khu vực link gọn đến 5 SEO pages.
 - Footer/header có thể thêm link nhưng ưu tiên contextual links trong main content.
 - Sitemap generated route giữ source of truth cho public indexable pages.
 
