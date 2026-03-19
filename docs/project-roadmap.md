@@ -82,7 +82,7 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 - [x] `GET /bm.js` route (compile-time embed)
 - [x] Loader bookmarklet (< 200 chars)
 
-#### Phase 3.2: Web PWA (apps/web — SvelteKit) ✅
+#### Phase 3.2: Web PWA (frontend — SvelteKit) ✅
 - [x] SvelteKit app scaffold
 - [x] Web Share Target API integration
 - [x] Background Fetch API support

@@ -410,7 +410,6 @@ A: See System Architecture → Performance Characteristics table or Project Over
 - API Server: `/crates/api`
 - Extractors: `/extractors`
 - Proxy Layer: `/crates/proxy`
-- GPU Pipeline: `/crates/gpu-pipeline`
 - Frontend: `/frontend`
 
 ### Infrastructure

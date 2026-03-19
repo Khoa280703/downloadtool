@@ -21,26 +21,23 @@ A high-performance video downloader platform supporting YouTube and other platfo
        │  - Extract     │           │  - Anti-bot      │
        │  - Batch       │           │  - Throttle      │
        │  - Stream      │           │  - Cookie/Header │
-       │  - Transcode   │           │  - Proxy Rotation│
+       │  - Jobs        │           │  - Proxy Rotation│
        └────┬──────┬────┘           └──────────────────┘
             │      │
-    ┌───────▼──┐   └──────────────────┐
-    │Extractor │    ┌────────────────┐▼───────────────┐
-    │Engine    │    │  GPU Pipeline  │  Muxer         │
-    │(crates/  │    │  (crates/gpu-  │  (crates/      │
-    │extractor)│    │  pipeline)     │  muxer)        │
-    │          │    │ - Decoder      │ - fMP4 Format  │
-    │- Hot     │    │ - Encoder      │ - Stream       │
-    │  reload  │    │ - Watermark    │   Fetcher      │
-    │- Runtime │    │- Frame Queue   │ - Codec Config │
-    │  pooling │    │               │ - Mux Router   │
-    └──────────┘    └───────────────┘─────────────────┘
-         │                    │             │
-         │            ┌───────▼─────────────▼──────┐
-         └───────────►│  GPU Worker Process        │
-                      │  (crates/gpu-worker)       │
-                      │  - Transcode Management    │
-                      └────────────────────────────┘
+    ┌───────▼──┐   └──────────────────────────┐
+    │Extractor │                  ┌────────────▼───────────┐
+    │(crates/  │                  │  Muxer (crates/muxer)  │
+    │extractor)│                  │  - fMP4 Format         │
+    │          │                  │  - Stream Fetcher      │
+    │- yt-dlp  │                  │  - Codec Config        │
+    │- Hot     │                  │  - Mux Router          │
+    │  reload  │                  └────────────────────────┘
+    │- Pooling │                             │
+    └──────────┘                  ┌──────────▼─────────────┐
+                                  │  Worker (crates/worker) │
+                                  │  - Concurrent job pool  │
+                                  │  - Artifact upload      │
+                                  └─────────────────────────┘
 ```
 
 ## Key Components
@@ -112,7 +109,6 @@ A high-performance video downloader platform supporting YouTube and other platfo
 ### 3. **Extractor Engine** (`crates/extractor`)
 - **Purpose:** Dynamic extraction of video metadata from various platforms
 - **Architecture:**
-  - `engine.rs` - Core extraction orchestrator
   - `runtime.rs` - Deno runtime management for JavaScript extractors
   - `pool.rs` - Connection pooling & reuse
   - `hot_reload.rs` - Live reload of extractor scripts
@@ -133,17 +129,7 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - `stream.rs` - Streaming response handler
 - **Critical Fix (2026-02-23):** Changed `.timeout(30s)` → `.connect_timeout(30s)` to allow long-duration transfers without mid-transfer timeout
 
-### 5. **GPU Pipeline** (`crates/gpu-pipeline`)
-- **Purpose:** Hardware-accelerated video encoding
-- **Components:**
-  - `pipeline.rs` - Orchestrates decode → transform → encode flow
-  - `decoder.rs` - Hardware video decoding
-  - `encoder.rs` - Hardware video encoding (largest component: 12,395 tokens)
-  - `frame_queue.rs` - Async frame buffering
-  - `watermark.rs` - Watermark overlay processing
-  - `ffi.rs` - GPU driver FFI bindings
-
-### 6. **Muxer** (`crates/muxer`)
+### 5. **Muxer** (`crates/muxer`)
 - **Purpose:** Container-level multiplexing (fMP4 format) with dual-track support
 - **Components:**
   - `fmp4_remuxer.rs` - Core dual-traf remuxer (407 LOC, video-led fragment merging)
@@ -171,14 +157,7 @@ A high-performance video downloader platform supporting YouTube and other platfo
   - Keeps sticky proxy affinity through `late_extract` and auth-like URL refresh, rotating only after the current proxy becomes unusable
   - **NEW:** `job_progress_publisher.rs` for 7-phase progress streaming
 
-### 7. **GPU Worker** (`crates/gpu-worker`)
-- **Purpose:** Standalone process for GPU transcoding
-- **Components:**
-  - `server.rs` - gRPC server for transcode requests
-  - `transcode.rs` - Transcode job execution
-- **Protocol:** Protocol Buffers (`proto/transcode.proto`)
-
-### 8. **Extractors** (`/extractors`)
+### 7. **Extractors** (`/extractors`)
 - **Format:** TypeScript files dynamically loaded by Deno runtime
 - **Key Files:**
   - `youtube.ts` - Main YouTube extractor (strategy: InnerTube → HTML fallback)
@@ -196,7 +175,7 @@ A high-performance video downloader platform supporting YouTube and other platfo
 
 The platform now reaches users via 4 independent channels:
 
-1. **Web PWA** (`apps/web/`)
+1. **Web PWA** (`frontend/`)
    - SvelteKit-based progressive web app
    - Web Share Target API: Android "Share from YouTube app" integration
    - Background Fetch API: Downloads continue even if PWA is closed
@@ -515,7 +494,7 @@ The platform now reaches users via 4 independent channels:
 | Muxer Crate | 9 files, 3,205 LOC (8 modules) |
 | Extractor Crate | 6 files, 700+ LOC (includes new ytdlp.rs 536 LOC) |
 | API Crate | 9 routes + auth (includes new jwt middleware, webhooks) |
-| Largest File | `crates/muxer/src/traf_merger.rs` (416 LOC) or `crates/gpu-pipeline/src/encoder.rs` (12,395 tokens) |
+| Largest File | `crates/muxer/src/traf_merger.rs` (416 LOC) |
 | Database Migrations | 1+ SQL files in `crates/api/migrations/` |
 | Language Distribution | Rust, TypeScript, Svelte, SQL, YAML |
 | Key Dependencies | Tokio, reqwest, deno_core, sqlx, jsonwebtoken, moka, governor |
@@ -537,14 +516,15 @@ The platform now reaches users via 4 independent channels:
 
 ```
 downloadtool/
-├── backend/
-│   └── crates/              # Rust crates (6 modules)
-│       ├── api/             # HTTP server & routes + static file serving
-│       ├── extractor/       # Extraction engine
-│       ├── gpu-pipeline/    # GPU transcoding
-│       ├── gpu-worker/      # GPU worker process
-│       ├── muxer/           # Container muxing
-│       └── proxy/           # Anti-bot & proxy layer
+├── crates/              # Rust crates (7 modules)
+│   ├── api/             # HTTP server & routes + static file serving
+│   ├── extractor/       # Extraction engine (yt-dlp + Deno)
+│   ├── muxer/           # Container muxing (fMP4)
+│   ├── proxy/           # Anti-bot & proxy layer
+│   ├── job-system/      # Durable job/artifact repository
+│   ├── worker/          # Standalone mux worker process
+│   └── object-store/    # S3/local storage abstraction
+├── frontend/            # SvelteKit PWA (Web UI + Share Target + Background Fetch)
 ├── packages/
 │   └── api-client/          # Generated TypeScript API client (@downloadtool/api-client)
 │       ├── src/
@@ -552,7 +532,6 @@ downloadtool/
 │       │   └── sdk.gen.ts       # Auto-generated fetch functions
 │       └── generate.sh          # Regenerate client from OpenAPI spec
 ├── apps/
-│   ├── web/                 # SvelteKit PWA (Web UI + Share Target + Background Fetch)
 │   ├── injector/            # Vite IIFE builder for bookmarklet & userscript
 │   │   ├── src/
 │   │   │   ├── bookmarklet.ts
@@ -604,5 +583,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-03-18 (Phase 4 complete)
+**Last Updated:** 2026-03-19 (docs sync: removed phantom gpu-pipeline/gpu-worker refs, fixed apps/web→frontend)
 **Status:** Complete & Operational (i18n ✅ | Mux Job Flow ✅ | Job System ✅ | Runtime Config ✅ | Frontend Auth Modal ✅ | Playlist Backend Orchestration ✅ | Admin Visibility ✅ | Reload Resume ✅ | Server Recovery ✅)

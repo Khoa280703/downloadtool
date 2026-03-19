@@ -535,7 +535,7 @@ if params.video_url.contains("mime=video%2Fwebm")
 - Function is minified but structure is consistent
 - Caching prevents repeated player.js fetches
 
-### 3. Extraction Engine (`crates/extractor/src/engine.rs`)
+### 3. Extraction Engine (`crates/extractor/src/`)
 
 **Architecture:**
 - Hot-reload TS extractors from `/extractors` directory

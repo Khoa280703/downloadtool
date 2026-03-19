@@ -34,7 +34,6 @@ downloadtool/
 │   │   ├── src/
 │   │   │   ├── main.rs
 │   │   │   ├── lib.rs               # Public interface
-│   │   │   ├── engine.rs            # Core orchestrator
 │   │   │   ├── runtime.rs           # Deno runtime management
 │   │   │   ├── pool.rs              # Connection pooling
 │   │   │   ├── ytdlp.rs             # yt-dlp subprocess extractor [2026-02-28]
@@ -74,28 +73,6 @@ downloadtool/
 │   │   │   ├── lib.rs
 │   │   │   ├── job_progress_publisher.rs  # Progress streaming
 │   │   │   └── ...
-│   │   ├── Cargo.toml
-│   │   └── README.md
-│   │
-│   ├── gpu-pipeline/                # GPU video encoding
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── pipeline.rs          # Orchestrator (largest: 3,976 tokens)
-│   │   │   ├── decoder.rs           # Hardware decode
-│   │   │   ├── encoder.rs           # Hardware encode (12,395 tokens)
-│   │   │   ├── frame_queue.rs       # Frame buffering
-│   │   │   ├── watermark.rs         # Watermark overlay
-│   │   │   └── ffi.rs               # GPU driver FFI
-│   │   ├── Cargo.toml
-│   │   └── README.md
-│   │
-│   ├── gpu-worker/                  # Standalone GPU worker process
-│   │   ├── src/
-│   │   │   ├── main.rs              # Entry point
-│   │   │   ├── lib.rs
-│   │   │   ├── server.rs            # gRPC server
-│   │   │   └── transcode.rs         # Job execution
-│   │   ├── build.rs
 │   │   ├── Cargo.toml
 │   │   └── README.md
 │   │
@@ -173,7 +150,6 @@ downloadtool/
 │       └── README.md
 │
 ├── docker/                          # Container images & composition
-│   ├── Dockerfile.gpu-worker        # GPU worker image
 │   ├── Dockerfile.api               # API image
 │   ├── docker-compose.server.yml
 │   └── .dockerignore
@@ -228,10 +204,12 @@ downloadtool/
 members = [
   "crates/api",
   "crates/extractor",
-  "crates/gpu-pipeline",
-  "crates/gpu-worker",
   "crates/muxer",
-  "crates/proxy"
+  "crates/proxy",
+  "crates/job-system",
+  "crates/worker",
+  "crates/object-store",
+  "crates/queue",
 ]
 ```
 
@@ -583,31 +561,7 @@ sqlx::query(
 .await?;
 ```
 
-### 8. GPU Pipeline (`crates/gpu-pipeline/src/pipeline.rs`)
-
-**File Size:** ~3,976 tokens
-
-**Data Flow:**
-```
-Input Stream
-    ↓
-Decoder (hardware)
-    ↓
-Frame Queue (buffering)
-    ↓
-Watermark Overlay
-    ↓
-Encoder (hardware)
-    ↓
-Output File
-```
-
-**Key Pattern:**
-- Async processing with `tokio::spawn()`
-- Frame rate management
-- Error propagation with `Result<T, PipelineError>`
-
-### 9. Runtime Limits Configuration (`config/runtime-limit-profiles.json`) [NEW 2026-03-06]
+### 8. Runtime Limits Configuration (`config/runtime-limit-profiles.json`) [NEW 2026-03-06]
 
 **Purpose:** Centralized configuration for all backend/frontend runtime limits without code changes
 
@@ -861,5 +815,5 @@ cargo audit
 
 ---
 
-**Version:** 1.5
-**Last Updated:** 2026-03-16 (Added job-system, worker, queue, object-store crates; i18n COMPLETE; mux job components; init_segment_normalizer)
+**Version:** 1.6
+**Last Updated:** 2026-03-19 (docs sync: removed phantom gpu-pipeline/gpu-worker/engine.rs refs; updated workspace crate list)

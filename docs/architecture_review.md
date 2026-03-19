@@ -54,26 +54,30 @@ Kiến trúc hiện tại của bạn là một **hệ thống phân tán khá m
 
 ## ⚠️ Điểm cần cải thiện cho Production
 
-### 1. **Worker chỉ chạy single-threaded loop** (Priority: HIGH)
+### 1. **Worker concurrent processing** (Đã implement ✅)
 
-```
-// worker/src/main.rs:112-149
-loop {
-    match queue_consumer.consume(1_000).await {
-        Ok(Some(claimed)) => { run_claimed_job(...).await?; }
-        Ok(None) => sleep(250ms),
+Worker hiện tại dùng `JoinSet` để xử lý nhiều job đồng thời, giới hạn bởi `config.concurrency`:
+
+```rust
+// worker/src/main.rs:131
+while in_flight.len() < config.concurrency {
+    match queue_consumer.consume(250).await {
+        Ok(Some(claimed)) => {
+            in_flight.spawn(async move {
+                run_claimed_job(...).await?;
+                ...
+            });
+        }
         ...
     }
 }
 ```
 
-**Vấn đề**: Worker chỉ xử lý **1 job tại 1 thời điểm**. Khi 1 video 4K mất 2 phút để mux, tất cả job khác phải chờ.
-
-**Đề xuất**: Spawn mỗi job vào `tokio::spawn` với giới hạn concurrency (semaphore), hoặc chạy nhiều worker instance qua Docker scale:
+**Trạng thái**: Đây không còn là vấn đề. Worker đã xử lý concurrent jobs theo `config.concurrency`. Có thể scale thêm bằng Docker:
 ```bash
 docker compose up --scale worker=3
 ```
-Scale worker qua Docker đã khả thi ngay vì bạn dùng Redis Streams consumer group — nhiều worker instance sẽ tự phân phối job.
+Scale qua Docker vẫn khả thi vì dùng Redis Streams consumer group.
 
 ---
 
@@ -146,7 +150,7 @@ Production cần observability. Đề xuất thêm:
 |---|---|---|
 | Kiến trúc tổng thể | 9/10 | Rất tốt, tách biệt rõ ràng |
 | Reliability | 7/10 | Cần graceful shutdown, connection pool |
-| Scalability | 7/10 | Worker single-thread, nhưng scale horizontal OK |
+| Scalability | 8/10 | Worker concurrent (JoinSet), scale horizontal qua Docker |
 | Security | 6/10 | CORS mở, cần audit thêm |
 | Observability | 5/10 | Thiếu metrics, logging chưa structured |
 | **Tổng** | **7/10** | **Gần production-ready, cần vài cải thiện** |
@@ -157,7 +161,7 @@ Production cần observability. Đề xuất thêm:
 
 | # | Việc cần làm | Effort | Impact |
 |---|---|---|---|
-| 1 | Scale worker qua Docker `--scale` | 🟢 Thấp | 🔴 Cao |
+| 1 | ~~Scale worker qua Docker `--scale`~~ | ✅ Done | Worker đã concurrent |
 | 2 | Tăng DB max_connections | 🟢 Thấp | 🟡 Trung bình |
 | 3 | Restrict CORS origins | 🟢 Thấp | 🟡 Trung bình |
 | 4 | Graceful shutdown cho worker | 🟡 Trung bình | 🟡 Trung bình |
