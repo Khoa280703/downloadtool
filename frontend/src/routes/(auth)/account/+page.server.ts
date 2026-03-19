@@ -1,20 +1,15 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-import { getSubscriptionForUser } from '$lib/server/auth-utils';
 import { isAdminEmail } from '$lib/server/admin-access';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user || !locals.session) {
 		throw redirect(302, `/?auth=required&redirectTo=${encodeURIComponent('/account')}`);
 	}
 
-	const subscription = await getSubscriptionForUser(locals.user.id);
-
 	return {
 		user: locals.user,
-		subscription,
-		checkoutStatus: url.searchParams.get('checkout'),
 		isAdmin: isAdminEmail(locals.user.email)
 	};
 };

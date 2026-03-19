@@ -131,13 +131,10 @@
 			<h2 class="text-3xl font-bold text-plum">
 				{mode === 'signin' ? m.auth_modal_title_signin() : m.auth_modal_title_signup()}
 			</h2>
-			<p class="mt-2 text-sm text-plum/70">
-				{m.auth_modal_subtitle()}
-			</p>
 
 			<button
 				type="button"
-				class="mt-6 flex w-full items-center justify-center rounded-full border border-plum/15 bg-white px-5 py-3 text-sm font-bold text-plum transition hover:border-primary/40 hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60"
+				class="mt-4 flex w-full items-center justify-center rounded-full border border-plum/15 bg-white px-5 py-3 text-sm font-bold text-plum transition hover:border-primary/40 hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-60"
 				onclick={handleGoogleSignIn}
 				disabled={isSocialLoading || isSubmitting}
 			>

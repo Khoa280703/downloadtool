@@ -798,7 +798,7 @@
 
 <svelte:head>
 	<title>{m.home_meta_title()}</title>
-	<meta name="description" content={m.home_meta_description()} />
+	<meta name="description" content={m.home_hero_subtitle()} />
 
 	{#each HOMEPAGE_HREFLANG_LINKS as link}
 		<link rel="alternate" hreflang={link.hreflang} href={link.href} />
