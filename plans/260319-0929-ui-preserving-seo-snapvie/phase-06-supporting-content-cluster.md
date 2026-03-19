@@ -7,7 +7,7 @@
 
 ## Overview
 - Priority: P1
-- Status: complete
+- Status: partial (core pages done, comparison pages and some TODOs deferred)
 - Brief: Tạo lớp supporting content rất sát pain points thật để tăng topical authority mà không biến site thành blog rác.
 
 ## Key Insights

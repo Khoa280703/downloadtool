@@ -9,7 +9,7 @@
 
 ## Overview
 - Priority: P1
-- Status: complete
+- Status: partial (key items done, some CWV items need field data)
 - Brief: Siết technical SEO ở lớp bot thực sự thấy được: renderability, head cleanliness, Core Web Vitals, crawl/index hygiene.
 
 ## Key Insights

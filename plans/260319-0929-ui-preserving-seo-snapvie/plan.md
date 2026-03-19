@@ -38,7 +38,7 @@ created: 2026-03-19
 
 ## SEO Pillars
 - Pillar 1: Money pages thắng intent cao
-  - Homepage + 4 EN landing pages + các page support có CTA rõ
+  - Homepage + 5 EN landing pages + các page support có CTA rõ
 - Pillar 2: Technical SEO sạch và nhanh
   - Canonical, hreflang, sitemap, renderability, Core Web Vitals, crawl/index hygiene
 - Pillar 3: Topical authority
@@ -95,10 +95,10 @@ created: 2026-03-19
 | 3 | EN long-tail landing pages | [phase-03-english-long-tail-landing-pages.md](./phase-03-english-long-tail-landing-pages.md) | complete |
 | 4 | Internal linking, sitemap, indexability | [phase-04-internal-linking-sitemap-indexability.md](./phase-04-internal-linking-sitemap-indexability.md) | complete |
 | 5 | Measurement, rollout, expansion gate | [phase-05-measurement-rollout-expansion-gate.md](./phase-05-measurement-rollout-expansion-gate.md) | partial |
-| 6 | Supporting content cluster | [phase-06-supporting-content-cluster.md](./phase-06-supporting-content-cluster.md) | complete |
+| 6 | Supporting content cluster | [phase-06-supporting-content-cluster.md](./phase-06-supporting-content-cluster.md) | partial |
 | 7 | Authority, distribution, link acquisition | [phase-07-authority-distribution-link-acquisition.md](./phase-07-authority-distribution-link-acquisition.md) | partial |
 | 8 | SERP CTR optimization loop | [phase-08-serp-ctr-optimization-loop.md](./phase-08-serp-ctr-optimization-loop.md) | partial |
-| 9 | Technical renderability, CWV, crawl efficiency | [phase-09-technical-renderability-cwv-crawl-efficiency.md](./phase-09-technical-renderability-cwv-crawl-efficiency.md) | complete |
+| 9 | Technical renderability, CWV, crawl efficiency | [phase-09-technical-renderability-cwv-crawl-efficiency.md](./phase-09-technical-renderability-cwv-crawl-efficiency.md) | partial |
 | 10 | Entity trust, legal surface, brand consistency | [phase-10-entity-trust-legal-surface.md](./phase-10-entity-trust-legal-surface.md) | complete |
 
 ## Non-goals

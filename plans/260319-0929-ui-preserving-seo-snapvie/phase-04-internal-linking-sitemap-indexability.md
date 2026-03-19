@@ -49,15 +49,13 @@
 
 ## Implementation Steps
 1. Tạo source of truth cho SEO pages public (`frontend/src/lib/seo/public-pages.ts`).
-2. Cập nhật sitemap để include: 4 landing pages + trust pages (about/contact/terms/dmca).
-3. **Update robots.txt** — thêm Disallow:
+2. Cập nhật sitemap để include: 5 landing pages + trust pages (about/contact/terms/dmca).
+3. **Update robots.txt** — chỉ Disallow API (không có HTML):
    ```
-   Disallow: /admin
-   Disallow: /account
-   Disallow: /download/mux-job
    Disallow: /api/
    ```
-4. **Add `<meta name="robots" content="noindex">` cho admin/account/mux-job pages.**
+   KHÔNG Disallow /admin, /account, /download/mux-job — bot cần crawl để thấy noindex tag. Disallow + noindex đồng thời là bẫy SEO: bot bị chặn → không thấy noindex → URL tồn tại dạng URL-only trong index.
+4. **Add `<meta name="robots" content="noindex, nofollow">` cho admin/account/mux-job pages** — đây là cơ chế deindex chính xác.
 5. Add contextual links từ homepage sang các landing pages.
 6. Add peer links từ mỗi landing page sang 2-3 pages gần intent.
 7. Ensure canonical từng page trỏ đúng self URL.

@@ -57,7 +57,7 @@
    - extract request
    - download start
 3. Ship measurement baseline cùng homepage + landing pages rollout.
-4. After deploy, request indexing on homepage + 4 landing pages.
+4. After deploy, request indexing on homepage + 5 landing pages.
 5. Review after 2 weeks:
    - indexed page count
    - impressions by page
