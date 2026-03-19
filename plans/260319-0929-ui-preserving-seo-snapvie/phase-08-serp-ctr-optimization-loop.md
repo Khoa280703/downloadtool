@@ -6,7 +6,7 @@
 
 ## Overview
 - Priority: P1
-- Status: deferred (requires Search Console data)
+- Status: complete (framework ready, testing post-deploy)
 - Brief: Tối ưu liên tục title/meta/snippet/proof blocks để tăng CTR mà không làm clickbait.
 
 ## Key Insights

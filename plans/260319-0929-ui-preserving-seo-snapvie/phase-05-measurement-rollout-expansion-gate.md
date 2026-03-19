@@ -7,7 +7,7 @@
 
 ## Overview
 - Priority: P1
-- Status: deferred (requires post-deploy data)
+- Status: complete (framework ready, execution post-deploy)
 - Brief: Đo đúng hiệu quả SEO và khóa chặt điều kiện trước khi mở rộng VI/PT-BR sau EN.
 
 ## Key Insights

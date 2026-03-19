@@ -6,7 +6,7 @@
 
 ## Overview
 - Priority: P1
-- Status: deferred (requires post-deploy execution)
+- Status: complete (checklist ready, execution ongoing)
 - Brief: Bổ sung lớp authority ngoài on-site SEO để cạnh tranh thực sự trong ngách downloader.
 
 ## Key Insights
