@@ -35,6 +35,12 @@ function isCrossOriginUrl(url: string): boolean {
 	}
 }
 
+/** Append ?fallback=1 marker so proxy route can distinguish fallback from organic requests. */
+function appendFallbackMarker(url: string): string {
+	const separator = url.includes('?') ? '&' : '?';
+	return `${url}${separator}fallback=1`;
+}
+
 let saveDirectoryHandle: SaveDirectoryHandle | null = null;
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 const MAX_RETRY_ATTEMPTS = 5;
@@ -83,7 +89,7 @@ export async function saveDownload(
 	// If no FSAA and URL is cross-origin (R2 direct), downgrade to proxy.
 	// Anchor downloads can't detect/recover from cross-origin failures.
 	const downgraded = !hasFsaa && options.fallbackUrl && requestedDirect;
-	const effectiveUrl = downgraded ? options.fallbackUrl! : url;
+	const effectiveUrl = downgraded ? appendFallbackMarker(options.fallbackUrl!) : url;
 
 	const actualDelivery = downgraded ? 'proxy_downgrade' : (requestedDirect ? 'direct' : 'proxy');
 	console.info('[downloadtool] saveDownload', { filename, actualDelivery, hasFsaa, ticketWasDirect: requestedDirect });
@@ -100,7 +106,7 @@ export async function saveDownload(
 				console.warn('[downloadtool] direct download failed, falling back to proxy', {
 					filename, originalUrl: url, fallbackUrl: options.fallbackUrl, error
 				});
-				await saveWithDirectory(options.fallbackUrl, filename, saveDirectoryHandle, signal, options.onProgress);
+				await saveWithDirectory(appendFallbackMarker(options.fallbackUrl), filename, saveDirectoryHandle, signal, options.onProgress);
 				return;
 			}
 			if (!allowAnchorFallback) throw error;

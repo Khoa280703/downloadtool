@@ -7,7 +7,7 @@
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
-	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
+	import { extract, extractYouTubeVideoId, isValidVideoUrl, buildMuxProxyFallbackUrl } from '$lib/api';
 	import { buildHomepageJsonLd, buildFaqSchema } from '$lib/seo/structured-data';
 	import {
 		createPlaylistJob,
@@ -339,7 +339,9 @@
 				percent: null,
 				indeterminate: true
 			});
+			const fallbackUrl = item.mux_job_id ? buildMuxProxyFallbackUrl(item.mux_job_id) : undefined;
 			void saveDownload(downloadUrl, `${item.title ?? item.video_id}.mp4`, new AbortController().signal, {
+				fallbackUrl,
 				onProgress: (progress) => {
 					updateBatchItemProgressByVideoId(item.video_id, {
 						label: m.download_btn_progress_starting_browser(),
