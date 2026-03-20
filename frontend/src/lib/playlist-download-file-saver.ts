@@ -35,7 +35,6 @@ function isCrossOriginUrl(url: string): boolean {
 	}
 }
 
-/** Append ?fallback=1 marker so proxy route can distinguish fallback from organic requests. */
 function appendFallbackMarker(url: string): string {
 	const separator = url.includes('?') ? '&' : '?';
 	return `${url}${separator}fallback=1`;
@@ -85,14 +84,14 @@ export async function saveDownload(
 	const allowAnchorFallback = options.allowAnchorFallback !== false;
 	const hasFsaa = !!saveDirectoryHandle;
 	const requestedDirect = isCrossOriginUrl(url);
+	const effectiveUrl = url;
 
-	// If no FSAA and URL is cross-origin (R2 direct), downgrade to proxy.
-	// Anchor downloads can't detect/recover from cross-origin failures.
-	const downgraded = !hasFsaa && options.fallbackUrl && requestedDirect;
-	const effectiveUrl = downgraded ? appendFallbackMarker(options.fallbackUrl!) : url;
-
-	const actualDelivery = downgraded ? 'proxy_downgrade' : (requestedDirect ? 'direct' : 'proxy');
-	console.info('[downloadtool] saveDownload', { filename, actualDelivery, hasFsaa, ticketWasDirect: requestedDirect });
+	console.info('[downloadtool] saveDownload', {
+		filename,
+		actualDelivery: requestedDirect ? 'direct' : 'proxy',
+		hasFsaa,
+		ticketWasDirect: requestedDirect
+	});
 
 	if (saveDirectoryHandle) {
 		try {
@@ -106,7 +105,13 @@ export async function saveDownload(
 				console.warn('[downloadtool] direct download failed, falling back to proxy', {
 					filename, originalUrl: url, fallbackUrl: options.fallbackUrl, error
 				});
-				await saveWithDirectory(appendFallbackMarker(options.fallbackUrl), filename, saveDirectoryHandle, signal, options.onProgress);
+				await saveWithDirectory(
+					appendFallbackMarker(options.fallbackUrl),
+					filename,
+					saveDirectoryHandle,
+					signal,
+					options.onProgress
+				);
 				return;
 			}
 			if (!allowAnchorFallback) throw error;
@@ -126,7 +131,17 @@ export async function saveDownload(
 		throw new Error(m.file_saver_error_anchor_fallback_disabled());
 	}
 
-	console.info('[downloadtool] saveDownload using anchor fallback', { filename, url: effectiveUrl });
+	if (requestedDirect) {
+		console.info('[downloadtool] saveDownload using direct anchor download', {
+			filename,
+			url: effectiveUrl
+		});
+	} else {
+		console.info('[downloadtool] saveDownload using anchor fallback', {
+			filename,
+			url: effectiveUrl
+		});
+	}
 	downloadViaAnchor(effectiveUrl, filename);
 }
 
