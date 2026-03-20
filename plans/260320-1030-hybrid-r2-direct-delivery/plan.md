@@ -1,7 +1,7 @@
 ---
 title: "Hybrid R2 Direct Download Delivery"
 description: "Default browser->R2 direct download, fallback browser->frontend proxy->R2 for incompatible UAs"
-status: in_progress
+status: completed
 priority: P1
 effort: 6h
 branch: main
@@ -36,9 +36,9 @@ AFTER:  Browser -> file-ticket -> DECIDE(direct R2 URL | proxy URL) -> download
 |---|-------|--------|--------|
 | 1 | [Backend ticket + hybrid delivery config](phase-01-backend-ticket-hybrid-delivery.md) | **done** | 1.5h |
 | 2 | [Client consume hybrid ticket](phase-02-client-consume-hybrid-ticket.md) | **done** | 2h |
-| 3 | [R2 CORS verification + content-disposition](phase-03-cors-r2-verification.md) | pending (ops) | 0.5h |
+| 3 | [R2 CORS verification + content-disposition](phase-03-cors-r2-verification.md) | **done** (configured) | 0.5h |
 | 4 | [Observability + audit logging](phase-04-observability-audit-logging.md) | **done** | 1h |
-| 5 | [Rollout + testing](phase-05-rollout-testing.md) | pending (ops) | 1h |
+| 5 | [Rollout + testing](phase-05-rollout-testing.md) | **done** (env set, monitoring) | 1h |
 
 ## Critical Constraints (from reviewer feedback)
 
