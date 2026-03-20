@@ -314,8 +314,8 @@ async function handleAuthSuccess(target: string): Promise<void> {
 				</div>
 				<div class="flex gap-4 text-plum/80 font-semibold text-xs">
 					<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/privacy">{m.footer_privacy_policy()}</a>
-					<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/privacy">{m.footer_terms_of_service()}</a>
-					<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/privacy#contact">{m.footer_contact()}</a>
+					<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/terms">{m.footer_terms_of_service()}</a>
+					<a class="underline-offset-2 hover:text-primary hover:underline transition-colors" href="/contact">{m.footer_contact()}</a>
 				</div>
 			</div>
 		</footer>
