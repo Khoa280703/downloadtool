@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-A high-performance video downloader platform supporting YouTube and other platforms with anti-bot protection, GPU-accelerated transcoding, and full-speed CDN downloads via YouTube n-parameter transformation.
+A high-performance video downloader platform supporting YouTube and other platforms with anti-bot protection, fMP4 remuxing, and full-speed CDN downloads via YouTube n-parameter transformation.
 
 ## Architecture Overview
 
@@ -562,7 +562,7 @@ downloadtool/
 
 1. **Anti-Bot Evasion:** Proxy rotation, header randomization, cookie persistence, request throttling
 2. **Dynamic Extraction:** Deno runtime for hot-reloadable JavaScript/TypeScript extractors
-3. **Hardware Acceleration:** GPU pipeline for real-time video transcoding
+3. **Remuxing Pipeline:** fMP4 muxing for combining separate video+audio streams
 4. **Streaming Architecture:** WebSocket for long-lived downloads, fMP4 for progressive playback
 5. **Connection Pooling:** Reused HTTP & extraction engine connections
 
@@ -570,13 +570,13 @@ downloadtool/
 
 - **YouTube Throttling:** Mitigated by n-parameter transform (deployed 2026-02-23)
 - **Bot Detection:** Multi-layer defense via proxy rotation, headers, throttling
-- **GPU Requirements:** NVIDIA/AMD GPU required for encoding
+- **Mux Pipeline:** Video+audio streams muxed server-side when direct combined stream unavailable
 - **Memory Usage:** Large files may require stream-based processing
 
 ## Future Improvements
 
 - Deeper YouTube support (channels, playlists, and richer metadata)
-- Distributed GPU worker scaling
+- GPU-accelerated transcoding (planned)
 - Advanced analytics & monitoring
 - API rate limiting & authentication
 - Batch download scheduling

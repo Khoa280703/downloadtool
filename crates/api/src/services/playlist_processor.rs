@@ -532,7 +532,8 @@ fn pick_best_streams(
 fn build_stream_download_url(stream_url: &str, title: &str, ext: &str) -> String {
     let encoded_url = urlencoding::encode(stream_url);
     let encoded_title = urlencoding::encode(title);
-    format!("/api/stream?url={encoded_url}&title={encoded_title}&ext={ext}")
+    let encoded_ext = urlencoding::encode(ext);
+    format!("/api/stream?url={encoded_url}&title={encoded_title}&format={encoded_ext}")
 }
 
 fn build_job_owner(job: &PlaylistJobRecord) -> JobOwner {

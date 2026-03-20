@@ -187,8 +187,7 @@ fn done_event(total: usize) -> Event {
 
 /// Check if URL is a valid YouTube playlist URL.
 fn is_valid_batch_url(url: &str) -> bool {
-    let lower = url.to_lowercase();
-    (lower.contains("youtube.com") || lower.contains("youtu.be")) && lower.contains("list=")
+    crate::validation::is_valid_youtube_url(url) && url.to_lowercase().contains("list=")
 }
 
 fn extract_playlist_id(url: &str) -> Option<String> {
