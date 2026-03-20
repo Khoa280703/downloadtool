@@ -329,8 +329,8 @@
 			if (playlistSavedVideoIds.has(item.video_id)) continue;
 			if ($batchQueue.find((queued) => queued.videoId === item.video_id)?.selected === false) continue;
 
-			const downloadUrl = resolvePlaylistItemDownloadUrl(item);
-			if (!downloadUrl) continue;
+			const controller = new AbortController();
+			const downloadUrlPromise = resolvePlaylistItemDownloadUrl(item, controller.signal);
 
 			playlistSavedVideoIds = new Set([...playlistSavedVideoIds, item.video_id]);
 			updateBatchItemByVideoId(item.video_id, 'downloading');
@@ -340,16 +340,22 @@
 				indeterminate: true
 			});
 			const fallbackUrl = item.mux_job_id ? buildMuxProxyFallbackUrl(item.mux_job_id) : undefined;
-			void saveDownload(downloadUrl, `${item.title ?? item.video_id}.mp4`, new AbortController().signal, {
-				fallbackUrl,
-				onProgress: (progress) => {
-					updateBatchItemProgressByVideoId(item.video_id, {
-						label: m.download_btn_progress_starting_browser(),
-						percent: progress.percent,
-						indeterminate: progress.percent === null
+			void downloadUrlPromise
+				.then((downloadUrl) => {
+					if (!downloadUrl) {
+						throw new Error('Playlist item is missing download URL');
+					}
+					return saveDownload(downloadUrl, `${item.title ?? item.video_id}.mp4`, controller.signal, {
+						fallbackUrl,
+						onProgress: (progress) => {
+							updateBatchItemProgressByVideoId(item.video_id, {
+								label: m.download_btn_progress_starting_browser(),
+								percent: progress.percent,
+								indeterminate: progress.percent === null
+							});
+						}
 					});
-				}
-			})
+				})
 				.then(() => {
 					updateBatchItemByVideoId(item.video_id, 'completed');
 					clearBatchItemProgressByVideoId(item.video_id);

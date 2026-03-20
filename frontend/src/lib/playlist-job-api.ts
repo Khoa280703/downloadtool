@@ -211,7 +211,30 @@ export function subscribePlaylistJobEvents(
 /**
  * Resolve download URL from a playlist item to an absolute URL.
  */
-export function resolvePlaylistItemDownloadUrl(item: PlaylistJobItem): string | null {
+export async function resolvePlaylistItemDownloadUrl(
+	item: PlaylistJobItem,
+	signal?: AbortSignal
+): Promise<string | null> {
 	if (!item.download_url) return null;
-	return toAbsoluteDownloadUrl(item.download_url);
+
+	const absoluteUrl = toAbsoluteDownloadUrl(item.download_url);
+	if (!absoluteUrl.endsWith('/file-ticket') && !absoluteUrl.includes('/file-ticket?')) {
+		return absoluteUrl;
+	}
+
+	const ticketResponse = await fetch(
+		`${absoluteUrl}${absoluteUrl.includes('?') ? '&' : '?'}t=${Date.now()}`,
+		{ signal }
+	);
+
+	if (!ticketResponse.ok) {
+		throw new Error(`Failed to resolve playlist file ticket (${ticketResponse.status})`);
+	}
+
+	const ticket = (await ticketResponse.json()) as { download_url?: string };
+	if (!ticket.download_url) {
+		throw new Error('Playlist file ticket is missing download_url');
+	}
+
+	return toAbsoluteDownloadUrl(ticket.download_url);
 }

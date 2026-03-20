@@ -9,8 +9,6 @@ const DOWNLOAD_SESSION_HEADER = 'x-download-session-id';
 const NO_STORE_CACHE_CONTROL = 'no-store, no-cache, must-revalidate';
 const RAW_MUX_JOB_PATH = '/api/jobs/';
 const PROXIED_MUX_JOB_PATH = '/api/proxy/jobs/';
-const RAW_MUX_FILE_TICKET_SUFFIX = '/file-ticket';
-const PROXIED_MUX_FILE_SUFFIX = '/file';
 
 function normalizeBaseUrl(url: string | undefined): string {
 	if (!url) return 'http://127.0.0.1:3068';
@@ -80,9 +78,7 @@ export function normalizePlaylistProxyPayload(payload: string): string {
 		return payload;
 	}
 
-	return payload
-		.replaceAll(RAW_MUX_JOB_PATH, PROXIED_MUX_JOB_PATH)
-		.replaceAll(RAW_MUX_FILE_TICKET_SUFFIX, PROXIED_MUX_FILE_SUFFIX);
+	return payload.replaceAll(RAW_MUX_JOB_PATH, PROXIED_MUX_JOB_PATH);
 }
 
 export function normalizePlaylistProxyStream(
