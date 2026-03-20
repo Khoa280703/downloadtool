@@ -360,13 +360,16 @@
 					updateBatchItemByVideoId(item.video_id, 'completed');
 					clearBatchItemProgressByVideoId(item.video_id);
 				})
-				.catch((err) =>
+				.catch((err) => {
+					playlistSavedVideoIds = new Set(
+						[...playlistSavedVideoIds].filter((videoId) => videoId !== item.video_id)
+					);
 					updateBatchItemByVideoId(
 						item.video_id,
 						'error',
 						err instanceof Error ? err.message : 'Download failed'
-					)
-				);
+					);
+				});
 		}
 	}
 
