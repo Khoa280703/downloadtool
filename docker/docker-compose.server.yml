@@ -172,6 +172,8 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - WHOP_PLAN_ID=${WHOP_PLAN_ID}
       - RUST_API_URL=http://api:3068
+      - DOWNLOAD_DELIVERY_MODE=${DOWNLOAD_DELIVERY_MODE:-proxy}
+      - DOWNLOAD_PROXY_UA_REGEX=${DOWNLOAD_PROXY_UA_REGEX:-Safari|iPhone|iPad}
     expose:
       - "5168"
     restart: unless-stopped
