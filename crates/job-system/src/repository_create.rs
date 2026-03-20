@@ -96,6 +96,7 @@ impl JobRepository {
                     WHERE j.user_id = $1
                       AND j.request_hash = $2
                       AND j.status IN ('queued', 'leased', 'processing', 'ready')
+                      AND (j.status <> 'ready' OR (a.status = 'ready' AND a.backend = 's3'))
                       AND (j.delete_after_at IS NULL OR j.delete_after_at > NOW())
                     ORDER BY j.created_at_ms DESC
                     LIMIT 1
@@ -120,6 +121,7 @@ impl JobRepository {
                     WHERE j.session_id = $1
                       AND j.request_hash = $2
                       AND j.status IN ('queued', 'leased', 'processing', 'ready')
+                      AND (j.status <> 'ready' OR (a.status = 'ready' AND a.backend = 's3'))
                       AND (j.delete_after_at IS NULL OR j.delete_after_at > NOW())
                     ORDER BY j.created_at_ms DESC
                     LIMIT 1

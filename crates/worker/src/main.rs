@@ -99,12 +99,10 @@ async fn main() -> Result<()> {
     let progress_store = Arc::new(JobProgressStore::new(&config.redis_url)?);
 
     let storage = build_storage_backend(&config).await?;
-    tokio::fs::create_dir_all(Path::new(&config.artifact_dir)).await?;
 
     info!(
         worker_id = config.worker_id,
         concurrency = config.concurrency,
-        artifact_backend = config.artifact_backend,
         queue_stream = config.queue_stream,
         "Mux worker started"
     );

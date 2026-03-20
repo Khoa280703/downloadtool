@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use object_store::{StorageBackend, StoredArtifact};
 
 use super::job_control_plane::JobStatusRecord;
@@ -8,45 +8,28 @@ use super::job_control_plane::JobStatusRecord;
 #[derive(Debug, Clone)]
 pub struct StorageDownloadTicket {
     pub download_url: String,
-    pub backend: String,
-    pub direct_download: bool,
 }
 
 pub struct StorageTicketService {
-    storage_backend: Option<Arc<dyn StorageBackend>>,
+    storage_backend: Arc<dyn StorageBackend>,
     ticket_ttl_secs: u64,
 }
 
 impl StorageTicketService {
-    pub fn new(
-        storage_backend: Option<Arc<dyn StorageBackend>>,
-        ticket_ttl_secs: u64,
-    ) -> Arc<Self> {
+    pub fn new(storage_backend: Arc<dyn StorageBackend>, ticket_ttl_secs: u64) -> Arc<Self> {
         Arc::new(Self {
             storage_backend,
             ticket_ttl_secs: ticket_ttl_secs.max(60),
         })
     }
 
-    pub async fn build_ticket(
-        &self,
-        job: &JobStatusRecord,
-        prefer_direct_download: bool,
-    ) -> anyhow::Result<StorageDownloadTicket> {
-        let backend = job.backend.as_deref().unwrap_or("localfs");
-        if backend == "localfs" || !prefer_direct_download {
-            return Ok(StorageDownloadTicket {
-                download_url: format!("/api/jobs/{}/file", job.job_id),
-                backend: backend.to_string(),
-                direct_download: false,
-            });
-        }
+    pub async fn build_ticket(&self, job: &JobStatusRecord) -> anyhow::Result<StorageDownloadTicket> {
+        let backend = job.backend.as_deref().unwrap_or("unknown");
+        anyhow::ensure!(
+            backend == "s3",
+            "unsupported mux artifact backend for direct delivery: {backend}"
+        );
 
-        let storage_backend = self
-            .storage_backend
-            .as_ref()
-            .cloned()
-            .context("object storage backend is not configured")?;
         let artifact = StoredArtifact {
             backend: backend.to_string(),
             local_path: job
@@ -63,26 +46,15 @@ impl StorageTicketService {
                 .unwrap_or_else(|| "video/mp4".to_string()),
         };
         let content_disposition = build_download_content_disposition(job.title.as_deref(), "mp4");
-        let presigned = storage_backend
+        let presigned = self
+            .storage_backend
             .presign_get(&artifact, self.ticket_ttl_secs, Some(&content_disposition))
             .await
             .with_context(|| format!("failed to presign download for job {}", job.job_id))?;
 
         Ok(StorageDownloadTicket {
             download_url: presigned.url,
-            backend: backend.to_string(),
-            direct_download: true,
         })
-    }
-
-    pub fn supports_proxy_file_stream(&self, job: &JobStatusRecord) -> bool {
-        matches!(job.backend.as_deref(), None | Some("localfs"))
-    }
-
-    pub fn ensure_local_path(job: &JobStatusRecord) -> anyhow::Result<&std::path::Path> {
-        job.local_path
-            .as_deref()
-            .ok_or_else(|| anyhow!("ready artifact is missing local storage path"))
     }
 }
 
@@ -147,7 +119,7 @@ mod tests {
 
     use super::*;
 
-    fn ready_local_job() -> JobStatusRecord {
+    fn ready_unsupported_backend_job() -> JobStatusRecord {
         JobStatusRecord {
             job_id: "job-1".to_string(),
             status: JobStatus::Ready,
@@ -157,7 +129,7 @@ mod tests {
             queue_position: None,
             file_size_bytes: Some(42),
             title: Some("demo".to_string()),
-            backend: Some("localfs".to_string()),
+            backend: Some("unknown".to_string()),
             local_path: Some(PathBuf::from("/tmp/demo.mp4")),
             object_key: None,
             storage_bucket: None,
@@ -167,15 +139,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn localfs_ticket_falls_back_to_api_file_route() {
-        let service = StorageTicketService::new(None, 900);
-        let ticket = service
-            .build_ticket(&ready_local_job(), true)
+    async fn unsupported_backend_ticket_is_rejected() {
+        let backend = Arc::new(object_store::s3_storage_backend::S3StorageBackend::new(
+            aws_sdk_s3::Client::from_conf(
+                aws_sdk_s3::config::Builder::new()
+                    .force_path_style(true)
+                    .build(),
+            ),
+            "bucket".to_string(),
+            8 * 1024 * 1024,
+        ));
+        let service = StorageTicketService::new(backend, 900);
+        let error = service
+            .build_ticket(&ready_unsupported_backend_job())
             .await
-            .expect("localfs ticket should succeed");
+            .expect_err("unsupported backend ticket should be rejected");
 
-        assert_eq!(ticket.download_url, "/api/jobs/job-1/file");
-        assert!(!ticket.direct_download);
+        assert!(error
+            .to_string()
+            .contains("unsupported mux artifact backend for direct delivery"));
     }
 
     #[test]

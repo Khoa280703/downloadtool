@@ -8,8 +8,6 @@ use crate::worker_config::WorkerConfig;
 
 pub async fn build_storage_backend(config: &WorkerConfig) -> Result<Arc<dyn StorageBackend>> {
     build_backend(&StorageBackendConfig {
-        backend: config.artifact_backend.clone(),
-        local_dir: config.artifact_dir.clone(),
         s3_bucket: config.s3_bucket.clone(),
         s3_region: config.s3_region.clone(),
         s3_endpoint: config.s3_endpoint.clone(),

@@ -69,7 +69,6 @@ export type MuxJobStatusUpdate = {
 type FileTicketApiResponse = {
 	job_id: string;
 	download_url: string;
-	ticket_delivery?: 'direct' | 'proxy';
 };
 
 function stripErrorPrefix(message: string): string {
@@ -658,10 +657,6 @@ async function fetchMuxJobFileTicket(
 function appendCacheBuster(url: string, value: string): string {
 	const separator = url.includes('?') ? '&' : '?';
 	return `${url}${separator}t=${encodeURIComponent(value)}`;
-}
-
-export function buildMuxProxyFallbackUrl(jobId: string): string {
-	return toAbsoluteDownloadUrl(`/api/proxy/jobs/${encodeURIComponent(jobId)}/file`);
 }
 
 export async function releaseMuxedDownloadJob(

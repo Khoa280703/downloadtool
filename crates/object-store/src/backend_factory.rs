@@ -1,18 +1,14 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::config::{Builder as S3ConfigBuilder, Credentials, Region};
 
-use crate::local_fs_storage_backend::LocalFsStorageBackend;
 use crate::s3_storage_backend::S3StorageBackend;
 use crate::StorageBackend;
 
 #[derive(Clone, Debug)]
 pub struct StorageBackendConfig {
-    pub backend: String,
-    pub local_dir: PathBuf,
     pub s3_bucket: Option<String>,
     pub s3_region: Option<String>,
     pub s3_endpoint: Option<String>,
@@ -25,16 +21,10 @@ pub struct StorageBackendConfig {
 pub async fn build_storage_backend(
     config: &StorageBackendConfig,
 ) -> Result<Arc<dyn StorageBackend>> {
-    if config.backend.eq_ignore_ascii_case("localfs") {
-        return Ok(Arc::new(LocalFsStorageBackend::new(
-            config.local_dir.clone(),
-        )?));
-    }
-
     let bucket = config
         .s3_bucket
         .clone()
-        .ok_or_else(|| anyhow!("S3_BUCKET_NAME is required for non-localfs artifact backend"))?;
+        .ok_or_else(|| anyhow!("S3_BUCKET_NAME is required for mux artifact backend"))?;
     let shared = aws_config::defaults(BehaviorVersion::latest()).load().await;
     let mut builder = S3ConfigBuilder::from(&shared);
 

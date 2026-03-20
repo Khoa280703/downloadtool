@@ -17,7 +17,6 @@ type FileWritableHandle = WritableStream & {
 export interface SaveDownloadOptions {
 	requireFsaa?: boolean;
 	allowAnchorFallback?: boolean;
-	fallbackUrl?: string; // proxy URL for FSAA fallback
 	onProgress?: (update: {
 		receivedBytes: number;
 		totalBytes: number | null;
@@ -33,11 +32,6 @@ function isCrossOriginUrl(url: string): boolean {
 	} catch {
 		return false;
 	}
-}
-
-function appendFallbackMarker(url: string): string {
-	const separator = url.includes('?') ? '&' : '?';
-	return `${url}${separator}fallback=1`;
 }
 
 let saveDirectoryHandle: SaveDirectoryHandle | null = null;
@@ -100,20 +94,6 @@ export async function saveDownload(
 			return;
 		} catch (error) {
 			if (isAbortError(error)) throw error;
-			// FSAA failed with direct URL — try proxy fallback
-			if (options.fallbackUrl && requestedDirect) {
-				console.warn('[downloadtool] direct download failed, falling back to proxy', {
-					filename, originalUrl: url, fallbackUrl: options.fallbackUrl, error
-				});
-				await saveWithDirectory(
-					appendFallbackMarker(options.fallbackUrl),
-					filename,
-					saveDirectoryHandle,
-					signal,
-					options.onProgress
-				);
-				return;
-			}
 			if (!allowAnchorFallback) throw error;
 			console.warn('[downloadtool] saveDownload falling back to anchor after FSAA failure', {
 				filename, url: effectiveUrl, error

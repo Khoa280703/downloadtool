@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS mux_artifacts (
     id               TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     artifact_key     TEXT NOT NULL UNIQUE,
     dedupe_key       TEXT,
-    backend          TEXT NOT NULL DEFAULT 'localfs',
+    backend          TEXT NOT NULL DEFAULT 's3',
     local_path       TEXT,
     storage_bucket   TEXT,
     object_key       TEXT,

@@ -29,24 +29,14 @@ wait_port() {
 run_one_mode() {
   local mode="$1"
   local port="$2"
-  local worker_env="$3"
-  local queue_env="$4"
-  local mux_env="$5"
 
   local mode_dir="$OUT_BASE/${mode}"
-  local mux_output_dir="/tmp/downloadtool-mux-bench-${RUN_ID}-${mode}"
   local backend_log="$mode_dir/backend.log"
   mkdir -p "$mode_dir"
-  rm -rf "$mux_output_dir"
-  mkdir -p "$mux_output_dir"
 
   echo "[INFO] Start backend mode=${mode} port=${port}"
   env \
     PORT="$port" \
-    MUX_JOB_OUTPUT_DIR="$mux_output_dir" \
-    MUX_JOB_MAX_WORKERS="$worker_env" \
-    MUX_JOB_QUEUE_CAPACITY="$queue_env" \
-    MUX_MAX_CONCURRENT="$mux_env" \
     cargo run -p api --bin api-server >"$backend_log" 2>&1 &
   local backend_pid=$!
 
@@ -128,10 +118,10 @@ NODE
 }
 
 # A (baseline defaults)
-run_one_mode "baseline" "4070" "6" "128" "20"
+run_one_mode "baseline" "4070"
 
-# B (tuned)
-run_one_mode "tuned" "4071" "24" "2000" "200000"
+# B (repeat)
+run_one_mode "repeat" "4071"
 
 echo "AB_SUMMARY_FILE=$SUMMARY_TSV"
 cat "$SUMMARY_TSV"

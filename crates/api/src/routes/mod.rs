@@ -12,8 +12,8 @@ pub mod whop_webhook;
 pub use batch::batch_handler;
 pub use extract::extract_handler;
 pub use jobs::{
-    create_job_handler, job_events_handler, job_file_handler, job_file_ticket_handler,
-    job_status_handler, release_job_handler,
+    create_job_handler, job_events_handler, job_file_ticket_handler, job_status_handler,
+    release_job_handler,
 };
 pub use openapi::openapi_handler;
 pub use playlist_jobs::{

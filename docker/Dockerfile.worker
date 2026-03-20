@@ -65,13 +65,12 @@ RUN useradd -m -u 1000 -s /bin/bash appuser
 COPY --from=builder /app/target/release/mux-worker /usr/local/bin/
 COPY --from=builder /app/crates/api/app-migrations /app/app-migrations
 
-RUN mkdir -p /app/extractors /app/mux-artifacts /app/proxy-state && chown -R appuser:appuser /app
+RUN mkdir -p /app/extractors /app/proxy-state && chown -R appuser:appuser /app
 
 USER appuser
 
 ENV EXTRACTOR_DIR=/app/extractors
 ENV YTDLP_PATH=/usr/local/bin/yt-dlp
 ENV RUST_LOG=info
-ENV MUX_JOB_OUTPUT_DIR=/app/mux-artifacts
 
 CMD ["mux-worker"]

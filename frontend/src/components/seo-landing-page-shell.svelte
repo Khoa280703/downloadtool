@@ -7,6 +7,8 @@
 	import AppIcon from '$components/AppIcon.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
+	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
+	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
 	import { currentDownload } from '$stores/download';
 	import type { ExtractResult, Stream } from '$lib/types';
@@ -206,46 +208,13 @@
 		</section>
 
 		<!-- FAQ -->
-		<section class="py-10 px-6 lg:px-20 bg-white border-t border-pink-50">
-			<div class="max-w-3xl mx-auto">
-				<h2 class="text-2xl font-bold text-plum mb-6 text-center">Frequently Asked Questions</h2>
-				<div class="divide-y divide-pink-50">
-					{#each config.faqItems as item}
-						<details class="py-3 group">
-							<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
-								{item.q}
-								<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
-							</summary>
-							<p class="mt-2 text-plum/70 text-sm leading-relaxed">{item.a}</p>
-						</details>
-					{/each}
-				</div>
-			</div>
-		</section>
+		<FrequentlyAskedQuestionsSection items={config.faqItems} />
 
 		<!-- Related pages / cross-links -->
-		<section class="py-8 px-6 lg:px-20 bg-slate-50 border-t border-pink-50">
-			<div class="max-w-3xl mx-auto text-center">
-				<h2 class="text-lg font-bold text-plum mb-5">Explore More Snapvie Tools</h2>
-				<div class="flex flex-wrap justify-center gap-3">
-					<a
-						href="/"
-						class="inline-flex items-center gap-2 rounded-full border border-pink-100 bg-white px-5 py-2 text-sm font-bold text-plum hover:text-primary hover:border-primary transition-colors"
-					>
-						<AppIcon name="home" class="text-base" />
-						Back to Snapvie
-					</a>
-					{#each config.relatedPages as rel}
-						<a
-							href={`/${rel.slug}`}
-							class="inline-flex items-center gap-2 rounded-full border border-pink-100 bg-white px-5 py-2 text-sm font-bold text-plum hover:text-primary hover:border-primary transition-colors"
-						>
-							{rel.label}
-						</a>
-					{/each}
-				</div>
-			</div>
-		</section>
+		<ExploreMoreSnapvieTools
+			showHomeLink={true}
+			links={config.relatedPages.map((rel) => ({ href: `/${rel.slug}`, label: rel.label }))}
+		/>
 
 <style>
 	h1, h2, h3, button {

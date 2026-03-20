@@ -7,38 +7,6 @@ use std::process::Command;
 
 use crate::limit_profiles::backend_limit_profile;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MuxArtifactBackend {
-    LocalFs,
-    Minio,
-    R2,
-}
-
-impl MuxArtifactBackend {
-    fn from_env(value: Option<String>) -> anyhow::Result<Self> {
-        match value
-            .unwrap_or_else(|| "localfs".to_string())
-            .trim()
-            .to_ascii_lowercase()
-            .as_str()
-        {
-            "localfs" => Ok(Self::LocalFs),
-            "minio" => Ok(Self::Minio),
-            "r2" => Ok(Self::R2),
-            other => Err(anyhow::anyhow!(
-                "MUX_ARTIFACT_BACKEND must be 'localfs', 'minio', or 'r2', got '{other}'"
-            )),
-        }
-    }
-
-    pub fn storage_backend_name(self) -> &'static str {
-        match self {
-            Self::LocalFs => "localfs",
-            Self::Minio | Self::R2 => "s3",
-        }
-    }
-}
-
 /// Application configuration loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -56,8 +24,6 @@ pub struct Config {
     pub whop_webhook_secret: String,
     /// Toggle rate limiter for /api/extract (default: true)
     pub extract_rate_limit_enabled: bool,
-    pub mux_artifact_backend: MuxArtifactBackend,
-    pub mux_direct_download: bool,
     pub redis_url: String,
     pub proxy_redis_url: String,
     pub proxy_quarantine_ttl_secs: u64,
@@ -275,17 +241,6 @@ impl Config {
         let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")
             .map_err(|_| anyhow::anyhow!("WHOP_WEBHOOK_SECRET env var is required"))?;
         let extract_rate_limit_enabled = backend_limit_profile().extract_rate_limit_enabled_value();
-        let mux_artifact_backend =
-            MuxArtifactBackend::from_env(Self::optional_env("MUX_ARTIFACT_BACKEND"))?;
-        let mux_direct_download = env::var("MUX_DIRECT_DOWNLOAD")
-            .ok()
-            .map(|value| {
-                matches!(
-                    value.trim().to_ascii_lowercase().as_str(),
-                    "1" | "true" | "yes"
-                )
-            })
-            .unwrap_or(false);
         let redis_url = Self::resolve_local_redis_url(&Self::env_or_default(
             "REDIS_URL",
             "redis://127.0.0.1:6379",
@@ -329,8 +284,6 @@ impl Config {
             jwt_secret,
             whop_webhook_secret,
             extract_rate_limit_enabled,
-            mux_artifact_backend,
-            mux_direct_download,
             redis_url,
             proxy_redis_url,
             proxy_quarantine_ttl_secs,
@@ -361,8 +314,6 @@ mod tests {
             jwt_secret: "secret".to_string(),
             whop_webhook_secret: "whop_secret".to_string(),
             extract_rate_limit_enabled: true,
-            mux_artifact_backend: MuxArtifactBackend::LocalFs,
-            mux_direct_download: false,
             redis_url: "redis://127.0.0.1:6379".to_string(),
             proxy_redis_url: "redis://127.0.0.1:6379".to_string(),
             proxy_quarantine_ttl_secs: 172_800,
@@ -384,8 +335,6 @@ mod tests {
         assert_eq!(config.jwt_secret, "secret");
         assert_eq!(config.whop_webhook_secret, "whop_secret");
         assert!(config.extract_rate_limit_enabled);
-        assert_eq!(config.mux_artifact_backend, MuxArtifactBackend::LocalFs);
-        assert!(!config.mux_direct_download);
         assert_eq!(config.redis_url, "redis://127.0.0.1:6379");
         assert_eq!(config.proxy_redis_url, "redis://127.0.0.1:6379");
         assert_eq!(config.proxy_quarantine_ttl_secs, 172_800);

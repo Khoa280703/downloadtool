@@ -1,5 +1,4 @@
 pub mod backend_factory;
-pub mod local_fs_storage_backend;
 mod s3_multipart_upload;
 pub mod s3_storage_backend;
 

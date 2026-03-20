@@ -1,16 +1,13 @@
-use std::io::ErrorKind;
 use std::time::Duration;
 
-use axum::body::Body;
 use axum::extract::{Path, State};
-use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
-use axum::response::{IntoResponse, Redirect};
+use axum::response::IntoResponse;
 use axum::{Extension, Json};
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use job_system::{JobOwner, JobProgressPhase, JobProgressSnapshot, JobStatus, MuxJobRequest};
 use serde::{Deserialize, Serialize};
-use tokio_util::io::ReaderStream;
 use tracing::warn;
 use utoipa::ToSchema;
 
@@ -285,84 +282,13 @@ pub async fn job_file_ticket_handler(
 
     let ticket = state
         .storage_ticket_service
-        .build_ticket(&job, state.mux_direct_download)
+        .build_ticket(&job)
         .await
         .map_err(map_control_plane_error)?;
 
     Ok(Json(JobFileTicketResponse {
         download_url: ticket.download_url,
     }))
-}
-
-pub async fn job_file_handler(
-    State(state): State<AppState>,
-    Extension(user): Extension<AuthenticatedUser>,
-    headers: HeaderMap,
-    Path(job_id): Path<String>,
-) -> Result<axum::response::Response, JobsApiError> {
-    let owner = resolve_job_owner(&user, &headers)?;
-    let job = state
-        .job_control_plane
-        .get_job_for_user(&job_id, &owner)
-        .await
-        .map_err(map_control_plane_error)?
-        .ok_or_else(not_found_error)?;
-
-    if job.status != JobStatus::Ready {
-        return Err(not_ready_error(job.status));
-    }
-
-    if !state
-        .storage_ticket_service
-        .supports_proxy_file_stream(&job)
-    {
-        let ticket = state
-            .storage_ticket_service
-            .build_ticket(&job, true)
-            .await
-            .map_err(map_control_plane_error)?;
-        return Ok(Redirect::temporary(&ticket.download_url).into_response());
-    }
-
-    let local_path =
-        crate::services::storage_ticket_service::StorageTicketService::ensure_local_path(&job)
-            .map_err(map_control_plane_error)?;
-
-    let file = tokio::fs::File::open(&local_path)
-        .await
-        .map_err(|error| match error.kind() {
-            ErrorKind::NotFound => JobsApiError {
-                message: "Muxed output file no longer exists".to_string(),
-                status: StatusCode::GONE,
-                retry_after_secs: None,
-            },
-            _ => JobsApiError {
-                message: format!("Failed to open muxed output file: {error}"),
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                retry_after_secs: None,
-            },
-        })?;
-
-    let stream = ReaderStream::new(file).map_err(std::io::Error::other);
-    let body = Body::from_stream(stream);
-    let filename = sanitize_filename(job.title.as_deref().unwrap_or("video"));
-    let disposition = format!("attachment; filename=\"{}.mp4\"", filename);
-
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "video/mp4")
-        .header(header::CACHE_CONTROL, NO_STORE_CACHE_CONTROL)
-        .header(
-            header::CONTENT_LENGTH,
-            job.file_size_bytes.unwrap_or_default().to_string(),
-        )
-        .header(header::CONTENT_DISPOSITION, disposition)
-        .body(body)
-        .map_err(|error| JobsApiError {
-            message: format!("Failed to build muxed file response: {error}"),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            retry_after_secs: None,
-        })
 }
 
 pub async fn release_job_handler(
@@ -571,19 +497,6 @@ fn build_status_url(job_id: &str) -> String {
 
 fn build_file_ticket_url(job_id: &str) -> String {
     format!("/api/jobs/{job_id}/file-ticket")
-}
-
-fn sanitize_filename(name: &str) -> String {
-    name.chars()
-        .map(|c| match c {
-            c if c.is_control() => '_',
-            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
-            c => c,
-        })
-        .take(100)
-        .collect::<String>()
-        .trim()
-        .to_string()
 }
 
 fn is_webm_mime(url: &str, media_kind: &str) -> bool {

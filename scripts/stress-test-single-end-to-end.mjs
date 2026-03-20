@@ -141,6 +141,22 @@ async function fetchAndDrainWithRetry(url, headers = {}) {
   }
   throw lastError;
 }
+
+async function fetchJobFileTicket(jobId, sessionId) {
+  const response = await fetch(`${API}/api/jobs/${jobId}/file-ticket`, {
+    headers: { 'x-download-session-id': sessionId },
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) {
+    throw new Error(`File ticket failed ${response.status} for ${jobId}: ${text}`);
+  }
+  if (!data.download_url) {
+    throw new Error(`Missing download_url for ${jobId}`);
+  }
+  return data.download_url;
+}
+
 function buildCommonResult(index, url, title, extractMs, extract, video, audio) {
   return {
     index: index + 1,
@@ -177,9 +193,8 @@ async function runOne(index, url) {
     }, { 'x-download-session-id': itemSessionId });
     const jobId = created.job_id;
     const ready = await waitForReady(jobId, itemSessionId);
-    const download = await fetchAndDrainWithRetry(`${API}/api/jobs/${jobId}/file`, {
-      'x-download-session-id': itemSessionId,
-    });
+    const downloadUrl = await fetchJobFileTicket(jobId, itemSessionId);
+    const download = await fetchAndDrainWithRetry(downloadUrl);
     await fetch(`${API}/api/jobs/${jobId}/release`, {
       method: 'POST',
       headers: { 'x-download-session-id': itemSessionId },

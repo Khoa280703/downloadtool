@@ -4,10 +4,12 @@
 	import { onDestroy, onMount } from 'svelte';
 	import BatchProgress from '$components/BatchProgress.svelte';
 	import AppIcon from '$components/AppIcon.svelte';
+	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
+	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
-	import { extract, extractYouTubeVideoId, isValidVideoUrl, buildMuxProxyFallbackUrl } from '$lib/api';
+	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
 	import { buildHomepageJsonLd, buildFaqSchema } from '$lib/seo/structured-data';
 	import {
 		createPlaylistJob,
@@ -339,14 +341,12 @@
 				percent: null,
 				indeterminate: true
 			});
-			const fallbackUrl = item.mux_job_id ? buildMuxProxyFallbackUrl(item.mux_job_id) : undefined;
 			void downloadUrlPromise
 				.then((downloadUrl) => {
 					if (!downloadUrl) {
 						throw new Error('Playlist item is missing download URL');
 					}
 					return saveDownload(downloadUrl, `${item.title ?? item.video_id}.mp4`, controller.signal, {
-						fallbackUrl,
 						onProgress: (progress) => {
 							updateBatchItemProgressByVideoId(item.video_id, {
 								label: m.download_btn_progress_starting_browser(),
@@ -766,13 +766,68 @@
 	const SEO_CANONICAL = 'https://snapvie.com/';
 	const SEO_OG_IMAGE = 'https://snapvie.com/og-image.png';
 	const homepageJsonLd = buildHomepageJsonLd();
-	const faqJsonLd = JSON.stringify(buildFaqSchema([
+	const faqItems = [
 		{ q: m.home_faq_q1(), a: m.home_faq_a1() },
 		{ q: m.home_faq_q2(), a: m.home_faq_a2() },
 		{ q: m.home_faq_q3(), a: m.home_faq_a3() },
 		{ q: m.home_faq_q4(), a: m.home_faq_a4() },
 		{ q: m.home_faq_q5(), a: m.home_faq_a5() }
-	]), null, 0);
+	];
+	const faqJsonLd = JSON.stringify(buildFaqSchema(faqItems), null, 0);
+	const whyCards = [
+		{
+			icon: 'hdr_on',
+			accentClass: 'closing-feature-primary',
+			kicker: '01',
+			title: m.home_why_usp1_title(),
+			description: m.home_why_usp1_desc()
+		},
+		{
+			icon: 'playlist_play',
+			accentClass: 'closing-feature-secondary',
+			kicker: '02',
+			title: m.home_why_usp2_title(),
+			description: m.home_why_usp2_desc()
+		},
+		{
+			icon: 'smartphone',
+			accentClass: 'closing-feature-accent',
+			kicker: '03',
+			title: m.home_why_usp3_title(),
+			description: m.home_why_usp3_desc()
+		},
+		{
+			icon: 'graphic_eq',
+			accentClass: 'closing-feature-neutral',
+			kicker: '04',
+			title: m.home_why_usp4_title(),
+			description: m.home_why_usp4_desc()
+		}
+	];
+	const qualityCards = [
+		{
+			icon: 'high_quality',
+			label: m.home_quality_label_resolutions(),
+			value: m.home_quality_res_list()
+		},
+		{
+			icon: 'hdr_strong',
+			label: m.home_quality_label_hdr(),
+			value: m.home_quality_hdr_list()
+		},
+		{
+			icon: 'movie_edit',
+			label: m.home_quality_label_modes(),
+			value: m.home_quality_modes_list()
+		}
+	];
+	const relatedToolLinks = [
+		{ href: '/download-youtube-8k-hdr', label: '8K HDR Videos' },
+		{ href: '/download-youtube-playlist', label: 'Playlist Download' },
+		{ href: '/download-youtube-shorts', label: 'YouTube Shorts' },
+		{ href: '/download-youtube-4k', label: '4K Videos' },
+		{ href: '/download-youtube-mp3', label: 'YouTube to MP3' }
+	];
 </script>
 
 <svelte:head>
@@ -1035,11 +1090,6 @@
 			contain-intrinsic-size: 760px;
 		}
 
-		.defer-render-testimonials {
-			content-visibility: auto;
-			contain-intrinsic-size: 640px;
-		}
-
 		.playlist-mode-switch {
 			margin: 0 auto 1rem;
 			display: inline-flex;
@@ -1264,6 +1314,340 @@
 			color: rgba(224, 208, 245, 0.84) !important;
 		}
 
+		.closing-stage {
+			position: relative;
+			overflow: hidden;
+			padding: 4rem 1.5rem 4.5rem;
+		}
+
+		.closing-stage::before,
+		.closing-stage::after {
+			content: '';
+			position: absolute;
+			border-radius: 999px;
+			filter: blur(64px);
+			pointer-events: none;
+			opacity: 0.55;
+		}
+
+		.closing-stage::before {
+			top: 4rem;
+			left: -6rem;
+			width: 16rem;
+			height: 16rem;
+			background: rgba(255, 77, 140, 0.14);
+		}
+
+		.closing-stage::after {
+			right: -5rem;
+			bottom: 5rem;
+			width: 18rem;
+			height: 18rem;
+			background: rgba(255, 185, 56, 0.16);
+		}
+
+		.closing-shell {
+			position: relative;
+			z-index: 1;
+			max-width: 80rem;
+			margin: 0 auto;
+			display: grid;
+			gap: 1.25rem;
+		}
+
+		.closing-panel {
+			position: relative;
+			overflow: hidden;
+			border: 1px solid rgba(255, 77, 140, 0.12);
+			border-radius: 2rem;
+			background:
+				linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 250, 252, 0.98)),
+				linear-gradient(135deg, rgba(255, 77, 140, 0.04), rgba(255, 185, 56, 0.06));
+			box-shadow: 0 30px 60px -44px rgba(84, 24, 64, 0.28);
+		}
+
+		.closing-panel::before {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background:
+				linear-gradient(125deg, rgba(255, 255, 255, 0.62), transparent 48%),
+				radial-gradient(circle at top right, rgba(255, 77, 140, 0.08), transparent 34%);
+			pointer-events: none;
+		}
+
+		.closing-panel-content {
+			position: relative;
+			z-index: 1;
+			padding: 1.5rem;
+		}
+
+		.closing-eyebrow {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.5rem;
+			border-radius: 999px;
+			padding: 0.45rem 0.85rem;
+			background: rgba(255, 77, 140, 0.08);
+			color: #be185d;
+			font-size: 0.7rem;
+			font-weight: 800;
+			letter-spacing: 0.16em;
+			text-transform: uppercase;
+		}
+
+		.closing-title {
+			font-size: clamp(1.7rem, 3vw, 2.6rem);
+			line-height: 1.02;
+			font-weight: 700;
+			color: #2d1b36;
+			letter-spacing: -0.03em;
+		}
+
+		.closing-subtitle {
+			max-width: 42rem;
+			color: rgba(45, 27, 54, 0.72);
+			font-size: 0.98rem;
+			font-weight: 700;
+			line-height: 1.7;
+		}
+
+		.closing-feature-grid,
+		.closing-quality-grid {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.closing-feature-card {
+			position: relative;
+			overflow: hidden;
+			border-radius: 1.65rem;
+			padding: 1.15rem;
+			background: rgba(255, 255, 255, 0.76);
+			border: 1px solid rgba(255, 77, 140, 0.08);
+			box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+			transition:
+				transform 220ms ease,
+				box-shadow 220ms ease,
+				border-color 220ms ease;
+		}
+
+		.closing-feature-card:hover {
+			transform: translateY(-3px);
+			box-shadow: 0 24px 40px -32px rgba(84, 24, 64, 0.32);
+			border-color: rgba(255, 77, 140, 0.16);
+		}
+
+		.closing-feature-top {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 0.95rem;
+		}
+
+		.closing-feature-icon,
+		.closing-quality-icon {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 1rem;
+			flex-shrink: 0;
+		}
+
+		.closing-feature-icon {
+			width: 3rem;
+			height: 3rem;
+			font-size: 1.4rem;
+		}
+
+		.closing-feature-kicker {
+			font-size: 0.72rem;
+			font-weight: 800;
+			letter-spacing: 0.18em;
+			text-transform: uppercase;
+			color: rgba(45, 27, 54, 0.34);
+		}
+
+		.closing-feature-card h3,
+		.closing-quality-card h3 {
+			font-family: 'Fredoka', sans-serif;
+		}
+
+		.closing-feature-card h3 {
+			font-size: 1.08rem;
+			font-weight: 700;
+			color: #2d1b36;
+			margin-bottom: 0.45rem;
+		}
+
+		.closing-feature-card p {
+			font-size: 0.88rem;
+			line-height: 1.65;
+			font-weight: 700;
+			color: rgba(45, 27, 54, 0.68);
+		}
+
+		.closing-proof {
+			margin-top: 1.15rem;
+			border-top: 1px solid rgba(255, 77, 140, 0.12);
+			padding-top: 1.15rem;
+		}
+
+		.closing-feature-primary .closing-feature-icon {
+			background: rgba(255, 77, 140, 0.12);
+			color: #ff4d8c;
+		}
+
+		.closing-feature-secondary .closing-feature-icon {
+			background: rgba(99, 102, 241, 0.12);
+			color: #5b5cf0;
+		}
+
+		.closing-feature-accent .closing-feature-icon {
+			background: rgba(255, 185, 56, 0.16);
+			color: #dd8a00;
+		}
+
+		.closing-feature-neutral .closing-feature-icon {
+			background: rgba(45, 27, 54, 0.08);
+			color: #2d1b36;
+		}
+
+		.closing-quality-card {
+			position: relative;
+			overflow: hidden;
+			border-radius: 1.65rem;
+			padding: 1.2rem;
+			background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(255, 248, 251, 0.92));
+			border: 1px solid rgba(255, 77, 140, 0.08);
+		}
+
+		.closing-quality-card::before {
+			content: '';
+			position: absolute;
+			inset: auto -18% -42% auto;
+			width: 8rem;
+			height: 8rem;
+			border-radius: 999px;
+			background: rgba(255, 77, 140, 0.08);
+		}
+
+		.closing-quality-top {
+			position: relative;
+			z-index: 1;
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			margin-bottom: 0.95rem;
+		}
+
+		.closing-quality-icon {
+			width: 2.7rem;
+			height: 2.7rem;
+			background: rgba(255, 77, 140, 0.1);
+			color: #ff4d8c;
+			font-size: 1.2rem;
+		}
+
+		.closing-quality-card h3 {
+			font-size: 0.78rem;
+			font-weight: 800;
+			letter-spacing: 0.14em;
+			text-transform: uppercase;
+			color: rgba(45, 27, 54, 0.48);
+		}
+
+		.closing-quality-card p {
+			position: relative;
+			z-index: 1;
+			font-size: 1rem;
+			line-height: 1.7;
+			font-weight: 700;
+			color: #2d1b36;
+		}
+
+		.closing-quality-note {
+			position: relative;
+			z-index: 1;
+			display: inline-flex;
+			align-items: center;
+			gap: 0.55rem;
+			border-radius: 999px;
+			padding: 0.7rem 1rem;
+			background: rgba(45, 27, 54, 0.04);
+			color: rgba(45, 27, 54, 0.62);
+			font-size: 0.82rem;
+			font-weight: 700;
+		}
+
+		.page-root.theme-dark .closing-panel {
+			background:
+				linear-gradient(180deg, rgba(26, 23, 39, 0.94), rgba(18, 18, 26, 0.96)),
+				linear-gradient(135deg, rgba(255, 77, 140, 0.07), rgba(255, 185, 56, 0.08));
+			border-color: rgba(255, 77, 140, 0.2);
+			box-shadow: 0 30px 60px -44px rgba(0, 0, 0, 0.58);
+		}
+
+		.page-root.theme-dark .closing-panel::before {
+			background:
+				linear-gradient(125deg, rgba(255, 255, 255, 0.03), transparent 48%),
+				radial-gradient(circle at top right, rgba(255, 77, 140, 0.14), transparent 34%);
+		}
+
+		.page-root.theme-dark .closing-eyebrow,
+		.page-root.theme-dark .closing-quality-icon {
+			background: rgba(255, 77, 140, 0.16);
+			color: #ff8fb7;
+		}
+
+		.page-root.theme-dark .closing-title,
+		.page-root.theme-dark .closing-feature-card h3,
+		.page-root.theme-dark .closing-quality-card p {
+			color: #ffffff;
+		}
+
+		.page-root.theme-dark .closing-subtitle,
+		.page-root.theme-dark .closing-feature-card p,
+		.page-root.theme-dark .closing-quality-note {
+			color: rgba(224, 208, 245, 0.72);
+		}
+
+		.page-root.theme-dark .closing-feature-kicker,
+		.page-root.theme-dark .closing-quality-card h3 {
+			color: rgba(224, 208, 245, 0.42);
+		}
+
+		.page-root.theme-dark .closing-feature-card,
+		.page-root.theme-dark .closing-quality-card,
+		.page-root.theme-dark .closing-quality-note {
+			background: rgba(255, 255, 255, 0.04);
+			border-color: rgba(255, 77, 140, 0.16);
+		}
+
+		.page-root.theme-dark .closing-proof {
+			border-top-color: rgba(255, 77, 140, 0.16);
+		}
+
+		.page-root.theme-dark .closing-feature-primary .closing-feature-icon {
+			background: rgba(255, 77, 140, 0.18);
+			color: #ff8fb7;
+		}
+
+		.page-root.theme-dark .closing-feature-secondary .closing-feature-icon {
+			background: rgba(99, 102, 241, 0.18);
+			color: #c7d2fe;
+		}
+
+		.page-root.theme-dark .closing-feature-accent .closing-feature-icon {
+			background: rgba(255, 185, 56, 0.2);
+			color: #ffd18a;
+		}
+
+		.page-root.theme-dark .closing-feature-neutral .closing-feature-icon {
+			background: rgba(255, 255, 255, 0.08);
+			color: rgba(224, 208, 245, 0.82);
+		}
+
 		@media (max-width: 768px) {
 			.playlist-mode-switch {
 				width: 100%;
@@ -1282,6 +1666,26 @@
 			.playlist-summary-line {
 				align-items: flex-start;
 			}
+
+			.closing-stage {
+				padding-top: 3rem;
+				padding-bottom: 3.5rem;
+			}
+		}
+
+		@media (min-width: 768px) {
+			.closing-panel-content {
+				padding: 1.85rem;
+			}
+
+			.closing-feature-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.closing-quality-grid {
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+			}
+
 		}
 	</style>
 </svelte:head>
@@ -1714,177 +2118,121 @@
 			</div>
 		</section>
 
-		<section class="defer-render-testimonials py-12 px-6 lg:px-20 relative overflow-hidden">
-			<div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-				<div class="absolute top-20 left-[10%] w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
-				<div class="absolute bottom-10 right-[10%] w-64 h-64 bg-secondary/5 rounded-full blur-3xl"></div>
-			</div>
-			<div class="max-w-7xl mx-auto relative z-10">
-				<div class="flex flex-col md:flex-row items-center gap-8 mb-10">
-					<div class="flex-1 text-center md:text-left">
-						<span class="inline-block py-1 px-3 rounded-full bg-green-100 text-green-700 font-bold text-xs uppercase mb-3 tracking-wider">{m.home_testimonials_badge()}</span>
-						<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">{m.home_testimonials_title()}</h2>
-						<p class="text-base text-plum/75 font-semibold max-w-md mx-auto md:mx-0">{m.home_testimonials_subtitle()}</p>
-						<div class="hidden md:flex mt-6 -space-x-3">
-								<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '1' })}><img alt={m.home_testimonial_user_avatar({ index: '1' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user1Avatar}/></div>
-								<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '2' })}><img alt={m.home_testimonial_user_avatar({ index: '2' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user2Avatar}/></div>
-								<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '3' })}><img alt={m.home_testimonial_user_avatar({ index: '3' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user3Avatar}/></div>
-							<div class="w-10 h-10 rounded-full border-2 border-white bg-plum text-white text-xs font-bold flex items-center justify-center">+9k</div>
+		<section class="closing-stage">
+			<div class="closing-shell">
+				<div class="closing-panel">
+					<div class="closing-panel-content">
+						<div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+							<div class="space-y-3">
+								<span class="closing-eyebrow">
+									<AppIcon name="auto_awesome" class="text-[14px]" />
+									Snapvie Highlights
+								</span>
+								<h2 class="closing-title">{m.home_why_title()}</h2>
+							</div>
 						</div>
-					</div>
-					<div class="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300">
-							<div class="flex items-center gap-3 mb-3">
-									<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt={m.home_testimonial_sarah_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={sarahAvatar}/></div>
-									<div>
-										<p class="font-bold text-plum text-sm">{m.home_testimonial_sarah_name()}</p>
-									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
+						<div class="closing-feature-grid">
+							{#each whyCards as card}
+								<article class={`closing-feature-card ${card.accentClass}`}>
+									<div class="closing-feature-top">
+										<div class="closing-feature-icon">
+											<AppIcon name={card.icon} />
+										</div>
+										<span class="closing-feature-kicker">{card.kicker}</span>
+									</div>
+									<h3>{card.title}</h3>
+									<p>{card.description}</p>
+								</article>
+							{/each}
+						</div>
+						<div class="closing-proof">
+							<div class="flex flex-col md:flex-row items-center gap-8">
+								<div class="flex-1 text-center md:text-left">
+									<span class="inline-block py-1 px-3 rounded-full bg-green-100 text-green-700 font-bold text-xs uppercase mb-3 tracking-wider">{m.home_testimonials_badge()}</span>
+									<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">{m.home_testimonials_title()}</h2>
+									<p class="text-base text-plum/75 font-semibold max-w-md mx-auto md:mx-0">{m.home_testimonials_subtitle()}</p>
+									<div class="hidden md:flex mt-6 -space-x-3">
+										<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '1' })}><img alt={m.home_testimonial_user_avatar({ index: '1' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user1Avatar}/></div>
+										<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '2' })}><img alt={m.home_testimonial_user_avatar({ index: '2' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user2Avatar}/></div>
+										<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '3' })}><img alt={m.home_testimonial_user_avatar({ index: '3' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user3Avatar}/></div>
+										<div class="w-10 h-10 rounded-full border-2 border-white bg-plum text-white text-xs font-bold flex items-center justify-center">+9k</div>
+									</div>
+								</div>
+								<div class="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
+									<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300">
+										<div class="flex items-center gap-3 mb-3">
+											<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt={m.home_testimonial_sarah_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={sarahAvatar}/></div>
+											<div>
+												<p class="font-bold text-plum text-sm">{m.home_testimonial_sarah_name()}</p>
+												<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
+											</div>
+										</div>
+										<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_sarah_quote()}</p>
+									</div>
+									<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300 sm:translate-y-4">
+										<div class="flex items-center gap-3 mb-3">
+											<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt={m.home_testimonial_mike_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={mikeAvatar}/></div>
+											<div>
+												<p class="font-bold text-plum text-sm">{m.home_testimonial_mike_name()}</p>
+												<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
+											</div>
+										</div>
+										<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_mike_quote()}</p>
+									</div>
+									<div class="col-span-1 sm:col-span-2 mt-2 bg-gradient-to-r from-primary/10 to-secondary/10 p-4 rounded-2xl border border-white/50 flex items-center justify-between">
+										<div class="flex-1">
+											<p class="font-bold text-plum text-sm mb-1">{m.home_join_party_title()}</p>
+											<p class="text-plum/75 text-xs">{m.home_join_party_subtitle()}</p>
+										</div>
+										<button class="bg-plum text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2">
+											<span>{m.home_join_party_cta()}</span>
+											<AppIcon name="arrow_forward" class="text-sm" />
+										</button>
+										<div class="w-12 h-12 ml-4 animate-wiggle"><span class="text-4xl">🎉</span></div>
+									</div>
 								</div>
 							</div>
-							<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_sarah_quote()}</p>
 						</div>
-						<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300 sm:translate-y-4">
-							<div class="flex items-center gap-3 mb-3">
-									<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt={m.home_testimonial_mike_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={mikeAvatar}/></div>
-									<div>
-										<p class="font-bold text-plum text-sm">{m.home_testimonial_mike_name()}</p>
-									<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
-								</div>
+					</div>
+				</div>
+
+				<div class="grid gap-4">
+					<div class="closing-panel">
+						<div class="closing-panel-content">
+							<div class="mb-6 space-y-3">
+								<span class="closing-eyebrow">
+									<AppIcon name="tune" class="text-[14px]" />
+									Formats
+								</span>
+								<h2 class="closing-title">{m.home_quality_title()}</h2>
 							</div>
-							<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_mike_quote()}</p>
-						</div>
-						<div class="col-span-1 sm:col-span-2 mt-2 bg-gradient-to-r from-primary/10 to-secondary/10 p-4 rounded-2xl border border-white/50 flex items-center justify-between">
-							<div class="flex-1">
-								<p class="font-bold text-plum text-sm mb-1">{m.home_join_party_title()}</p>
-								<p class="text-plum/75 text-xs">{m.home_join_party_subtitle()}</p>
+							<div class="closing-quality-grid">
+								{#each qualityCards as card}
+									<article class="closing-quality-card">
+										<div class="closing-quality-top">
+											<div class="closing-quality-icon">
+												<AppIcon name={card.icon} />
+											</div>
+											<h3>{card.label}</h3>
+										</div>
+										<p>{card.value}</p>
+									</article>
+								{/each}
 							</div>
-							<button class="bg-plum text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2">
-								<span>{m.home_join_party_cta()}</span>
-								<AppIcon name="arrow_forward" class="text-sm" />
-							</button>
-							<div class="w-12 h-12 ml-4 animate-wiggle"><span class="text-4xl">🎉</span></div>
+							<div class="mt-5">
+								<p class="closing-quality-note">
+									<AppIcon name="info" class="text-[15px]" />
+									{m.home_quality_note()}
+								</p>
+							</div>
 						</div>
 					</div>
 				</div>
-			</div>
-		</section>
 
-		<!-- Why Snapvie -->
-		<section class="py-10 px-6 lg:px-20 bg-white border-t border-pink-50">
-			<div class="max-w-7xl mx-auto">
-				<h2 class="text-2xl font-bold text-plum mb-6 text-center">{m.home_why_title()}</h2>
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
-						<AppIcon name="smart_display" class="text-xl text-primary mt-0.5 shrink-0" />
-						<div>
-							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp1_title()}</p>
-							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp1_desc()}</p>
-						</div>
-					</div>
-					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
-						<AppIcon name="playlist_play" class="text-xl text-primary mt-0.5 shrink-0" />
-						<div>
-							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp2_title()}</p>
-							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp2_desc()}</p>
-						</div>
-					</div>
-					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
-						<AppIcon name="smartphone" class="text-xl text-primary mt-0.5 shrink-0" />
-						<div>
-							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp3_title()}</p>
-							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp3_desc()}</p>
-						</div>
-					</div>
-					<div class="flex gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-pink-50">
-						<AppIcon name="graphic_eq" class="text-xl text-primary mt-0.5 shrink-0" />
-						<div>
-							<p class="font-bold text-plum text-sm mb-1">{m.home_why_usp4_title()}</p>
-							<p class="text-plum/70 text-xs leading-relaxed">{m.home_why_usp4_desc()}</p>
-						</div>
-					</div>
-				</div>
 			</div>
 		</section>
-
-		<!-- Supported Qualities & Formats -->
-		<section class="py-10 px-6 lg:px-20 border-t border-pink-50">
-			<div class="max-w-7xl mx-auto">
-				<h2 class="text-2xl font-bold text-plum mb-5 text-center">{m.home_quality_title()}</h2>
-				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-					<div class="rounded-2xl bg-white border border-pink-50 p-4 shadow-sm">
-						<p class="text-xs font-bold text-primary uppercase tracking-wide mb-2">{m.home_quality_label_resolutions()}</p>
-						<p class="text-plum text-sm font-medium leading-relaxed">{m.home_quality_res_list()}</p>
-					</div>
-					<div class="rounded-2xl bg-white border border-pink-50 p-4 shadow-sm">
-						<p class="text-xs font-bold text-primary uppercase tracking-wide mb-2">{m.home_quality_label_hdr()}</p>
-						<p class="text-plum text-sm font-medium leading-relaxed">{m.home_quality_hdr_list()}</p>
-					</div>
-					<div class="rounded-2xl bg-white border border-pink-50 p-4 shadow-sm">
-						<p class="text-xs font-bold text-primary uppercase tracking-wide mb-2">{m.home_quality_label_modes()}</p>
-						<p class="text-plum text-sm font-medium leading-relaxed">{m.home_quality_modes_list()}</p>
-					</div>
-				</div>
-				<p class="text-center text-plum/50 text-xs mt-4">{m.home_quality_note()}</p>
-			</div>
-		</section>
-
-		<!-- FAQ -->
-		<section class="py-10 px-6 lg:px-20 bg-white border-t border-pink-50">
-			<div class="max-w-3xl mx-auto">
-				<h2 class="text-2xl font-bold text-plum mb-6 text-center">{m.home_faq_title()}</h2>
-				<div class="divide-y divide-pink-50">
-					<details class="py-3 group">
-						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
-							{m.home_faq_q1()}
-							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
-						</summary>
-						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a1()}</p>
-					</details>
-					<details class="py-3 group">
-						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
-							{m.home_faq_q2()}
-							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
-						</summary>
-						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a2()}</p>
-					</details>
-					<details class="py-3 group">
-						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
-							{m.home_faq_q3()}
-							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
-						</summary>
-						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a3()}</p>
-					</details>
-					<details class="py-3 group">
-						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
-							{m.home_faq_q4()}
-							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
-						</summary>
-						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a4()}</p>
-					</details>
-					<details class="py-3 group">
-						<summary class="cursor-pointer font-semibold text-plum text-sm list-none flex items-center justify-between gap-2">
-							{m.home_faq_q5()}
-							<span class="text-plum/40 text-xs group-open:rotate-180 transition-transform shrink-0 select-none">▼</span>
-						</summary>
-						<p class="mt-2 text-plum/70 text-sm leading-relaxed">{m.home_faq_a5()}</p>
-					</details>
-				</div>
-			</div>
-		</section>
-
-		<!-- Related Tools — internal links to SEO landing pages -->
-		<section class="py-8 px-6 lg:px-20 border-t border-pink-50">
-			<div class="max-w-7xl mx-auto text-center">
-				<h2 class="text-lg font-bold text-plum mb-4">Explore More Download Options</h2>
-				<div class="flex flex-wrap justify-center gap-3">
-					<a href="/download-youtube-8k-hdr" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">8K HDR Videos</a>
-					<a href="/download-youtube-playlist" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">Playlist Download</a>
-					<a href="/download-youtube-shorts" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">YouTube Shorts</a>
-					<a href="/download-youtube-4k" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">4K Videos</a>
-					<a href="/download-youtube-mp3" class="px-4 py-2 rounded-full bg-white border border-pink-100 text-sm font-semibold text-plum hover:bg-primary/5 transition-colors">YouTube to MP3</a>
-				</div>
-			</div>
-		</section>
+		<FrequentlyAskedQuestionsSection title={m.home_faq_title()} items={faqItems} />
+		<ExploreMoreSnapvieTools links={relatedToolLinks} />
 		</main>
 
 		{#if authModalOpen && AuthModalComponent}

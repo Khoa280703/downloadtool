@@ -37,7 +37,7 @@ mod routes;
 mod services;
 mod validation;
 
-use config::{Config, MuxArtifactBackend};
+use config::Config;
 use job_system::{JobProgressStore, PlaylistJobRepository};
 
 #[derive(Clone)]
@@ -49,7 +49,6 @@ pub struct AppState {
     pub job_progress_store: Arc<JobProgressStore>,
     pub storage_ticket_service: Arc<services::storage_ticket_service::StorageTicketService>,
     pub playlist_job_repository: Arc<PlaylistJobRepository>,
-    pub mux_direct_download: bool,
 }
 
 type KeyedLimiter = RateLimiter<IpAddr, DefaultKeyedStateStore<IpAddr>, DefaultClock>;
@@ -181,7 +180,6 @@ fn build_app(
             "/api/jobs/{job_id}/file-ticket",
             get(routes::job_file_ticket_handler),
         )
-        .route("/api/jobs/{job_id}/file", get(routes::job_file_handler))
         .route(
             "/api/jobs/{job_id}/release",
             post(routes::release_job_handler),
@@ -301,27 +299,16 @@ async fn main() -> anyhow::Result<()> {
         "mux-workers",
         "api-publisher",
     )?) as Arc<dyn JobQueuePublisher>;
-    let storage_backend = if config.mux_artifact_backend == MuxArtifactBackend::LocalFs {
-        None
-    } else {
-        Some(
-            build_storage_backend(&StorageBackendConfig {
-                backend: config
-                    .mux_artifact_backend
-                    .storage_backend_name()
-                    .to_string(),
-                local_dir: Path::new("/tmp/downloadtool-api-object-store-fallback").to_path_buf(),
-                s3_bucket: config.s3_bucket.clone(),
-                s3_region: config.s3_region.clone(),
-                s3_endpoint: config.s3_endpoint.clone(),
-                s3_access_key_id: config.s3_access_key_id.clone(),
-                s3_secret_access_key: config.s3_secret_access_key.clone(),
-                s3_force_path_style: config.s3_force_path_style,
-                multipart_part_size_bytes: 8 * 1024 * 1024,
-            })
-            .await?,
-        )
-    };
+    let storage_backend = build_storage_backend(&StorageBackendConfig {
+        s3_bucket: config.s3_bucket.clone(),
+        s3_region: config.s3_region.clone(),
+        s3_endpoint: config.s3_endpoint.clone(),
+        s3_access_key_id: config.s3_access_key_id.clone(),
+        s3_secret_access_key: config.s3_secret_access_key.clone(),
+        s3_force_path_style: config.s3_force_path_style,
+        multipart_part_size_bytes: 8 * 1024 * 1024,
+    })
+    .await?;
     let job_control_plane = services::job_control_plane::JobControlPlaneService::new(
         durable_job_repository,
         queue_publisher,
@@ -341,7 +328,6 @@ async fn main() -> anyhow::Result<()> {
         job_progress_store,
         storage_ticket_service,
         playlist_job_repository,
-        mux_direct_download: config.mux_direct_download,
     };
 
     // Recover orphaned playlist jobs from previous server instance
@@ -363,8 +349,7 @@ async fn main() -> anyhow::Result<()> {
         }
     );
     info!(
-        mux_artifact_backend = config.mux_artifact_backend.storage_backend_name(),
-        mux_direct_download = config.mux_direct_download,
+        storage_backend = "s3",
         "Mux job runtime configuration loaded"
     );
     let app = build_app(app_state, limiter, config.extract_rate_limit_enabled);
@@ -416,10 +401,18 @@ mod tests {
                     .expect("test job progress store should initialize"),
             ),
             storage_ticket_service: services::storage_ticket_service::StorageTicketService::new(
-                None, 900,
+                Arc::new(object_store::s3_storage_backend::S3StorageBackend::new(
+                    aws_sdk_s3::Client::from_conf(
+                        aws_sdk_s3::config::Builder::new()
+                            .force_path_style(true)
+                            .build(),
+                    ),
+                    "bucket".to_string(),
+                    8 * 1024 * 1024,
+                )),
+                900,
             ),
             playlist_job_repository: Arc::new(PlaylistJobRepository::new(db_pool)),
-            mux_direct_download: false,
         }
     }
 

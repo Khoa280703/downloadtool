@@ -1,5 +1,4 @@
 use std::env;
-use std::path::PathBuf;
 use std::process::Command;
 
 #[derive(Clone, Debug)]
@@ -16,8 +15,6 @@ pub struct WorkerConfig {
     pub lease_secs: i64,
     pub reclaim_limit: i64,
     pub max_attempts: i32,
-    pub artifact_backend: String,
-    pub artifact_dir: PathBuf,
     pub artifact_ttl_secs: i64,
     pub cleanup_interval_secs: i64,
     pub cleanup_batch_limit: i64,
@@ -244,11 +241,6 @@ impl WorkerConfig {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(3),
-            artifact_backend: env::var("MUX_ARTIFACT_BACKEND")
-                .unwrap_or_else(|_| "localfs".to_string()),
-            artifact_dir: PathBuf::from(Self::env_or_default("MUX_JOB_OUTPUT_DIR", || {
-                "/tmp/downloadtool-worker-artifacts".to_string()
-            })),
             artifact_ttl_secs: env::var("MUX_ARTIFACT_TTL_SECS")
                 .ok()
                 .and_then(|v| v.parse().ok())

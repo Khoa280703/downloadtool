@@ -1,5 +1,4 @@
 import {
-	buildMuxProxyFallbackUrl,
 	buildStreamUrl,
 	createMuxedDownloadJob,
 	extract,
@@ -275,11 +274,9 @@ async function startDownload(ready: ReadyEntry): Promise<void> {
 }
 
 async function saveReadyEntry(ready: ReadyEntry, signal: AbortSignal): Promise<void> {
-	const fallbackUrl = ready.muxJobId ? buildMuxProxyFallbackUrl(ready.muxJobId) : undefined;
 	const saveOptions = {
 		requireFsaa: strictFsaaMode,
 		allowAnchorFallback: true,
-		fallbackUrl,
 		onProgress: (progress: {
 			receivedBytes: number;
 			totalBytes: number | null;

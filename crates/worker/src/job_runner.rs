@@ -89,8 +89,6 @@ pub async fn run_claimed_job(
             job_id = job.id,
             artifact_id = artifact.id,
             dedupe_key = job.dedupe_key,
-            artifact_backend = config.artifact_backend,
-            artifact_dir = %config.artifact_dir.display(),
             "Worker starting mux artifact build"
         );
         repo.mark_processing(
