@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { AdminProxyRow, ProxyStatus } from '$lib/admin/types';
 	import AdminStatusBadge from '$components/admin/AdminStatusBadge.svelte';
 	import AppIcon from '$components/AppIcon.svelte';
@@ -7,6 +8,15 @@
 
 	const nextStatuses: ProxyStatus[] = ['active', 'disabled', 'quarantined'];
 	let expandedId: string | null = $state(null);
+	let nowMs = $state(Date.now());
+
+	onMount(() => {
+		const intervalId = window.setInterval(() => {
+			nowMs = Date.now();
+		}, 1000);
+
+		return () => window.clearInterval(intervalId);
+	});
 
 	function toggleExpand(id: string) {
 		expandedId = expandedId === id ? null : id;
@@ -27,10 +37,37 @@
 		if (score >= 55) return 'text-amber-600';
 		return 'text-red-600';
 	}
+
+	function getQuarantineRemainingMs(proxy: AdminProxyRow): number | null {
+		if (proxy.status !== 'quarantined' || !proxy.quarantineExpiresAt) return null;
+		const expiresAtMs = Date.parse(proxy.quarantineExpiresAt);
+		if (Number.isNaN(expiresAtMs)) return null;
+		return expiresAtMs - nowMs;
+	}
+
+	function formatCountdown(ms: number): string {
+		const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+		const days = Math.floor(totalSeconds / 86_400);
+		const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+		const minutes = Math.floor((totalSeconds % 3_600) / 60);
+		const seconds = totalSeconds % 60;
+
+		if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+		if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+		if (minutes > 0) return `${minutes}m ${seconds}s`;
+		return `${seconds}s`;
+	}
+
+	function quarantineCountdownLabel(proxy: AdminProxyRow): string | null {
+		const remainingMs = getQuarantineRemainingMs(proxy);
+		if (remainingMs === null) return null;
+		if (remainingMs <= 0) return 'Hết hạn';
+		return `Còn ${formatCountdown(remainingMs)}`;
+	}
 </script>
 
 <div class="overflow-x-auto">
-	<table class="min-w-full text-[13px] text-gray-700">
+	<table class="min-w-[980px] text-[13px] text-gray-700 md:min-w-full">
 		<thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-left text-[10px] uppercase tracking-wider text-gray-500">
 			<tr>
 				<th class="w-8 px-2 py-2.5"></th>
@@ -66,6 +103,11 @@
 					</td>
 					<td class="px-4 py-2.5">
 						<AdminStatusBadge value={proxy.status} kind="proxy" />
+						{#if proxy.status === 'quarantined' && quarantineCountdownLabel(proxy)}
+							<p class="mt-1 text-[11px] font-medium tabular-nums text-rose-600">
+								{quarantineCountdownLabel(proxy)}
+							</p>
+						{/if}
 					</td>
 					<td class="px-4 py-2.5">
 						<span class={`font-semibold tabular-nums ${scoreTone(proxy.healthScore)}`}>{proxy.healthScore}</span>
@@ -116,8 +158,8 @@
 				<!-- Expandable detail row -->
 				{#if expandedId === proxy.id}
 					<tr class="bg-gray-50/50">
-						<td colspan="9" class="px-6 py-4">
-							<div class="grid grid-cols-2 gap-x-8 gap-y-2 text-[12px] md:grid-cols-4">
+						<td colspan="9" class="px-4 py-4 md:px-6">
+							<div class="grid grid-cols-1 gap-x-8 gap-y-2 text-[12px] sm:grid-cols-2 md:grid-cols-4">
 								<div>
 									<p class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Extract 24h</p>
 									<p class="mt-0.5 font-semibold tabular-nums text-gray-900">{proxy.extractAttempts24h}</p>
@@ -178,6 +220,17 @@
 									{/if}
 								</div>
 								<div>
+									<p class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Quarantine Expires</p>
+									{#if proxy.quarantineExpiresAt}
+										<p class="mt-0.5 text-gray-700">{new Date(proxy.quarantineExpiresAt).toLocaleString()}</p>
+										<p class="font-medium tabular-nums text-rose-600">
+											{quarantineCountdownLabel(proxy) ?? '—'}
+										</p>
+									{:else}
+										<p class="mt-0.5 text-gray-400">—</p>
+									{/if}
+								</div>
+								<div>
 									<p class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Auto-Disabled</p>
 									{#if proxy.autoDisabledAt}
 										<p class="mt-0.5 text-gray-700">{new Date(proxy.autoDisabledAt).toLocaleString()}</p>
@@ -200,7 +253,7 @@
 									>{proxy.notes ?? ''}</textarea>
 									<button
 										type="submit"
-										class="rounded-md bg-gray-900 px-3 py-2 text-[12px] font-medium text-white transition hover:bg-gray-800"
+										class="rounded-md bg-gray-900 px-3 py-2 text-[12px] font-medium text-white transition hover:bg-gray-800 md:self-start"
 									>
 										Save Notes
 									</button>

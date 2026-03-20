@@ -10,6 +10,7 @@ import {
 import { deriveAuditOutcome, logAuditEvent } from '$lib/server/audit-log';
 
 export const GET: RequestHandler = async ({ params, request, fetch, cookies, locals, url }) => {
+	const startTime = Date.now();
 	const downloadSessionId = ensureDownloadSessionId(cookies);
 	const rustHeaders = await buildRustApiHeaders(request, false, downloadSessionId);
 	const ticketUpstream = await fetch(
@@ -47,10 +48,15 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies, loc
 			? ticketUrl
 			: buildRustApiUrl(ticketUrl && ticketUrl.startsWith('/api/jobs/') ? ticketUrl : rustFallbackPath);
 	const viaSignedUrl = /^https?:\/\//i.test(upstreamUrl);
+	const isFallback = url.searchParams.has('fallback');
 	const upstream = await fetch(upstreamUrl, {
 		headers: viaSignedUrl ? undefined : rustHeaders,
 		signal: request.signal
 	});
+
+	const durationMs = Date.now() - startTime;
+	const contentLength = upstream.headers.get('content-length');
+	const bytesSent = contentLength ? Number(contentLength) : null;
 
 	await logAuditEvent(
 		{ request, locals, cookies, url },
@@ -63,7 +69,14 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies, loc
 			outcome: deriveAuditOutcome(upstream.status),
 			payload: {
 				viaSignedUrl,
-				upstreamTarget: viaSignedUrl ? new URL(upstreamUrl).host : rustFallbackPath
+				upstreamTarget: viaSignedUrl ? new URL(upstreamUrl).host : rustFallbackPath,
+				isFallback,
+				durationMs,
+				bytesSent,
+				effectiveMbps:
+					bytesSent && durationMs > 0
+						? Number(((bytesSent * 8) / (durationMs / 1000) / 1_000_000).toFixed(2))
+						: null
 			}
 		}
 	);

@@ -8,6 +8,10 @@ import {
 	ensureDownloadSessionId
 } from '$lib/server/rust-api-proxy';
 import { deriveAuditOutcome, logAuditEvent } from '$lib/server/audit-log';
+import {
+	classifyUserAgentFamily,
+	resolveDeliveryMode
+} from '$lib/server/delivery-mode-resolver';
 
 export const GET: RequestHandler = async ({ params, request, fetch, cookies, locals, url }) => {
 	const downloadSessionId = ensureDownloadSessionId(cookies);
@@ -41,6 +45,25 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies, loc
 		});
 	}
 
+	// Parse backend ticket to get the real download_url (may be R2 signed URL or local path)
+	const ticket = await upstream.json();
+	const backendUrl: string = ticket.download_url ?? '';
+	const userAgent = request.headers.get('user-agent');
+
+	const decision = resolveDeliveryMode(userAgent, backendUrl);
+	const uaFamily = classifyUserAgentFamily(userAgent);
+
+	// Resolve final download URL based on delivery decision
+	const proxyPath = `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file`;
+	const finalUrl = decision.deliveryMode === 'direct' ? backendUrl : proxyPath;
+
+	// Audit: never log full R2 signed URL
+	const auditDownloadUrl =
+		decision.deliveryMode === 'direct' ? '[r2-signed]' : proxyPath;
+	const downloadHost = decision.deliveryMode === 'direct'
+		? (() => { try { return new URL(backendUrl).hostname; } catch { return 'unknown'; } })()
+		: 'self';
+
 	await logAuditEvent(
 		{ request, locals, cookies, url },
 		{
@@ -51,16 +74,19 @@ export const GET: RequestHandler = async ({ params, request, fetch, cookies, loc
 			statusCode: 200,
 			outcome: 'success',
 			payload: {
-				downloadUrl: `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file`
+				downloadUrl: auditDownloadUrl,
+				ticketDelivery: decision.deliveryMode,
+				decisionReason: decision.reason,
+				userAgentFamily: uaFamily,
+				downloadHost
 			}
 		}
 	);
 
-	// Always force browser downloads through same-origin proxy.
-	// Direct presigned R2 URLs cause some browsers to navigate instead of downloading.
 	return json(
 		{
-			download_url: `/api/proxy/jobs/${encodeURIComponent(params.jobId)}/file`
+			download_url: finalUrl,
+			ticket_delivery: decision.deliveryMode
 		},
 		{
 			headers: applyNoStoreCache(new Headers())

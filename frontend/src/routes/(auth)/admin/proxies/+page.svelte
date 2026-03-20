@@ -49,7 +49,7 @@
 </svelte:head>
 
 <!-- Page header -->
-<div class="mb-5 flex items-center justify-between">
+<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 	<div>
 		<h2 class="text-lg font-semibold text-gray-900">Proxy Management</h2>
 		<p class="mt-0.5 text-[13px] text-gray-500">{total} proxies in fleet · {data.proxies.length} visible</p>
@@ -72,7 +72,7 @@
 
 <!-- Fleet Summary KPI strip -->
 <div class="admin-panel mb-5 overflow-hidden border border-gray-200 bg-white">
-	<div class="grid grid-cols-3 divide-x divide-gray-100 md:grid-cols-6">
+	<div class="grid grid-cols-2 divide-x divide-y divide-gray-100 md:grid-cols-6 md:divide-y-0">
 		<div class="px-4 py-3 text-center">
 			<p class="text-2xl font-semibold tabular-nums text-green-700">{data.overview.activeProxies}</p>
 			<p class="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">Active</p>
@@ -105,14 +105,14 @@
 
 <!-- Proxy Inventory -->
 <section class="admin-panel overflow-hidden border border-gray-200 bg-white">
-	<div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+	<div class="flex flex-col gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-2.5">
 		<div>
 			<h3 class="text-[13px] font-semibold text-gray-900">Proxy Inventory</h3>
 			<p class="text-[11px] text-gray-400">Expand row for extract stats. Update status inline.</p>
 		</div>
 		<!-- Pagination controls -->
 		{#if totalPages > 1}
-			<div class="flex items-center gap-1">
+			<div class="flex flex-wrap items-center gap-1">
 				<button
 					type="button"
 					disabled={currentPage <= 1}
@@ -234,4 +234,3 @@
 		</div>
 	</div>
 {/if}
-

@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import AppIcon from '$components/AppIcon.svelte';
 	import {
+		buildMuxProxyFallbackUrl,
 		buildStreamUrl,
 		createMuxedDownloadJob,
 		releaseMuxedDownloadJob,
@@ -474,8 +475,9 @@
 
 			const saveOpts = {
 				requireFsaa: false,
-				allowAnchorFallback: true
-			} as const;
+				allowAnchorFallback: true,
+				fallbackUrl: muxJobId ? buildMuxProxyFallbackUrl(muxJobId) : undefined
+			};
 
 			await saveDownload(secureDownloadUrl, filename, controller.signal, saveOpts);
 			console.info('[downloadtool] saveDownload resolved', {

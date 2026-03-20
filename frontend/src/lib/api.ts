@@ -69,6 +69,7 @@ export type MuxJobStatusUpdate = {
 type FileTicketApiResponse = {
 	job_id: string;
 	download_url: string;
+	ticket_delivery?: 'direct' | 'proxy';
 };
 
 function stripErrorPrefix(message: string): string {
@@ -543,7 +544,12 @@ async function pollForMuxedDownloadJobReady(
 		emitMuxJobStatusUpdate(status, startedAt, pollCount, options?.onStatus);
 		if (status.status === 'ready') {
 			const ticket = await fetchMuxJobFileTicket(jobPath, cacheBuster, signal);
-			return toAbsoluteDownloadUrl(appendCacheBuster(ticket.download_url, cacheBuster));
+			// CRITICAL: signed R2 URL + cache-buster param → 403. Only cache-bust relative proxy paths.
+			const isAbsoluteUrl = /^https?:\/\//i.test(ticket.download_url);
+			const downloadUrl = isAbsoluteUrl
+				? ticket.download_url
+				: toAbsoluteDownloadUrl(appendCacheBuster(ticket.download_url, cacheBuster));
+			return downloadUrl;
 		}
 		if (status.status === 'failed') {
 			throw new Error(status.error || m.api_mux_job_failed());
@@ -652,6 +658,10 @@ async function fetchMuxJobFileTicket(
 function appendCacheBuster(url: string, value: string): string {
 	const separator = url.includes('?') ? '&' : '?';
 	return `${url}${separator}t=${encodeURIComponent(value)}`;
+}
+
+export function buildMuxProxyFallbackUrl(jobId: string): string {
+	return toAbsoluteDownloadUrl(`/api/proxy/jobs/${encodeURIComponent(jobId)}/file`);
 }
 
 export async function releaseMuxedDownloadJob(

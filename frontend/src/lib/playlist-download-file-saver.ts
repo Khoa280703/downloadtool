@@ -17,11 +17,22 @@ type FileWritableHandle = WritableStream & {
 export interface SaveDownloadOptions {
 	requireFsaa?: boolean;
 	allowAnchorFallback?: boolean;
+	fallbackUrl?: string; // proxy URL for FSAA fallback
 	onProgress?: (update: {
 		receivedBytes: number;
 		totalBytes: number | null;
 		percent: number | null;
 	}) => void;
+}
+
+function isCrossOriginUrl(url: string): boolean {
+	if (typeof window === 'undefined') return false;
+	try {
+		const parsed = new URL(url, window.location.origin);
+		return parsed.origin !== window.location.origin;
+	} catch {
+		return false;
+	}
 }
 
 let saveDirectoryHandle: SaveDirectoryHandle | null = null;
@@ -66,24 +77,37 @@ export async function saveDownload(
 ): Promise<void> {
 	const requireFsaa = options.requireFsaa === true;
 	const allowAnchorFallback = options.allowAnchorFallback !== false;
+	const hasFsaa = !!saveDirectoryHandle;
+	const requestedDirect = isCrossOriginUrl(url);
+
+	// If no FSAA and URL is cross-origin (R2 direct), downgrade to proxy.
+	// Anchor downloads can't detect/recover from cross-origin failures.
+	const downgraded = !hasFsaa && options.fallbackUrl && requestedDirect;
+	const effectiveUrl = downgraded ? options.fallbackUrl! : url;
+
+	const actualDelivery = downgraded ? 'proxy_downgrade' : (requestedDirect ? 'direct' : 'proxy');
+	console.info('[downloadtool] saveDownload', { filename, actualDelivery, hasFsaa, ticketWasDirect: requestedDirect });
 
 	if (saveDirectoryHandle) {
 		try {
-			console.info('[downloadtool] saveDownload using File System Access API', {
-				filename,
-				url
-			});
-			await saveWithDirectory(url, filename, saveDirectoryHandle, signal, options.onProgress);
+			console.info('[downloadtool] saveDownload using File System Access API', { filename, url: effectiveUrl });
+			await saveWithDirectory(effectiveUrl, filename, saveDirectoryHandle, signal, options.onProgress);
 			return;
 		} catch (error) {
 			if (isAbortError(error)) throw error;
+			// FSAA failed with direct URL — try proxy fallback
+			if (options.fallbackUrl && requestedDirect) {
+				console.warn('[downloadtool] direct download failed, falling back to proxy', {
+					filename, originalUrl: url, fallbackUrl: options.fallbackUrl, error
+				});
+				await saveWithDirectory(options.fallbackUrl, filename, saveDirectoryHandle, signal, options.onProgress);
+				return;
+			}
 			if (!allowAnchorFallback) throw error;
 			console.warn('[downloadtool] saveDownload falling back to anchor after FSAA failure', {
-				filename,
-				url,
-				error
+				filename, url: effectiveUrl, error
 			});
-			downloadViaAnchor(url, filename);
+			downloadViaAnchor(effectiveUrl, filename);
 			return;
 		}
 	}
@@ -96,11 +120,8 @@ export async function saveDownload(
 		throw new Error(m.file_saver_error_anchor_fallback_disabled());
 	}
 
-	console.info('[downloadtool] saveDownload using anchor fallback', {
-		filename,
-		url
-	});
-	downloadViaAnchor(url, filename);
+	console.info('[downloadtool] saveDownload using anchor fallback', { filename, url: effectiveUrl });
+	downloadViaAnchor(effectiveUrl, filename);
 }
 
 async function saveWithDirectory(

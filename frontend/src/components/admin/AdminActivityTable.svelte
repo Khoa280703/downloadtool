@@ -42,7 +42,7 @@
 </script>
 
 <div class="overflow-x-auto">
-	<table class="min-w-full text-[13px] text-gray-700">
+	<table class="min-w-[960px] text-[13px] text-gray-700 md:min-w-full">
 		<thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-left text-[10px] uppercase tracking-wider text-gray-500">
 			<tr>
 				<th class="px-4 py-2.5 font-semibold">Scope</th>

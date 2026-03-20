@@ -72,7 +72,7 @@
 
 <!-- KPI Strip -->
 <div class="admin-panel mb-5 overflow-hidden border border-gray-200 bg-white">
-	<div class="grid grid-cols-3 divide-x divide-gray-100 md:grid-cols-6">
+	<div class="grid grid-cols-2 divide-x divide-y divide-gray-100 md:grid-cols-6 md:divide-y-0">
 		<div class="px-4 py-3 text-center">
 			<p class="text-2xl font-semibold tabular-nums text-gray-900">{backlog}</p>
 			<p class="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">Backlog</p>
@@ -108,10 +108,10 @@
 	</div>
 	<div class="divide-y divide-gray-100">
 		{#each signals as signal}
-			<div class="flex items-center gap-3 px-5 py-2.5">
+			<div class="flex flex-col items-start gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-5 sm:py-2.5">
 				<span class={`h-2 w-2 shrink-0 rounded-full ${statusDot(signal.status)}`}></span>
-				<span class="w-40 text-[13px] font-medium text-gray-900">{signal.label}</span>
-				<span class="w-20 text-[13px] font-semibold tabular-nums text-gray-900">{signal.value}</span>
+				<span class="text-[13px] font-medium text-gray-900 sm:w-40">{signal.label}</span>
+				<span class="text-[13px] font-semibold tabular-nums text-gray-900 sm:w-20">{signal.value}</span>
 				<span class="text-[12px] text-gray-400">{signal.note}</span>
 			</div>
 		{/each}
@@ -125,16 +125,16 @@
 		<p class="text-[11px] text-gray-400">Quick reference for common scenarios.</p>
 	</div>
 	<div class="divide-y divide-gray-100">
-		<div class="flex gap-4 px-5 py-2.5">
-			<span class="w-56 shrink-0 text-[13px] font-medium text-gray-900">Failed + expired rising</span>
+		<div class="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:gap-4 sm:px-5 sm:py-2.5">
+			<span class="text-[13px] font-medium text-gray-900 sm:w-56 sm:shrink-0">Failed + expired rising</span>
 			<span class="text-[13px] text-gray-500">Check proxy health, upstream extract, and lease timeout.</span>
 		</div>
-		<div class="flex gap-4 px-5 py-2.5">
-			<span class="w-56 shrink-0 text-[13px] font-medium text-gray-900">Building high, ready low</span>
+		<div class="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:gap-4 sm:px-5 sm:py-2.5">
+			<span class="text-[13px] font-medium text-gray-900 sm:w-56 sm:shrink-0">Building high, ready low</span>
 			<span class="text-[13px] text-gray-500">Review worker throughput, upload latency, storage backend.</span>
 		</div>
-		<div class="flex gap-4 px-5 py-2.5">
-			<span class="w-56 shrink-0 text-[13px] font-medium text-gray-900">Quarantined proxies rising</span>
+		<div class="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:gap-4 sm:px-5 sm:py-2.5">
+			<span class="text-[13px] font-medium text-gray-900 sm:w-56 sm:shrink-0">Quarantined proxies rising</span>
 			<span class="text-[13px] text-gray-500">Add new proxies or reduce extract load.</span>
 		</div>
 	</div>

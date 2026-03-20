@@ -38,7 +38,7 @@
 	<div class="border-b border-gray-100 bg-gray-50 px-5 py-2">
 		<p class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Job Pipeline</p>
 	</div>
-	<div class="grid grid-cols-3 divide-x divide-gray-100 md:grid-cols-6">
+	<div class="grid grid-cols-2 divide-x divide-y divide-gray-100 md:grid-cols-6 md:divide-y-0">
 		<div class="px-4 py-3 text-center">
 			<p class="text-2xl font-semibold tabular-nums text-amber-600">{data.overview.queuedJobs}</p>
 			<p class="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">Queued</p>
@@ -72,7 +72,7 @@
 		<div class="border-b border-gray-100 bg-gray-50 px-5 py-2">
 			<p class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Artifacts</p>
 		</div>
-		<div class="grid grid-cols-3 divide-x divide-gray-100">
+		<div class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
 			<div class="px-4 py-3 text-center">
 				<p class="text-2xl font-semibold tabular-nums text-blue-600">{data.overview.buildingArtifacts}</p>
 				<p class="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">Building</p>
@@ -92,7 +92,7 @@
 		<div class="border-b border-gray-100 bg-gray-50 px-5 py-2">
 			<p class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Proxy Fleet</p>
 		</div>
-		<div class="grid grid-cols-3 divide-x divide-gray-100">
+		<div class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
 			<div class="px-4 py-3 text-center">
 				<p class="text-2xl font-semibold tabular-nums text-green-700">{data.overview.activeProxies}<span class="text-sm text-gray-400">/{totalProxies}</span></p>
 				<p class="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">Active</p>
@@ -110,7 +110,7 @@
 </div>
 
 <!-- Quick links -->
-<div class="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+<div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
 	<a href="/admin/jobs" class="admin-panel flex flex-col items-center rounded-lg border border-gray-200 bg-white px-4 py-4 text-center transition hover:bg-gray-50">
 		<span class="text-lg font-semibold tabular-nums text-gray-900">{data.overview.queuedJobs + data.overview.processingJobs + data.overview.leasedJobs}</span>
 		<span class="mt-0.5 text-[12px] font-medium text-gray-600">Mux Queue →</span>

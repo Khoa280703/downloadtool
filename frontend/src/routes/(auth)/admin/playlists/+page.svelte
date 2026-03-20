@@ -53,7 +53,7 @@
 
 <!-- KPI Strip -->
 <div class="admin-panel mb-5 overflow-hidden border border-gray-200 bg-white">
-	<div class="grid grid-cols-3 divide-x divide-gray-100">
+	<div class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
 		<div class="px-4 py-3 text-center">
 			<p class="text-2xl font-semibold tabular-nums text-blue-600">{data.overview.playlistActiveJobs}</p>
 			<p class="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">Active</p>
@@ -72,7 +72,7 @@
 <!-- Table -->
 <div class="admin-panel overflow-hidden border border-gray-200 bg-white">
 	<div class="overflow-x-auto">
-		<table class="w-full text-left text-[13px]">
+		<table class="min-w-[760px] w-full text-left text-[13px]">
 			<thead>
 				<tr class="border-b border-gray-100 bg-gray-50 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
 					<th class="px-4 py-2.5">ID</th>
@@ -120,7 +120,7 @@
 	</div>
 
 	{#if totalPages > 1}
-		<div class="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 text-[12px] text-gray-500">
+		<div class="flex flex-col gap-2 border-t border-gray-100 px-4 py-2.5 text-[12px] text-gray-500 sm:flex-row sm:items-center sm:justify-between">
 			<span>Page {currentPage} / {totalPages}</span>
 			<div class="flex gap-1">
 				<button onclick={() => goPage(currentPage - 1)} disabled={currentPage <= 1}

@@ -16,7 +16,11 @@ export const PUBLIC_PAGES: PublicPage[] = [
 	{ path: '/download-youtube-shorts', priority: 0.8, changefreq: 'monthly' },
 	{ path: '/download-youtube-4k', priority: 0.8, changefreq: 'monthly' },
 	{ path: '/download-youtube-mp3', priority: 0.8, changefreq: 'monthly' },
+	{ path: '/about', priority: 0.4, changefreq: 'monthly' },
+	{ path: '/contact', priority: 0.4, changefreq: 'monthly' },
+	{ path: '/terms', priority: 0.3, changefreq: 'monthly' },
 	{ path: '/privacy', priority: 0.3, changefreq: 'monthly' },
+	{ path: '/dmca', priority: 0.2, changefreq: 'monthly' },
 	// Supporting content cluster — informational / pain-point pages
 	{ path: '/why-youtube-downloads-show-360p-only', priority: 0.6, changefreq: 'monthly' },
 	{ path: '/how-to-download-youtube-playlists', priority: 0.6, changefreq: 'monthly' },

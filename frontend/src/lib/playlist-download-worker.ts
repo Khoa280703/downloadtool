@@ -1,4 +1,5 @@
 import {
+	buildMuxProxyFallbackUrl,
 	buildStreamUrl,
 	createMuxedDownloadJob,
 	extract,
@@ -41,6 +42,7 @@ type ReadyEntry = {
 	entry: QueueEntry;
 	downloadUrl: string;
 	filename: string;
+	muxJobId?: string;
 };
 
 const MAX_CONCURRENT = playlistWorkerLimitConfig.maxConcurrent;
@@ -273,9 +275,11 @@ async function startDownload(ready: ReadyEntry): Promise<void> {
 }
 
 async function saveReadyEntry(ready: ReadyEntry, signal: AbortSignal): Promise<void> {
+	const fallbackUrl = ready.muxJobId ? buildMuxProxyFallbackUrl(ready.muxJobId) : undefined;
 	const saveOptions = {
 		requireFsaa: strictFsaaMode,
 		allowAnchorFallback: true,
+		fallbackUrl,
 		onProgress: (progress: {
 			receivedBytes: number;
 			totalBytes: number | null;
@@ -287,7 +291,7 @@ async function saveReadyEntry(ready: ReadyEntry, signal: AbortSignal): Promise<v
 				indeterminate: progress.percent === null
 			});
 		}
-	} as const;
+	};
 
 	await saveDownload(ready.downloadUrl, ready.filename, signal, saveOptions);
 }
@@ -385,7 +389,8 @@ async function createReadyEntry(entry: QueueEntry, signal?: AbortSignal): Promis
 		return {
 			entry,
 			downloadUrl: muxedFileUrl,
-			filename: safeFilename(entry.title, 'mp4')
+			filename: safeFilename(entry.title, 'mp4'),
+			muxJobId: jobId
 		};
 	}
 
