@@ -1,8 +1,8 @@
 # Project Overview & Product Development Requirements (PDR)
 
-**Version:** 2.5
-**Last Updated:** 2026-03-16
-**Status:** Phase 9.1 Complete ✅ | Phase 10 i18n Complete ✅ | Phase 11 Mux Job Flow Complete ✅
+**Version:** 2.6
+**Last Updated:** 2026-03-20
+**Status:** Phase 9.1 Complete ✅ | Phase 10 i18n Complete ✅ | Phase 11 Mux Job Flow Complete ✅ | SEO Phase 01-04, 10 Complete ✅
 
 ## Executive Summary
 
@@ -624,179 +624,11 @@ Enable creators and power users to reliably download video content at maximum sp
 | **Deno Core** | Library | JS extraction | V8 (heavier) |
 | **Tokio** | Library | Async runtime | async-std (less mature) |
 
-## Future Roadmap
+## Future Work
 
-### Q1 2026
-- [ ] YouTube playlist/channel extraction hardening
-- [ ] Advanced filtering (date range, duration)
-- [ ] Download history export (CSV/JSON)
+- Playlist/channel extraction hardening (Q2 2026)
+- Desktop app (Electron/Tauri) (Q3 2026)
+- CLI tool for scripting (Q3 2026)
+- Distributed worker fleet (Q4 2026)
 
-### Q2 2026
-- [ ] API authentication & rate limiting
-- [ ] Advanced scheduling (cron-like)
-- [ ] Playlist/channel batch operations
-- [ ] Analytics dashboard
-
-### Q3 2026
-- [ ] Desktop app (Electron/Tauri)
-- [ ] CLI tool for scripting
-- [ ] WebDAV/FTP upload integration
-- [ ] Cloud storage integration (S3, GCS)
-
-### Q4 2026
-- [ ] Distributed worker fleet
-- [ ] Advanced transcoding profiles
-- [ ] AI-powered smart scheduling
-- [ ] Enterprise features (auth, RBAC)
-
-## Known Limitations
-
-1. **GPU-Only Transcoding:** Requires NVIDIA/AMD GPU (optional feature)
-2. **Proxy Dependency:** YouTube requires external proxies for 403/429 recovery
-3. **Player.js Parsing:** Vulnerable to YouTube player code refactors
-4. **Storage:** No built-in S3/cloud storage (manual integration needed)
-5. **Rate Limiting:** No per-user rate limiting (server-side only)
-6. **DRM Content:** Cannot handle DRM-protected streams
-
-## Testing Strategy
-
-### Unit Tests
-- Anti-bot client (retry, proxy rotation, throttling)
-- Extractor engine (script loading, execution)
-- N-transform parser (regex accuracy)
-- GPU pipeline (frame processing)
-
-### Integration Tests
-- YouTube extraction (InnerTube + fallback)
-- End-to-end download flow
-- Batch operations
-- GPU transcoding pipeline
-
-### Performance Tests
-- Extraction latency (p50, p95, p99)
-- Download throughput
-- GPU encoding speed
-- Memory usage under load
-
-### Security Tests
-- Input validation (malformed URLs, XSS)
-- Proxy rotation effectiveness
-- Cookie isolation per platform
-- Header randomization coverage
-
-## Deployment Strategy
-
-### Development
-```bash
-docker-compose -f docker/docker-compose.server.yml up
-```
-
-### Production (Home Server)
-```bash
-docker-compose -f docker/docker-compose.server.yml up -d
-```
-
-### Monitoring
-- Health checks every 30 seconds
-- Error rate alerting (threshold: 5%)
-- Proxy pool health monitoring
-- GPU worker availability tracking
-
-## Compliance & Legal
-
-### User Privacy
-- No user data collection (except downloads)
-- No tracking/analytics (unless opted-in)
-- Cookies only for platform authentication
-- GDPR-compliant cookie consent
-
-### Copyright Compliance
-- Users responsible for ToS compliance
-- Tool provides no circumvention of DRM
-- Educational use presumption
-
-### Platform ToS
-- YouTube: Non-commercial use recommended
-
-## Support & Documentation
-
-### User Documentation
-- `/frontend/README.md` - UI usage guide
-- `/docs/project-overview-pdr.md` - This document
-- Web-based help (privacy page, FAQ)
-
-### Developer Documentation
-- `/docs/codebase-summary.md` - Architecture overview
-- `/docs/system-architecture.md` - Data flows & components
-- `/docs/code-standards.md` - Development guidelines
-- Inline code comments & doc strings
-
-### Community
-- GitHub issues for bug reports
-- GitHub discussions for feature requests
-- Email support (optional)
-
----
-
-**Version:** 2.4
-**Last Updated:** 2026-03-06
-**Next Review:** 2026-04-06 (1 month)
-**Status:** Phase 9.1 Complete ✅ | Phase 10 i18n In Progress 🔄
-
----
-
-## Appendix: Version History
-
-### v2.5 (2026-03-16)
-- Internationalization (i18n) marked COMPLETE — 24+ languages active
-- Dual download flow implemented: direct browser + background mux job
-- Job progress tracking: 7-phase pipeline with SSE real-time updates
-- New DownloadBtn & AppIcon components
-- AppIcon replaced Material Symbols font (SVG-based)
-- Frontend messages system with 384 translation keys
-- hreflang + multilingual sitemap.xml for SEO
-
-### v2.4 (2026-03-06)
-- Runtime limits configuration now active (config/runtime-limit-profiles.json)
-- Proxy quarantine system stabilized and documented
-- API access tracing enabled for observability
-- i18n status updated: Planned → In Progress (now COMPLETE)
-- Deprecated/removed features documented (cookie extraction, yt-dlp profile fallback, preflight checks)
-
-### v2.3 (2026-03-01)
-- Auth flow migration: `/login` route → modal on homepage
-- Font optimization: Material Symbols 1.1 MB → 4.5 KB
-- Homepage prerendering: Static HTML generation
-- Cookie check optimization: DB query savings for unauthenticated users
-- Batch download URL fix: Consistent buildStreamUrl usage
-- Updated all documentation with frontend changes
-
-### v2.2 (2026-02-28)
-- Replaced in-process extraction with yt-dlp subprocess (ytdlp.rs, 536 LOC)
-- Moka async cache (500 items, 300s TTL) for extraction results
-- Semaphore throttling (max 10 concurrent yt-dlp processes)
-- JWT authentication system (jsonwebtoken crate)
-- Whop subscription integration with webhook handler (HMAC-SHA256)
-- PostgreSQL connection pooling & migrations
-- User tier system (Free, Pro, Premium) with rate limiting
-- Batch operations with SSE streaming
-- Updated all documentation to reflect new auth architecture
-
-### v2.1 (2026-02-24)
-- Fixed QuickTime double-duration bug (moov_merger.rs)
-- Implemented dual-traf muxer (traf_merger.rs + fmp4_remuxer.rs)
-- Added WebM video-only stream exclusion (API 422 + frontend filter)
-- Updated all documentation to reflect new architecture
-- Legacy fmp4_muxer.rs removed
-
-### v2.0 (2026-02-23)
-- Added YouTube N-Parameter Transform (youtube-n-transform.ts)
-- Fixed download timeout bug (.connect_timeout vs .timeout)
-- Updated system architecture documentation
-- All 8 phases complete + enhancements
-
-### v1.0 (2026-02-22)
-- Completed Phase 1-8 implementation
-- Core platform operational
-- Ad integration complete
-- Initial documentation
+**See full roadmap:** `/docs/project-roadmap.md`

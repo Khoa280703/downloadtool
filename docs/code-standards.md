@@ -641,22 +641,13 @@ Deno.test("test name", async () => {
 });
 ```
 
-## Performance Considerations
-
-| Component | Optimization | Technique |
-|-----------|-------------|-----------|
-| **Proxy Layer** | Connection reuse | HTTP client with connection pool |
-| **N-Transform** | Caching by version | Cache keyed by player.js URL |
-| **Extraction** | Hot reload | Minimal runtime overhead |
-| **GPU Pipeline** | Hardware acceleration | Native GPU APIs (NVIDIA/AMD) |
-| **Muxing** | Streaming output | No full-file buffering |
-
 ## Security Practices
 
 ### Input Validation
-- All user URLs validated with `reqwest::Url::parse()`
-- Video IDs checked against regex patterns
-- Query parameters sanitized
+- All user URLs validated via `validation.rs` module with `is_valid_youtube_url()`
+- Uses `reqwest::Url` for URL parsing & scheme validation
+- Query parameters sanitized before processing
+- Prevents SSRF attacks on internal networks
 
 ### Error Messages
 - No internal paths in error messages
@@ -789,19 +780,6 @@ cargo fmt --all -- --check
 cargo audit
 ```
 
-## Common Pitfalls & Solutions
-
-| Pitfall | Issue | Solution |
-|---------|-------|----------|
-| WebM video streams | EBML container (not BMFF) | Stream.rs returns 422, filter in FormatPicker |
-| QuickTime duration | YouTube sums mdhd.duration | Moov merger zeros both trak mdhd.duration |
-| `.timeout()` on streams | Kills mid-transfer | Use `.connect_timeout()` instead |
-| Blocking in async | Tokio panic | Use `tokio::spawn()` or `tokio::task::block_in_place()` |
-| Extractor errors silent | Hard to debug | Check logs with `RUST_LOG=debug` |
-| Cookie jar not shared | Per-request cookies | Use `Arc<CookieStore>` + Arc<Client> |
-| N-transform cache miss | Slow first request | Cache per player version automatically |
-| fMP4 brand mismatch | Dash vs isom | Remuxer patches brand to isom (QuickTime) |
-
 ## Deployment Checklist
 
 - [ ] All tests passing (`cargo test --all`)
@@ -815,5 +793,5 @@ cargo audit
 
 ---
 
-**Version:** 1.6
-**Last Updated:** 2026-03-19 (docs sync: removed phantom gpu-pipeline/gpu-worker/engine.rs refs; updated workspace crate list)
+**Version:** 1.7
+**Last Updated:** 2026-03-20 (added validation.rs SSRF protection, trimmed GPU/perf sections to fit 800 LOC)

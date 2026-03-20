@@ -160,7 +160,7 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ## Phase 4: GPU Acceleration (Planned)
 
-**Status:** 🔄 In Progress | **Estimated Completion:** Q2 2026
+**Status:** 📋 Planned | **Estimated Completion:** Q2 2026
 
 ### Objectives
 - GPU-accelerated video encoding (NVIDIA/AMD support)
@@ -295,21 +295,21 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-## Phase 5.2: UI-Preserving SEO (In Progress)
+## Phase 5.2: UI-Preserving SEO (Partial)
 
 **Status:** 🔄 In Progress | **Estimated Completion:** Q2 2026
 
 ### Objectives
-- [x] Phase 01: Homepage SEO foundation (brand rename, metadata, JSON-LD, cache-control)
-- [x] Phase 02: Homepage content blocks (Why Snapvie, quality, FAQ with schema)
-- [x] Phase 03: 5 EN landing pages (8k-hdr, playlist, shorts, 4k, mp3) + BreadcrumbList
-- [x] Phase 04: Sitemap, robots.txt, internal links, indexability
-- [ ] Phase 05: Measurement, rollout, expansion gate
-- [ ] Phase 06: Supporting content cluster
-- [ ] Phase 07: Authority, distribution, link acquisition
-- [ ] Phase 08: SERP CTR optimization loop
-- [ ] Phase 09: Technical renderability, CWV, crawl efficiency
-- [x] Phase 10: Trust pages (about, contact, terms, dmca)
+- [x] Phase 01: Homepage SEO foundation (brand rename, metadata, JSON-LD, cache-control) — COMPLETE
+- [x] Phase 02: Homepage content blocks (Why Snapvie, quality, FAQ with schema) — COMPLETE
+- [x] Phase 03: 5 EN landing pages (8k-hdr, playlist, shorts, 4k, mp3) + BreadcrumbList — COMPLETE
+- [x] Phase 04: Sitemap, robots.txt, internal links, indexability — COMPLETE
+- [ ] Phase 05: Measurement, rollout, expansion gate — DEFERRED (need Search Console data)
+- [ ] Phase 06: Supporting content cluster — DEFERRED
+- [ ] Phase 07: Authority, distribution, link acquisition — DEFERRED
+- [ ] Phase 08: SERP CTR optimization loop — DEFERRED
+- [ ] Phase 09: Technical renderability, CWV, crawl efficiency — DEFERRED
+- [x] Phase 10: Trust pages (about, contact, terms, dmca) — COMPLETE
 
 ### Completed Deliverables
 - Brand rename: FetchTube → Snapvie (39 files)
@@ -392,7 +392,8 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 | Runtime Config | 1.2.1 | ✅ Released | 2026-03-06 |
 | i18n Integration | 1.4.0 | ✅ Released | 2026-03-16 |
 | Mux Job Flow & Job System | 1.5.0 | ✅ Released | 2026-03-16 |
-| GPU Acceleration | 2.0.0 | 🔄 In Progress | Q2 2026 |
+| SEO Foundation | 1.6.0 | ✅ Partial | 2026-03-19 |
+| GPU Acceleration | 2.0.0 | 📋 Planned | Q2 2026 |
 | Batch & Scheduling | 2.1.0 | 📋 Planned | Q3 2026 |
 
 ---
@@ -462,5 +463,5 @@ YouTube downloader platform with anti-bot protection, GPU-accelerated transcodin
 
 ---
 
-**Last Reviewed:** 2026-03-16
-**Next Review Date:** 2026-04-16
+**Last Reviewed:** 2026-03-20
+**Next Review Date:** 2026-04-20

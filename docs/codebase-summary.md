@@ -45,6 +45,13 @@ A high-performance video downloader platform supporting YouTube and other platfo
 ### 1. **Frontend** (`/frontend`)
 - **Framework:** SvelteKit with Svelte components
 - **i18n System:** Paraglide JS (24+ languages, 384 keys, `frontend/messages/`)
+- **SEO System** (**NEW 2026-03-19**):
+  - `lib/seo/structured-data.ts` - JSON-LD schema generation
+  - `lib/seo/landing-page-config.ts` - Landing page metadata
+  - `lib/seo/public-pages.ts` - Public trust pages configuration
+  - Landing pages: 5 money pages (`/download-youtube-*`), 6 content pages, 4 trust pages
+  - Structured data: Organization → WebSite → WebApplication, FAQPage, BreadcrumbList, HowTo
+  - SEO shell component: `seo-landing-page-shell.svelte` (reusable landing page layout)
 - **Key Components:**
   - `UrlInput.svelte` - URL input handling
   - `DownloadBtn.svelte` - Unified download (direct + mux job, **NEW 2026-03-16**)
@@ -66,8 +73,10 @@ A high-performance video downloader platform supporting YouTube and other platfo
 
 ### 2. **API Layer** (`crates/api`)
 - **Entry Point:** `main.rs` - HTTP server (Tokio-based), PostgreSQL pool setup
+- **Modules:**
+  - `validation.rs` - **NEW (2026-03-20):** Input validation with SSRF protection (`is_valid_youtube_url()`)
 - **Routes:**
-  - `extract.rs` - Extract video metadata & streams
+  - `extract.rs` - Extract video metadata & streams (uses validation module)
   - `batch.rs` - Batch download operations with SSE (Server-Sent Events) streaming
   - `stream.rs` - WebSocket stream handler with 422 WebM validation
   - `transcode.rs` - GPU transcoding requests
@@ -228,6 +237,50 @@ The platform now reaches users via 4 independent channels:
 - `GET /bm.js`: Serves bookmarklet (compile-time embed via `include_str!`)
 - `GET /userscript`: Serves userscript (compile-time embed via `include_str!`)
 - External clients use `POST /api/extract` plus app-domain launcher `/download/mux-job`, which then drives durable `/api/jobs/*`
+
+## Recent Changes (2026-03-20 — SSRF Validation & SEO)
+
+### 1. **SSRF Protection via validation.rs** ✅
+**File:** `crates/api/src/validation.rs` (NEW)
+
+**Features:**
+- `is_valid_youtube_url()` validates URLs using `reqwest::Url`
+- Prevents SSRF attacks on internal networks
+- Scheme validation (HTTPS only)
+- Integrated into `/api/extract` path
+
+**Impact:** Security hardening against injection attacks
+
+---
+
+## Recent Changes (2026-03-19 — Brand Rename & SEO Foundation)
+
+### 1. **Brand Rename: FetchTube → Snapvie** ✅
+**Scope:** 39 files updated across frontend, API, docs, config
+
+**Changes:**
+- Product name, URLs, metadata, legal pages updated
+- localStorage key migration for user preferences
+- Domain: snapvie.com
+
+**Status:** Complete
+
+### 2. **SEO Foundation & Landing Pages** ✅
+**Scope:** `frontend/src/lib/seo/` and `frontend/src/routes/` (landing pages, trust pages)
+
+**Deliverables:**
+- Structured Data: Organization → WebSite → WebApplication (JSON-LD)
+- 5 EN money pages: `/download-youtube-{8k-hdr, playlist, shorts, 4k, mp3}`
+- 6 content pages + 4 trust pages: `/about`, `/contact`, `/terms`, `/privacy`, `/dmca`
+- BreadcrumbList schema on all pages
+- hreflang tags for multilingual variants
+- Sitemap + robots.txt with proper directives
+- Cache-control headers (public for SEO, private for auth pages)
+- Canonical URL tags on all variants
+
+**Impact:** 7/10 SEO foundation complete; phases 05/07/08 deferred pending Search Console data
+
+---
 
 ## Recent Changes (2026-03-18 — Playlist Backend Orchestration)
 
@@ -540,14 +593,15 @@ downloadtool/
 │   │   └── dist/
 │   │       ├── bm.js            # Bookmarklet output
 │   │       └── youtube-downloader.user.js  # UserScript output
-│   └── extension/           # MV3 Extension (Firefox + Edge)
-│       ├── src/
-│       │   ├── content-script.ts
-│       │   ├── background.ts
-│       │   └── popup/
-│       ├── manifest-firefox.json
-│       ├── manifest-edge.json
-│       └── build-extension.sh
+│   ├── extension/           # MV3 Extension (Firefox + Edge)
+│   │   ├── src/
+│   │   │   ├── content-script.ts
+│   │   │   ├── background.ts
+│   │   │   └── popup/
+│   │   ├── manifest-firefox.json
+│   │   ├── manifest-edge.json
+│   │   └── build-extension.sh
+│   └── [browser]/          # Browser extension distribution packages
 ├── extractors/          # Dynamic extractor scripts (TS)
 ├── infra/               # Infrastructure configs (WireGuard)
 ├── proto/               # Protocol Buffer definitions
@@ -583,5 +637,5 @@ downloadtool/
 
 ---
 
-**Last Updated:** 2026-03-19 (docs sync: removed phantom gpu-pipeline/gpu-worker refs, fixed apps/web→frontend)
-**Status:** Complete & Operational (i18n ✅ | Mux Job Flow ✅ | Job System ✅ | Runtime Config ✅ | Frontend Auth Modal ✅ | Playlist Backend Orchestration ✅ | Admin Visibility ✅ | Reload Resume ✅ | Server Recovery ✅)
+**Last Updated:** 2026-03-20 (added validation.rs SSRF protection, SEO foundation, brand rename documentation)
+**Status:** Complete & Operational (i18n ✅ | Mux Job Flow ✅ | Job System ✅ | Runtime Config ✅ | Frontend Auth Modal ✅ | Playlist Backend Orchestration ✅ | SSRF Protection ✅ | SEO Foundation ✅)

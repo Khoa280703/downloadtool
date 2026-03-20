@@ -123,12 +123,16 @@ pnpm dev:down  # stop docker compose services
 - `frontend.playlist_worker_extract_jitter_range_ms`: Jitter random bổ sung (ms). `null` = 0.
 - `frontend.playlist_worker_circuit_cooldown_ms`: Cooldown circuit breaker (ms). `null` = 0.
 
-## Recent Changes (2026-03-16)
+## Recent Changes (2026-03-20)
 
+- **SSRF Protection:** New `validation.rs` module with `is_valid_youtube_url()` using `reqwest::Url`
+- **Playlist Orchestration Complete:** Backend playlist job system with item-level progress tracking (2026-03-18)
+- **SEO Foundation:** Brand rename (FetchTube → Snapvie), 5 landing pages, JSON-LD schema, sitemap (2026-03-19)
+- **Code Review Fixes:** Playlist `requested_mode` support, stream param naming (ext → format), batch URL validation
+- **CI Integration:** Frontend job added (pnpm check + build) to GitHub Actions
 - **i18n Complete:** 24+ languages active via Paraglide JS
 - **Dual Download Flow:** Direct browser + background mux job with SSE progress
 - **New Job System:** Durable job pipeline (PostgreSQL + Redis + Worker)
-- **Real-Time Progress:** SSE endpoint `/api/proxy/jobs/{id}/events` for 7-phase progress tracking
-- **New Components:** DownloadBtn (unified), AppIcon (SVG icons + quality badges)
-- **S3 Support:** S3 multipart upload for artifact storage
 - For SEO audits: disable Cloudflare "Managed robots/content signals" for `robots.txt`, otherwise Cloudflare injects `Content-Signal` lines that Lighthouse flags as invalid robots directives.
+
+**See:** `docs/project-overview-pdr.md` (Phase 9.1, 10, 11 complete) | `docs/project-roadmap.md` (SEO status update) | `plans/260319-0929-ui-preserving-seo-snapvie/` (full SEO details)
