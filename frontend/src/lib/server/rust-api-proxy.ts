@@ -16,7 +16,7 @@ function normalizeBaseUrl(url: string | undefined): string {
 }
 
 export function buildRustApiUrl(path: string): string {
-	return `${normalizeBaseUrl(env.RUST_API_URL ?? env.VITE_API_URL)}${path}`;
+	return `${normalizeBaseUrl(env.INTERNAL_RUST_API_URL ?? env.RUST_API_URL ?? env.VITE_API_URL)}${path}`;
 }
 
 export function ensureDownloadSessionId(cookies: Cookies): string {

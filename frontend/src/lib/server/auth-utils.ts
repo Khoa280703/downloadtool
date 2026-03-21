@@ -35,6 +35,14 @@ function requireEnv(name: keyof typeof env, fallback = ''): string {
 	return value ?? fallback;
 }
 
+function readEnv(...names: string[]): string | undefined {
+	for (const name of names) {
+		const value = env[name]?.trim();
+		if (value) return value;
+	}
+	return undefined;
+}
+
 function parseTimestamp(value: Date | string | null): string | null {
 	if (!value) return null;
 	if (value instanceof Date) return value.toISOString();
@@ -66,10 +74,9 @@ function mapSubscriptionRow(row: SubscriptionQueryRow | undefined): Subscription
 export function getDatabasePool(): Pool {
 	if (!globalPool.__frontendAuthDbPool) {
 		globalPool.__frontendAuthDbPool = new Pool({
-			connectionString: requireEnv(
-				'DATABASE_URL',
-				'postgres://postgres:postgres@127.0.0.1:5432/postgres'
-			)
+			connectionString:
+				readEnv('INTERNAL_DATABASE_URL', 'DATABASE_URL') ??
+				requireEnv('DATABASE_URL', 'postgres://postgres:postgres@127.0.0.1:5432/postgres')
 		});
 	}
 	return globalPool.__frontendAuthDbPool;
@@ -78,7 +85,8 @@ export function getDatabasePool(): Pool {
 export function getProxyDatabasePool(): Pool {
 	if (!globalPool.__frontendProxyDbPool) {
 		const connectionString =
-			env.PROXY_DATABASE_URL?.trim() ||
+			readEnv('INTERNAL_PROXY_DATABASE_URL', 'PROXY_DATABASE_URL') ||
+			readEnv('INTERNAL_DATABASE_URL', 'DATABASE_URL') ||
 			requireEnv('DATABASE_URL', 'postgres://postgres:postgres@127.0.0.1:5432/postgres');
 		globalPool.__frontendProxyDbPool = new Pool({
 			connectionString

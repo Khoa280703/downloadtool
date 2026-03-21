@@ -39,6 +39,10 @@ pub struct Config {
 }
 
 impl Config {
+    fn first_present_env(names: &[&str]) -> Option<String> {
+        names.iter().find_map(|name| Self::optional_env(name))
+    }
+
     fn optional_env(name: &str) -> Option<String> {
         env::var(name).ok().and_then(|value| {
             let trimmed = value.trim();
@@ -50,8 +54,8 @@ impl Config {
         })
     }
 
-    fn env_or_default(name: &str, default: &str) -> String {
-        Self::optional_env(name).unwrap_or_else(|| default.to_string())
+    fn first_env_or_default(names: &[&str], default: &str) -> String {
+        Self::first_present_env(names).unwrap_or_else(|| default.to_string())
     }
 
     fn command_stdout_trimmed(command: &mut Command) -> Option<String> {
@@ -230,33 +234,38 @@ impl Config {
 
         let extractor_dir =
             env::var("EXTRACTOR_DIR").unwrap_or_else(|_| "./extractors".to_string());
-        let database_url = env::var("DATABASE_URL")
-            .map_err(|_| anyhow::anyhow!("DATABASE_URL env var is required"))?;
+        let database_url = Self::first_present_env(&["INTERNAL_DATABASE_URL", "DATABASE_URL"])
+            .ok_or_else(|| anyhow::anyhow!("DATABASE_URL env var is required"))?;
         let database_url = Self::resolve_local_database_url(&database_url);
-        let proxy_database_url = Self::optional_env("PROXY_DATABASE_URL")
-            .map(|value| Self::resolve_local_database_url(&value))
-            .unwrap_or_else(|| database_url.clone());
+        let proxy_database_url =
+            Self::first_present_env(&["INTERNAL_PROXY_DATABASE_URL", "PROXY_DATABASE_URL"])
+                .map(|value| Self::resolve_local_database_url(&value))
+                .unwrap_or_else(|| database_url.clone());
         let jwt_secret = env::var("BETTER_AUTH_SECRET")
             .map_err(|_| anyhow::anyhow!("BETTER_AUTH_SECRET env var is required"))?;
         let whop_webhook_secret = env::var("WHOP_WEBHOOK_SECRET")
             .map_err(|_| anyhow::anyhow!("WHOP_WEBHOOK_SECRET env var is required"))?;
         let extract_rate_limit_enabled = backend_limit_profile().extract_rate_limit_enabled_value();
-        let redis_url = Self::resolve_local_redis_url(&Self::env_or_default(
-            "REDIS_URL",
+        let redis_url = Self::resolve_local_redis_url(&Self::first_env_or_default(
+            &["INTERNAL_REDIS_URL", "REDIS_URL"],
             "redis://127.0.0.1:6379",
         ));
-        let proxy_redis_url = Self::optional_env("PROXY_REDIS_URL")
-            .map(|value| Self::resolve_local_redis_url(&value))
-            .unwrap_or_else(|| redis_url.clone());
+        let proxy_redis_url =
+            Self::first_present_env(&["INTERNAL_PROXY_REDIS_URL", "PROXY_REDIS_URL"])
+                .map(|value| Self::resolve_local_redis_url(&value))
+                .unwrap_or_else(|| redis_url.clone());
         let proxy_quarantine_ttl_secs = env::var("PROXY_QUARANTINE_TTL_SECS")
             .ok()
             .and_then(|value| value.parse().ok())
             .unwrap_or(172_800);
-        let mux_queue_stream = Self::env_or_default("MUX_QUEUE_STREAM", "mux_jobs");
-        let mux_job_max_attempts = env::var("MUX_JOB_MAX_ATTEMPTS")
-            .ok()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(3);
+        let mux_queue_stream = Self::first_env_or_default(
+            &["INTERNAL_MUX_QUEUE_STREAM", "MUX_QUEUE_STREAM"],
+            "mux_jobs",
+        );
+        let mux_job_max_attempts =
+            Self::first_present_env(&["INTERNAL_MUX_JOB_MAX_ATTEMPTS", "MUX_JOB_MAX_ATTEMPTS"])
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(3);
         let mux_file_ticket_ttl_secs = env::var("MUX_FILE_TICKET_TTL_SECS")
             .ok()
             .and_then(|value| value.parse().ok())

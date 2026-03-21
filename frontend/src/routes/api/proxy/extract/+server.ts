@@ -42,7 +42,7 @@ async function sleep(ms: number): Promise<void> {
 
 export const POST: RequestHandler = async ({ request, locals, fetch, cookies, url }) => {
 	const body = await request.text();
-	const rustApiUrl = normalizeBaseUrl(env.RUST_API_URL ?? env.VITE_API_URL);
+	const rustApiUrl = normalizeBaseUrl(env.INTERNAL_RUST_API_URL ?? env.RUST_API_URL ?? env.VITE_API_URL);
 	let requestUrl: string | null = null;
 
 	try {
