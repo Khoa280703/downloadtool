@@ -1,0 +1,16 @@
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:15431:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  shared-proxy-postgres:
+    ports:
+      - "127.0.0.1:15432:5432"
+
+  shared-proxy-redis:
+    ports:
+      - "127.0.0.1:6381:6379"

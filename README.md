@@ -35,7 +35,7 @@ http://<server-ip>:5168
 - `pnpm dev:be` and `pnpm dev:worker` are intended to use those local containers, not shared server services.
 - Keep local `.env` aligned with `.env.example`:
 ```text
-DATABASE_URL=postgres://downloadtool:...@127.0.0.1:5432/downloadtool
+DATABASE_URL=postgres://downloadtool:...@127.0.0.1:15431/downloadtool
 REDIS_URL=redis://127.0.0.1:6379
 ```
 - Optional shared proxy source of truth:
@@ -48,6 +48,7 @@ PROXY_QUARANTINE_TTL_SECS=172800
 - When `PROXY_DATABASE_URL` / `PROXY_REDIS_URL` are set, only proxy inventory + proxy health are shared.
   Users, subscriptions, jobs, artifacts still use local `DATABASE_URL` / `REDIS_URL`.
 - Production uses internal Compose service names inside `docker/docker-compose.server.yml`.
+- Local dev publishes DB/Redis ports through `docker/docker-compose.local-dev.yml`.
 - Shared proxy Postgres/Redis now live in the same compose file as the app stack.
 - Do not point local `.env` to shared services like `server-redis`, otherwise dev and non-dev state becomes ambiguous.
 
@@ -92,7 +93,7 @@ pnpm dev:down  # stop docker compose services
 - If you run `pnpm dev:be` + `pnpm dev:fe`, requests go to host API and logs appear in Terminal B.
 - Env source of truth is root `.env` (see `.env.example`) for secrets/runtime endpoints.
 - Local dev target should stay isolated:
-- `DATABASE_URL` -> `127.0.0.1:5432/downloadtool`
+- `DATABASE_URL` -> `127.0.0.1:15431/downloadtool`
 - `REDIS_URL` -> `127.0.0.1:6379`
 - Optional shared proxy state:
 - `PROXY_DATABASE_URL` -> `127.0.0.1:15432` locally, `shared-proxy-postgres:5432` in Docker/Coolify
