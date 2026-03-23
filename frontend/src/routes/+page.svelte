@@ -1701,12 +1701,12 @@
 		<FrequentlyAskedQuestionsSection title={m.home_faq_title()} items={faqItems} />
 
 		<section class="guides-discovery py-8 px-6 bg-white border-t border-pink-50">
-			<div class="max-w-3xl mx-auto">
-				<h2 class="text-lg font-bold text-plum mb-4 text-center" style="font-family:'Fredoka',sans-serif">
+			<div class="max-w-4xl mx-auto text-center">
+				<h2 class="text-lg font-bold text-plum mb-4" style="font-family:'Fredoka',sans-serif">
 					Guides & Resources
 				</h2>
-				<div class="grid sm:grid-cols-2 gap-4 text-sm">
-					<div>
+				<div class="grid sm:grid-cols-2 gap-6 text-sm max-w-2xl mx-auto">
+					<div class="text-left">
 						<p class="font-bold text-plum/70 text-xs uppercase tracking-wider mb-2">Guides</p>
 						<ul class="space-y-1.5">
 							<li><a href="/guides/how-to-use-snapvie" class="text-plum/80 hover:text-primary transition-colors font-semibold">How to Use Snapvie</a></li>
@@ -1716,7 +1716,7 @@
 						</ul>
 						<a href="/guides" class="inline-block mt-2 text-xs font-bold text-primary hover:underline">View all guides →</a>
 					</div>
-					<div>
+					<div class="text-left">
 						<p class="font-bold text-plum/70 text-xs uppercase tracking-wider mb-2">Compare</p>
 						<ul class="space-y-1.5">
 							<li><a href="/compare/snapvie-vs-y2mate" class="text-plum/80 hover:text-primary transition-colors font-semibold">Snapvie vs y2mate</a></li>
