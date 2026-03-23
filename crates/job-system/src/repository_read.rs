@@ -122,7 +122,12 @@ impl JobRepository {
                         a.size_bytes AS artifact_size_bytes, a.content_type, a.etag
                     FROM mux_jobs j
                     JOIN mux_artifacts a ON a.id = j.artifact_id
-                    WHERE j.id = $1 AND j.user_id = $2 AND j.status = 'ready' AND a.status = 'ready' AND a.backend = 's3'
+                    WHERE j.id = $1
+                      AND j.user_id = $2
+                      AND j.status = 'ready'
+                      AND a.status = 'ready'
+                      AND a.backend = 's3'
+                      AND (a.expires_at IS NULL OR a.expires_at > NOW())
                     "#,
                 )
                 .bind(job_id)
@@ -144,7 +149,12 @@ impl JobRepository {
                         a.size_bytes AS artifact_size_bytes, a.content_type, a.etag
                     FROM mux_jobs j
                     JOIN mux_artifacts a ON a.id = j.artifact_id
-                    WHERE j.id = $1 AND j.session_id = $2 AND j.status = 'ready' AND a.status = 'ready' AND a.backend = 's3'
+                    WHERE j.id = $1
+                      AND j.session_id = $2
+                      AND j.status = 'ready'
+                      AND a.status = 'ready'
+                      AND a.backend = 's3'
+                      AND (a.expires_at IS NULL OR a.expires_at > NOW())
                     "#,
                 )
                 .bind(job_id)
@@ -170,7 +180,10 @@ impl JobRepository {
                 a.storage_bucket, a.object_key, a.status AS artifact_status,
                 a.size_bytes AS artifact_size_bytes, a.content_type, a.etag
             FROM mux_artifacts a
-            WHERE a.dedupe_key = $1 AND a.status = 'ready' AND a.backend = 's3'
+            WHERE a.dedupe_key = $1
+              AND a.status = 'ready'
+              AND a.backend = 's3'
+              AND (a.expires_at IS NULL OR a.expires_at > NOW())
             ORDER BY a.ready_at DESC NULLS LAST
             LIMIT 1
             "#,
