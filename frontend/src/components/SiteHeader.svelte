@@ -39,6 +39,8 @@
 				<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href={homeHref}>{m.header_nav_home()}</a>
 				<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href={howItWorksHref}>{m.header_nav_how_it_works()}</a>
 				<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href={toolsHref}>{m.header_nav_tools()}</a>
+				<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="/guides">Guides</a>
+				<a class="text-plum font-semibold hover:text-primary transition-colors text-base" href="/compare">Compare</a>
 			</nav>
 			<LanguageSwitcher />
 			{#if authUser === undefined}

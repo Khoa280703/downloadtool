@@ -1302,6 +1302,11 @@
 			}
 		}
 
+	.page-root.theme-dark .guides-discovery {
+		background-color: #1c1b28;
+		border-color: rgba(255, 77, 140, 0.15);
+	}
+
 	</style>
 </svelte:head>
 
@@ -1694,6 +1699,36 @@
 
 		<WhySnapvieSection cards={whyCards} />
 		<FrequentlyAskedQuestionsSection title={m.home_faq_title()} items={faqItems} />
+
+		<section class="guides-discovery py-8 px-6 bg-white border-t border-pink-50">
+			<div class="max-w-3xl mx-auto">
+				<h2 class="text-lg font-bold text-plum mb-4 text-center" style="font-family:'Fredoka',sans-serif">
+					Guides & Resources
+				</h2>
+				<div class="grid sm:grid-cols-2 gap-4 text-sm">
+					<div>
+						<p class="font-bold text-plum/70 text-xs uppercase tracking-wider mb-2">Guides</p>
+						<ul class="space-y-1.5">
+							<li><a href="/guides/how-to-use-snapvie" class="text-plum/80 hover:text-primary transition-colors font-semibold">How to Use Snapvie</a></li>
+							<li><a href="/guides/how-to-download-youtube-playlists" class="text-plum/80 hover:text-primary transition-colors font-semibold">How to Download Playlists</a></li>
+							<li><a href="/guides/why-youtube-downloads-show-360p-only" class="text-plum/80 hover:text-primary transition-colors font-semibold">Why Downloads Show 360p Only</a></li>
+							<li><a href="/guides/best-format-for-youtube-downloads-mp4-vs-webm" class="text-plum/80 hover:text-primary transition-colors font-semibold">MP4 vs WebM: Best Format</a></li>
+						</ul>
+						<a href="/guides" class="inline-block mt-2 text-xs font-bold text-primary hover:underline">View all guides →</a>
+					</div>
+					<div>
+						<p class="font-bold text-plum/70 text-xs uppercase tracking-wider mb-2">Compare</p>
+						<ul class="space-y-1.5">
+							<li><a href="/compare/snapvie-vs-y2mate" class="text-plum/80 hover:text-primary transition-colors font-semibold">Snapvie vs y2mate</a></li>
+							<li><a href="/compare/best-youtube-downloader-for-4k" class="text-plum/80 hover:text-primary transition-colors font-semibold">Best Downloader for 4K</a></li>
+							<li><a href="/compare/best-youtube-downloader-for-playlists" class="text-plum/80 hover:text-primary transition-colors font-semibold">Best for Playlists</a></li>
+						</ul>
+						<a href="/compare" class="inline-block mt-2 text-xs font-bold text-primary hover:underline">View all comparisons →</a>
+					</div>
+				</div>
+			</div>
+		</section>
+
 		<ExploreMoreSnapvieTools links={relatedToolLinks} />
 		</main>
 
