@@ -3,7 +3,7 @@
  * All schemas use @id anchors for entity linking.
  */
 
-const SITE_URL = 'https://snapvie.com';
+import { SITE_URL } from '$lib/seo/public-pages';
 const SITE_NAME = 'Snapvie';
 const LOGO_URL = `${SITE_URL}/logo.svg`;
 const OG_IMAGE_URL = `${SITE_URL}/og-image.png`;

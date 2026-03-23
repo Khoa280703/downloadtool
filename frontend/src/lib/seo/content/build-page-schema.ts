@@ -4,16 +4,13 @@
  * Returns serialized JSON-LD strings ready for <script type="application/ld+json">.
  */
 
-import type { ContentEntry, ContentHubConfig, ContentPageType } from './content-types';
+import type { ContentEntry, ContentHubConfig } from './content-types';
+import { hubPath } from './content-types';
 import { contentPageUrl } from './build-page-seo';
+import { SITE_URL } from '$lib/seo/public-pages';
 
-const SITE_URL = 'https://snapvie.com';
 const ORG_ID = `${SITE_URL}/#organization`;
 const WEBSITE_ID = `${SITE_URL}/#website`;
-
-function hubPath(pageType: ContentPageType): string {
-	return pageType === 'guide' ? '/guides' : '/compare';
-}
 
 /** Article schema node for a content entry */
 export function buildArticleSchema(entry: ContentEntry) {

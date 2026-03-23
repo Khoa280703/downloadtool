@@ -3,15 +3,11 @@
  * Matches the base URL and OG conventions used in structured-data.ts.
  */
 
-import type { ContentEntry, ContentHubConfig, ContentPageType } from './content-types';
+import type { ContentEntry, ContentHubConfig } from './content-types';
+import { hubPath } from './content-types';
+import { SITE_URL } from '$lib/seo/public-pages';
 
-const SITE_URL = 'https://snapvie.com';
 const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
-
-/** Base path for each content page type */
-function hubPath(pageType: ContentPageType): string {
-	return pageType === 'guide' ? '/guides' : '/compare';
-}
 
 /** Full canonical URL for a content entry */
 export function contentPageUrl(entry: ContentEntry): string {

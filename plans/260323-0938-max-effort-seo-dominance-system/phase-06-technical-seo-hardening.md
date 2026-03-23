@@ -8,8 +8,10 @@
 
 ## Overview
 - Priority: P0
-- Status: proposed
+- Status: complete (code)
 - Brief: Khóa technical SEO ở mức "khó lỗi", đủ để scale số lượng page và locale mà không tạo index mess.
+- Code completed: llms.txt, schema (Breadcrumb, Article, ItemList, AI Search quick-answer blocks), DRY cleanup, redirects, CDN cache fix.
+- Pending: OG images (need design assets), video sitemap (YAGNI - no videos yet), CWV profiling (need performance baseline).
 
 ## Key Insights
 - Technical debt ở SEO thường không giết site ngay, nhưng nó làm mọi content effort kém hiệu quả.
@@ -127,23 +129,23 @@
 5. Review CWV bottlenecks on money and guide templates.
 
 ## Todo List
-- [ ] Canonical audit all page types
-- [ ] Hreflang audit all locale variants
-- [ ] Registry-driven sitemap
-- [ ] Breadcrumb schema across content pages
-- [ ] Noindex audit for non-public surfaces
-- [ ] CWV budget for public pages (use Phase 01 baseline)
-- [ ] Implement schema strategy matrix across all page types
-- [ ] Add Article schema with dates/author to guides and compare pages
-- [ ] Add ItemList schema to hub pages
-- [ ] Create VideoObject schema builder
-- [ ] Create video sitemap route
-- [ ] Set up YouTube channel + upload initial demo videos
-- [ ] Add AI Search quick-answer blocks to all guides
-- [ ] Create `/llms.txt` file
-- [ ] Design + deploy unique OG images for 5 money pages
-- [ ] Create OG image template for guides/compare pages
-- [ ] Switch all public pages to `summary_large_image` Twitter card
+- [x] Canonical audit all page types
+- [x] Hreflang audit all locale variants
+- [x] Registry-driven sitemap
+- [x] Breadcrumb schema across content pages
+- [x] Noindex audit for non-public surfaces
+- [ ] CWV budget for public pages (use Phase 01 baseline) — pending profiling
+- [x] Implement schema strategy matrix across all page types
+- [x] Add Article schema with dates/author to guides and compare pages
+- [x] Add ItemList schema to hub pages
+- [ ] Create VideoObject schema builder — YAGNI (no videos yet)
+- [ ] Create video sitemap route — YAGNI (no videos yet)
+- [ ] Set up YouTube channel + upload initial demo videos — out of scope Phase 06
+- [x] Add AI Search quick-answer blocks to all guides
+- [x] Create `/llms.txt` file
+- [ ] Design + deploy unique OG images for 5 money pages — pending design assets
+- [ ] Create OG image template for guides/compare pages — pending design assets
+- [x] Switch all public pages to `summary_large_image` Twitter card
 
 ## Success Criteria
 - Technical SEO remains clean as page count grows.

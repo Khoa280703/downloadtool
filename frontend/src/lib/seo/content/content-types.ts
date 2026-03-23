@@ -53,6 +53,11 @@ export interface ContentEntry {
 	canonicalSlug?: string;
 }
 
+/** Base path for each content page type */
+export function hubPath(pageType: ContentPageType): string {
+	return pageType === 'guide' ? '/guides' : '/compare';
+}
+
 export interface ContentHubConfig {
 	pageType: ContentPageType;
 	title: string;
