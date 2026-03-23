@@ -1,0 +1,45 @@
+# Preview env for Coolify
+# Clone of current production env contract.
+# Preview on Coolify may require the 4 SERVICE_* vars to be filled before saving.
+# They are platform-managed in production, but for preview you can use placeholders.
+#
+# Replace these 7 lines with your preview URLs if needed:
+# - SERVICE_FQDN_API
+# - SERVICE_FQDN_FRONTEND
+# - SERVICE_URL_API
+# - SERVICE_URL_FRONTEND
+# - ORIGIN
+# - BETTER_AUTH_TRUSTED_ORIGINS
+# - VITE_API_URL
+
+SERVICE_FQDN_API=preview-api.invalid
+SERVICE_FQDN_FRONTEND=preview.invalid
+SERVICE_URL_API=https://preview-api.invalid
+SERVICE_URL_FRONTEND=https://preview.invalid
+ORIGIN=https://your-preview-frontend.example.com
+WHOP_WEBHOOK_SECRET=your-whop-webhook-secret
+BETTER_AUTH_TRUSTED_ORIGINS=https://your-preview-frontend.example.com
+POSTGRES_PASSWORD=your-postgres-password
+BETTER_AUTH_SECRET=your-better-auth-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+WHOP_PLAN_ID=your-whop-plan-id
+VITE_API_URL=https://your-preview-api.example.com
+S3_BUCKET_NAME=your-s3-bucket-name
+S3_ACCESS_KEY_ID=your-s3-access-key-id
+S3_SECRET_ACCESS_KEY=your-s3-secret-access-key
+S3_REGION=your-s3-region
+S3_ENDPOINT=https://your-s3-endpoint.example.com
+ADMIN_EMAILS=you@example.com
+MUX_ARTIFACT_TTL_SECS=82800
+MUX_CLEANUP_INTERVAL_SECS=600
+MUX_FILE_TICKET_TTL_SECS=900
+PROXY_QUARANTINE_TTL_SECS=172800
+SHARED_PROXY_POSTGRES_PASSWORD=your-shared-proxy-postgres-password
+MUX_QUEUE_STREAM=mux_jobs
+MUX_WORKER_CONCURRENCY=64
+MUX_JOB_MAX_ATTEMPTS=3
+MUX_CLEANUP_BATCH_LIMIT=50
+MUX_QUEUE_GROUP=mux-workers
+MUX_WORKER_LEASE_SECS=90
+MUX_WORKER_RECLAIM_LIMIT=100

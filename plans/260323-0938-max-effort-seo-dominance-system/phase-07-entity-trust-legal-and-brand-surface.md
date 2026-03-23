@@ -5,7 +5,7 @@
 
 ## Overview
 - Priority: P0
-- Status: proposed
+- Status: complete
 - Brief: Trong ngách downloader, trust không phải nice-to-have. Nó là điều kiện để site không trông như low-quality tool clone.
 
 ## Key Insights
@@ -45,11 +45,11 @@
 5. Tie trust pages back into guides and homepage/footer.
 
 ## Todo List
-- [ ] Expand About page depth
-- [ ] Strengthen Contact page
-- [ ] Review legal page consistency
-- [ ] Add/update organization schema fields
-- [ ] Standardize footer/header trust links
+- [x] Expand About page depth (added How Snapvie Works, Built for Quality sections)
+- [x] Strengthen Contact page (added BreadcrumbList schema, OG tags)
+- [x] Add/update organization schema fields (description, foundingDate, contactPoint)
+- [x] Review legal page consistency (About/Contact now have consistent OG tags + schema)
+- [x] Standardize footer/header trust links (Privacy, Terms, Contact in layout.svelte)
 
 ## Success Criteria
 - Site no longer looks like a thin anonymous downloader tool.

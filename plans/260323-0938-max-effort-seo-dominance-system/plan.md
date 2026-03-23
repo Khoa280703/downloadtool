@@ -239,7 +239,7 @@ created: 2026-03-23
 | 4 | Guides cluster buildout | [phase-04-guides-cluster-buildout.md](./phase-04-guides-cluster-buildout.md) | complete (20 guides) |
 | 5 | Comparison and alternatives cluster | [phase-05-comparison-and-alternatives-cluster.md](./phase-05-comparison-and-alternatives-cluster.md) | complete (6 comparisons) |
 | 6 | Technical SEO hardening | [phase-06-technical-seo-hardening.md](./phase-06-technical-seo-hardening.md) | complete (code: llms.txt, schema, redirects, CDN cache, DRY cleanup; pending: OG images, video sitemap, CWV — need design assets/profiling) |
-| 7 | Entity, trust, legal, and brand surface | [phase-07-entity-trust-legal-and-brand-surface.md](./phase-07-entity-trust-legal-and-brand-surface.md) | proposed |
+| 7 | Entity, trust, legal, and brand surface | [phase-07-entity-trust-legal-and-brand-surface.md](./phase-07-entity-trust-legal-and-brand-surface.md) | complete (About + Contact enriched, Org schema enhanced, BreadcrumbList + OG tags added) |
 | 8 | Authority acquisition and distribution | [phase-08-authority-acquisition-and-distribution.md](./phase-08-authority-acquisition-and-distribution.md) | proposed |
 | 9 | International SEO expansion | [phase-09-international-seo-expansion.md](./phase-09-international-seo-expansion.md) | proposed |
 | 10 | CTR, CRO, and freshness loops | [phase-10-ctr-cro-and-freshness-loops.md](./phase-10-ctr-cro-and-freshness-loops.md) | proposed |
