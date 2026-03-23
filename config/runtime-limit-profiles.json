@@ -26,8 +26,8 @@
   "production": {
     "backend": {
       "extract_rate_limit_enabled": false,
-      "stream_max_concurrent": null,
-      "stream_url_refresh_max_attempts": null,
+      "stream_max_concurrent": 256,
+      "stream_url_refresh_max_attempts": 5,
       "playlist_mux_idle_timeout_secs": 300,
       "playlist_job_max_concurrent_items": 4
     },

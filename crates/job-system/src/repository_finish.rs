@@ -185,7 +185,7 @@ impl JobRepository {
         Ok(next_status)
     }
 
-    pub async fn list_expired_artifacts(&self, limit: i64) -> anyhow::Result<Vec<ArtifactRecord>> {
+    pub async fn list_expired_artifacts(&self) -> anyhow::Result<Vec<ArtifactRecord>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -196,10 +196,8 @@ impl JobRepository {
             WHERE expires_at IS NOT NULL
               AND expires_at <= NOW()
             ORDER BY expires_at ASC
-            LIMIT $1
             "#,
         )
-        .bind(limit.max(1))
         .fetch_all(self.pool())
         .await
         .context("failed to list expired artifacts")?;

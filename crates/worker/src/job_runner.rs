@@ -263,9 +263,8 @@ pub async fn republish_reclaimed_jobs(
 pub async fn cleanup_expired_artifacts(
     repo: &JobRepository,
     storage: Arc<dyn StorageBackend>,
-    batch_limit: i64,
 ) -> Result<()> {
-    let expired = repo.list_expired_artifacts(batch_limit).await?;
+    let expired = repo.list_expired_artifacts().await?;
     for artifact in expired {
         let stored = StoredArtifact {
             backend: artifact.backend.clone(),
