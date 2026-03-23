@@ -21,7 +21,8 @@ export function contentPageUrl(entry: ContentEntry): string {
 /** SEO metadata object for a content detail page */
 export function buildContentPageMeta(entry: ContentEntry) {
 	const url = contentPageUrl(entry);
-	const ogImage = `${SITE_URL}/og/${entry.pageType}-${entry.slug}.png`;
+	// TODO: generate per-page OG images, then switch to `/og/${entry.pageType}-${entry.slug}.png`
+	const ogImage = DEFAULT_OG_IMAGE;
 
 	return {
 		title: entry.title,

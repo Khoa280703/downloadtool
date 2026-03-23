@@ -16,8 +16,24 @@
 	import type { ExtractResult, Stream } from '$lib/types';
 	import type { LandingPageConfig } from '$lib/seo/landing-page-config';
 	import { CONTENT_REGISTRY } from '$lib/seo/content/content-registry';
+	import {
+		trackSeoPageView,
+		trackSeoInputFocus,
+		trackSeoExtractSubmit,
+		trackSeoExtractSuccess
+	} from '$lib/analytics/seo-page-events';
+	import { onMount } from 'svelte';
 
 	let { config }: { config: LandingPageConfig } = $props();
+
+	const seoParams = {
+		page_group: 'money' as const,
+		page_slug: config.slug,
+		cluster: config.slug,
+		locale: 'en'
+	};
+
+	onMount(() => trackSeoPageView(seoParams));
 
 	// Guides related to this money page (up to 3)
 	const relatedGuides = CONTENT_REGISTRY.filter(
@@ -48,6 +64,7 @@
 			return;
 		}
 
+		trackSeoExtractSubmit(seoParams);
 		isExtracting = true;
 		extractError = '';
 		extractResult = null;
@@ -61,6 +78,7 @@
 				return;
 			}
 			extractResult = result;
+			trackSeoExtractSuccess({ ...seoParams, format_count: result.streams.length });
 			requestAnimationFrame(() => {
 				document.getElementById('lp-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 			});
@@ -109,6 +127,7 @@
 					bind:value={inputUrl}
 					disabled={isExtracting}
 					aria-label="YouTube video URL"
+					onfocus={() => trackSeoInputFocus(seoParams)}
 				/>
 				<button
 					class="absolute right-1.5 top-1.5 bottom-1.5 flex items-center justify-center rounded-full bg-gradient-primary px-3 text-sm font-bold text-white shadow-candy transition-all hover:scale-105 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 md:gap-2 md:px-10 md:text-lg"

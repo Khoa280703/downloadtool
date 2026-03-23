@@ -2,8 +2,7 @@ import type { PageLoad } from './$types';
 import { getContentBySlug } from '$lib/seo/content/content-registry';
 import { error } from '@sveltejs/kit';
 
-// Disable prerendering until compare entries are added to content-registry.ts
-export const prerender = false;
+export const prerender = true;
 
 export const load: PageLoad = ({ params }) => {
 	const entry = getContentBySlug(params.slug);

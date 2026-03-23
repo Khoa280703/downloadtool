@@ -233,12 +233,12 @@ created: 2026-03-23
 ## Phase Table
 | # | Phase | File | Status |
 |---|-------|------|--------|
-| 1 | Measurement foundation and SEO operating system | [phase-01-measurement-foundation-and-seo-operating-system.md](./phase-01-measurement-foundation-and-seo-operating-system.md) | partial (events created, wiring pending) |
+| 1 | Measurement foundation and SEO operating system | [phase-01-measurement-foundation-and-seo-operating-system.md](./phase-01-measurement-foundation-and-seo-operating-system.md) | complete (events created + wired) |
 | 2 | Content platform architecture for scale | [phase-02-content-platform-architecture-for-scale.md](./phase-02-content-platform-architecture-for-scale.md) | complete (infrastructure) |
-| 3 | Money page domination | [phase-03-money-page-domination.md](./phase-03-money-page-domination.md) | partial (internal links + footer done) |
-| 4 | Guides cluster buildout | [phase-04-guides-cluster-buildout.md](./phase-04-guides-cluster-buildout.md) | proposed |
-| 5 | Comparison and alternatives cluster | [phase-05-comparison-and-alternatives-cluster.md](./phase-05-comparison-and-alternatives-cluster.md) | proposed |
-| 6 | Technical SEO hardening | [phase-06-technical-seo-hardening.md](./phase-06-technical-seo-hardening.md) | partial (llms.txt, schema done) |
+| 3 | Money page domination | [phase-03-money-page-domination.md](./phase-03-money-page-domination.md) | complete (internal links + footer + legacy redirects) |
+| 4 | Guides cluster buildout | [phase-04-guides-cluster-buildout.md](./phase-04-guides-cluster-buildout.md) | complete (20 guides) |
+| 5 | Comparison and alternatives cluster | [phase-05-comparison-and-alternatives-cluster.md](./phase-05-comparison-and-alternatives-cluster.md) | complete (6 comparisons) |
+| 6 | Technical SEO hardening | [phase-06-technical-seo-hardening.md](./phase-06-technical-seo-hardening.md) | partial (llms.txt, schema, redirects done) |
 | 7 | Entity, trust, legal, and brand surface | [phase-07-entity-trust-legal-and-brand-surface.md](./phase-07-entity-trust-legal-and-brand-surface.md) | proposed |
 | 8 | Authority acquisition and distribution | [phase-08-authority-acquisition-and-distribution.md](./phase-08-authority-acquisition-and-distribution.md) | proposed |
 | 9 | International SEO expansion | [phase-09-international-seo-expansion.md](./phase-09-international-seo-expansion.md) | proposed |

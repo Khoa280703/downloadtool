@@ -16,6 +16,8 @@ const PUBLIC_SEO_PATHS = ['/', '/privacy', '/about', '/terms', '/contact', '/dmc
 function isPublicSeoPage(pathname: string): boolean {
 	if (PUBLIC_SEO_PATHS.includes(pathname)) return true;
 	if (pathname.startsWith('/download-youtube-')) return true;
+	if (pathname.startsWith('/guides')) return true;
+	if (pathname.startsWith('/compare')) return true;
 	return false;
 }
 const LANGUAGE_TAGS = [
@@ -177,4 +179,26 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 		});
 	});
 
-export const handle = sequence(handleParaglide, existingHandle);
+/** 301 redirects for legacy support page URLs → /guides/[slug] */
+const LEGACY_GUIDE_SLUGS = new Set([
+	'how-to-use-snapvie',
+	'how-to-download-youtube-playlists',
+	'download-youtube-shorts-with-audio',
+	'why-youtube-downloads-show-360p-only',
+	'why-youtube-downloads-need-muxing',
+	'best-format-for-youtube-downloads-mp4-vs-webm'
+]);
+
+const handleLegacyRedirects: Handle = ({ event, resolve }) => {
+	const path = event.url.pathname.replace(/\/$/, '') || '/';
+	const slug = path.slice(1); // remove leading /
+	if (LEGACY_GUIDE_SLUGS.has(slug)) {
+		return new Response(null, {
+			status: 301,
+			headers: { location: `/guides/${slug}` }
+		});
+	}
+	return resolve(event);
+};
+
+export const handle = sequence(handleLegacyRedirects, handleParaglide, existingHandle);

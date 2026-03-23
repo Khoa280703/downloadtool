@@ -7,14 +7,25 @@
 	import { buildContentPageMeta } from '$lib/seo/content/build-page-seo';
 	import { buildContentPageJsonLd } from '$lib/seo/content/build-page-schema';
 	import { getRelatedContent } from '$lib/seo/content/related-content';
+	import { trackSeoPageView } from '$lib/analytics/seo-page-events';
 	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
 	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
+	import { onMount } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	const meta = buildContentPageMeta(data.entry);
 	const jsonLd = buildContentPageJsonLd(data.entry);
 	const related = getRelatedContent(data.entry.slug, 3);
+
+	onMount(() =>
+		trackSeoPageView({
+			page_group: 'compare',
+			page_slug: data.entry.slug,
+			cluster: data.entry.category,
+			locale: data.entry.locale
+		})
+	);
 </script>
 
 <svelte:head>
