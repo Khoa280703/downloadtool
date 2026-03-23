@@ -159,6 +159,11 @@ impl ProxyInventoryStore {
             return Ok(Vec::new());
         }
 
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("failed to begin release-expired-quarantined transaction")?;
         let rows = sqlx::query(
             r#"
             UPDATE proxies
@@ -171,7 +176,7 @@ impl ProxyInventoryStore {
             "#,
         )
         .bind(quarantine_ttl_secs as f64)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *tx)
         .await
         .context("failed to release expired quarantined proxies")?;
 
@@ -190,10 +195,14 @@ impl ProxyInventoryStore {
                 "proxy_url": proxy_url,
                 "source": "quarantine-ttl"
             }))
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .context("failed to record expired quarantine release event")?;
         }
+
+        tx.commit()
+            .await
+            .context("failed to commit release-expired-quarantined transaction")?;
 
         Ok(rows
             .into_iter()

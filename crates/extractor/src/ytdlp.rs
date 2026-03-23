@@ -127,12 +127,31 @@ async fn require_proxy(preferred_proxy: Option<&str>) -> Result<SelectedProxy, E
     const PROXY_ACQUIRE_RETRY_DELAY_MS: u64 = 50;
     const PROXY_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
 
+    let Some(pool) = get_proxy_pool() else {
+        return select_proxy_with_preference(preferred_proxy).ok_or_else(|| {
+            ExtractionError::ScriptExecutionFailed(
+                "proxy-only mode requires at least one healthy proxy".to_string(),
+            )
+        });
+    };
+
     let deadline = Instant::now() + PROXY_ACQUIRE_TIMEOUT;
     while Instant::now() < deadline {
         if let Some(proxy) = select_proxy_with_preference(preferred_proxy) {
             return Ok(proxy);
         }
+        if !pool.has_usable_proxy() {
+            return Err(ExtractionError::ScriptExecutionFailed(
+                "proxy-only mode requires at least one usable proxy".to_string(),
+            ));
+        }
         tokio::time::sleep(Duration::from_millis(PROXY_ACQUIRE_RETRY_DELAY_MS)).await;
+    }
+
+    if !pool.has_healthy_proxy() && !pool.has_usable_proxy() {
+        return Err(ExtractionError::ScriptExecutionFailed(
+            "proxy-only mode requires at least one usable proxy".to_string(),
+        ));
     }
 
     Err(ExtractionError::ScriptExecutionFailed(
@@ -433,10 +452,6 @@ async fn extract_subprocess(
     url: String,
     preferred_proxy: Option<String>,
 ) -> Result<Arc<VideoInfo>, ExtractionError> {
-    let _permit = get_semaphore().acquire().await.map_err(|error| {
-        ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
-    })?;
-
     let pool_rotation_enabled = get_proxy_pool().is_some();
     let max_attempts = if pool_rotation_enabled {
         MAX_PROXY_ROTATION_ATTEMPTS
@@ -448,6 +463,9 @@ async fn extract_subprocess(
 
     for attempt in 0..max_attempts {
         let selected_proxy = require_proxy(preferred_proxy.as_deref()).await?;
+        let _permit = get_semaphore().acquire().await.map_err(|error| {
+            ExtractionError::ScriptExecutionFailed(format!("semaphore acquire failed: {error}"))
+        })?;
         let attempt_started_at = Instant::now();
         debug!(
             url = %url,

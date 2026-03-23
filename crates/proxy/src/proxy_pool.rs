@@ -120,13 +120,6 @@ impl ProxyEntry {
 
     fn set_quarantined(&self, quarantined: bool) {
         self.quarantined.store(quarantined, Ordering::Relaxed);
-        if !quarantined {
-            self.failed_count.store(0, Ordering::Relaxed);
-            self.bot_check_streak.store(0, Ordering::Relaxed);
-            if let Ok(mut last_failed) = self.last_failed.write() {
-                *last_failed = None;
-            }
-        }
     }
 
     fn try_acquire_extract_slot(&self) -> bool {
@@ -159,6 +152,9 @@ impl ProxyEntry {
 
         self.failed_count
             .store(health.fail_count.min(MAX_FAILURES), Ordering::Relaxed);
+        if !health.cooldown_active && health.fail_count == 0 {
+            self.bot_check_streak.store(0, Ordering::Relaxed);
+        }
 
         if let Ok(mut last_failed) = self.last_failed.write() {
             *last_failed = if health.cooldown_active || health.fail_count > 0 {
@@ -282,6 +278,20 @@ impl ProxyPool {
         }
 
         None
+    }
+
+    pub fn has_healthy_proxy(&self) -> bool {
+        self.proxies
+            .read()
+            .map(|guard| guard.iter().any(|entry| entry.is_healthy()))
+            .unwrap_or(false)
+    }
+
+    pub fn has_usable_proxy(&self) -> bool {
+        self.proxies
+            .read()
+            .map(|guard| guard.iter().any(|entry| !entry.is_quarantined()))
+            .unwrap_or(false)
     }
 
     pub fn try_acquire_preferred_owned(&self, proxy_url: &str) -> Option<ProxyLease> {
