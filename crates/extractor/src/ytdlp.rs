@@ -6,7 +6,7 @@
 use crate::runtime_limit_profiles::extractor_limit_profile;
 use crate::types::{ExtractionError, VideoFormat, VideoInfo};
 use moka::future::Cache;
-use proxy::{ProxyExtractEvent, ProxyPool};
+use proxy::{ProxyExtractEvent, ProxyPool, BOT_CHECK_QUARANTINE_THRESHOLD};
 use serde_json::Value;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -19,7 +19,7 @@ use tracing::{debug, info, warn};
 const MAX_CONCURRENT_YTDLP: usize = 10;
 const EXTRACT_CACHE_MAX_CAPACITY: u64 = 500;
 const DEFAULT_EXTRACT_CACHE_TTL_SECONDS: u64 = 300;
-const MAX_PROXY_ROTATION_ATTEMPTS: usize = 3;
+const MAX_PROXY_ROTATION_ATTEMPTS: usize = 5;
 const STREAM_PROXY_CACHE_MAX_CAPACITY: u64 = 10_000;
 const DEFAULT_STREAM_PROXY_CACHE_TTL_SECONDS: u64 = 1800;
 
@@ -595,11 +595,15 @@ async fn extract_subprocess(
                             .note_bot_check(&selected_proxy.url, "yt-dlp-bot-check")
                             .await
                         {
-                            pool.quarantine(&selected_proxy.url, "yt-dlp-bot-check-streak-2");
+                            pool.quarantine(
+                                &selected_proxy.url,
+                                "yt-dlp-bot-check-streak-5",
+                            );
                         } else {
                             warn!(
                                 proxy = %selected_proxy.url,
-                                "Proxy hit bot-check once; waiting for one more consecutive bot-check before quarantine"
+                                threshold = BOT_CHECK_QUARANTINE_THRESHOLD,
+                                "Proxy hit bot-check; waiting for more consecutive bot-checks before quarantine"
                             );
                         }
                     }

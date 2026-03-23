@@ -21,6 +21,7 @@ use crate::proxy_quarantine::append_quarantine_record;
 
 /// Maximum consecutive failures before marking proxy as unhealthy.
 pub const MAX_FAILURES: usize = 3;
+pub const BOT_CHECK_QUARANTINE_THRESHOLD: usize = 5;
 /// Default cooldown period for failed proxies.
 pub const FAILURE_COOLDOWN: Duration = Duration::from_secs(1800);
 
@@ -266,14 +267,14 @@ impl ProxyPool {
 
         if let Some(health_store) = self.health_store.clone() {
             match health_store.record_bot_check(proxy_url, reason).await {
-                Ok(streak) => return streak >= 2,
+                Ok(streak) => return streak >= BOT_CHECK_QUARANTINE_THRESHOLD,
                 Err(error) => {
                     warn!(err = %error, "Failed to persist proxy bot-check streak to redis");
                 }
             }
         }
 
-        local_streak >= 2
+        local_streak >= BOT_CHECK_QUARANTINE_THRESHOLD
     }
 
     pub fn clear_bot_check_streak(&self, proxy_url: &str) {
