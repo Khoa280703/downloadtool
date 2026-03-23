@@ -32,6 +32,7 @@ struct ProxyEntry {
     failed_count: AtomicUsize,
     bot_check_streak: AtomicUsize,
     extract_in_flight: AtomicUsize,
+    download_in_flight: AtomicUsize,
     health_score: AtomicUsize,
     last_failed: RwLock<Option<Instant>>,
 }
@@ -44,6 +45,7 @@ impl ProxyEntry {
             failed_count: AtomicUsize::new(0),
             bot_check_streak: AtomicUsize::new(0),
             extract_in_flight: AtomicUsize::new(0),
+            download_in_flight: AtomicUsize::new(0),
             health_score: AtomicUsize::new(health_score.clamp(0, 100) as usize),
             last_failed: RwLock::new(None),
         }
@@ -132,6 +134,19 @@ impl ProxyEntry {
         self.extract_in_flight.store(0, Ordering::Release);
     }
 
+    fn acquire_download_slot(&self) {
+        self.download_in_flight.fetch_add(1, Ordering::AcqRel);
+    }
+
+    fn release_download_slot(&self) {
+        let previous = self.download_in_flight.fetch_sub(1, Ordering::AcqRel);
+        debug_assert!(previous > 0, "download slot released without acquisition");
+    }
+
+    fn has_download_in_flight(&self) -> bool {
+        self.download_in_flight.load(Ordering::Acquire) > 0
+    }
+
     fn note_bot_check(&self) -> usize {
         self.bot_check_streak.fetch_add(1, Ordering::Relaxed) + 1
     }
@@ -180,6 +195,19 @@ impl ProxyLease {
 impl Drop for ProxyLease {
     fn drop(&mut self) {
         self.entry.release_extract_slot();
+    }
+}
+
+#[derive(Debug)]
+pub struct ProxyDownloadLease {
+    entries: Vec<Arc<ProxyEntry>>,
+}
+
+impl Drop for ProxyDownloadLease {
+    fn drop(&mut self) {
+        for entry in &self.entries {
+            entry.release_download_slot();
+        }
     }
 }
 
@@ -261,7 +289,9 @@ impl ProxyPool {
         }
 
         if let Some(entry) = rotated_pick_entry(&guard, start_idx, |entry| {
-            entry.is_healthy() && entry.try_acquire_extract_slot()
+            entry.is_healthy()
+                && !entry.has_download_in_flight()
+                && entry.try_acquire_extract_slot()
         }) {
             return Some(ProxyLease { entry });
         }
@@ -271,7 +301,9 @@ impl ProxyPool {
         }
 
         if let Some(entry) = rotated_pick_entry(&guard, start_idx, |entry| {
-            !entry.is_quarantined() && entry.try_acquire_extract_slot()
+            !entry.is_quarantined()
+                && !entry.has_download_in_flight()
+                && entry.try_acquire_extract_slot()
         }) {
             warn!("No free healthy proxies available, falling back to free non-quarantined proxy");
             return Some(ProxyLease { entry });
@@ -296,10 +328,34 @@ impl ProxyPool {
 
     pub fn try_acquire_preferred_owned(&self, proxy_url: &str) -> Option<ProxyLease> {
         let entry = self.find_entry(proxy_url)?;
-        if !entry.is_healthy() || !entry.try_acquire_extract_slot() {
+        if !entry.is_healthy()
+            || entry.has_download_in_flight()
+            || !entry.try_acquire_extract_slot()
+        {
             return None;
         }
         Some(ProxyLease { entry })
+    }
+
+    pub fn acquire_download_leases<'a>(
+        &self,
+        proxy_urls: impl IntoIterator<Item = Option<&'a str>>,
+    ) -> ProxyDownloadLease {
+        let mut grouped = HashMap::<String, Arc<ProxyEntry>>::new();
+        for proxy_url in proxy_urls.into_iter().flatten() {
+            if grouped.contains_key(proxy_url) {
+                continue;
+            }
+
+            if let Some(entry) = self.find_entry(proxy_url) {
+                entry.acquire_download_slot();
+                grouped.insert(proxy_url.to_string(), entry);
+            }
+        }
+
+        ProxyDownloadLease {
+            entries: grouped.into_values().collect(),
+        }
     }
 
     /// Mark a specific proxy as failed.
@@ -852,6 +908,30 @@ mod tests {
             .try_acquire_next_owned()
             .expect("healthy proxy should become available after release");
         assert_eq!(next.proxy_url(), "http://proxy1:8080");
+    }
+
+    #[test]
+    fn test_extract_slot_skips_proxy_with_download_in_flight() {
+        let pool = ProxyPool::new(vec![
+            "http://proxy1:8080".to_string(),
+            "http://proxy2:8080".to_string(),
+        ]);
+
+        let _download = pool.acquire_download_leases([Some("http://proxy1:8080"), None]);
+        let extract = pool
+            .try_acquire_next_owned()
+            .expect("extract should use proxy that is not busy downloading");
+        assert_eq!(extract.proxy_url(), "http://proxy2:8080");
+    }
+
+    #[test]
+    fn test_preferred_extract_proxy_rejected_while_download_busy() {
+        let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
+
+        let _download = pool.acquire_download_leases([Some("http://proxy1:8080")]);
+        assert!(pool
+            .try_acquire_preferred_owned("http://proxy1:8080")
+            .is_none());
     }
 
     #[test]

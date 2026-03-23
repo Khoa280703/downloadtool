@@ -93,6 +93,10 @@ pub async fn upload_muxed_artifact(
         .map(|value| value.max_refresh_attempts)
         .unwrap_or(0)
     {
+        let _download_leases = global_proxy_pool().map(|pool| {
+            pool.acquire_download_leases([video_proxy.as_deref(), audio_proxy.as_deref()])
+        });
+
         if let Err(error) = progress
             .publish_phase(JobProgressPhase::FetchingStreams, None)
             .await
