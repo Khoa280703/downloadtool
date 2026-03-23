@@ -183,17 +183,16 @@ async fn process_playlist_worker_loop(
             return Ok(());
         };
 
-        let result =
-            process_single_item(
-                &item.id,
-                &item.video_id,
-                job,
-                owner,
-                repo,
-                job_control_plane,
-                job_progress_store,
-            )
-            .await;
+        let result = process_single_item(
+            &item.id,
+            &item.video_id,
+            job,
+            owner,
+            repo,
+            job_control_plane,
+            job_progress_store,
+        )
+        .await;
 
         match result {
             Ok(()) => {
@@ -237,23 +236,27 @@ async fn discover_playlist_items(
     source_url: &str,
     repo: &PlaylistJobRepository,
 ) -> anyhow::Result<Vec<(String, String, Option<String>, i32)>> {
-    let playlist_id = extract_playlist_id(source_url)
-        .context("Could not parse playlist ID from URL")?;
+    let playlist_id =
+        extract_playlist_id(source_url).context("Could not parse playlist ID from URL")?;
     let playlist_url = format!("https://www.youtube.com/playlist?list={playlist_id}");
 
     let raw = extractor::extract_playlist("youtube", &playlist_url)
         .await
         .map_err(|e| anyhow::anyhow!("Playlist extraction failed: {e}"))?;
 
-    let mut entries: Vec<PlaylistVideoEntry> = serde_json::from_value(raw)
-        .context("Invalid playlist payload")?;
+    let mut entries: Vec<PlaylistVideoEntry> =
+        serde_json::from_value(raw).context("Invalid playlist payload")?;
     entries.sort_by_key(|e| e.index);
 
     let items: Vec<(String, String, Option<String>, i32)> = entries
         .into_iter()
         .enumerate()
         .map(|(i, e)| {
-            let ordinal = if e.index == 0 { (i + 1) as i32 } else { e.index as i32 };
+            let ordinal = if e.index == 0 {
+                (i + 1) as i32
+            } else {
+                e.index as i32
+            };
             (e.video_id, e.title, e.thumbnail, ordinal)
         })
         .collect();
@@ -354,9 +357,13 @@ async fn process_single_item(
     .await?;
 
     // Wait for mux job to finish
-    let download_url =
-        wait_for_mux_ready(&mux_result.job_id, owner, job_control_plane, job_progress_store)
-            .await?;
+    let download_url = wait_for_mux_ready(
+        &mux_result.job_id,
+        owner,
+        job_control_plane,
+        job_progress_store,
+    )
+    .await?;
 
     repo.update_item_status(
         item_id,
@@ -451,7 +458,10 @@ fn pick_best_streams(
     formats: &[extractor::VideoFormat],
     quality: &str,
     mode: &str,
-) -> (Option<extractor::VideoFormat>, Option<extractor::VideoFormat>) {
+) -> (
+    Option<extractor::VideoFormat>,
+    Option<extractor::VideoFormat>,
+) {
     // Audio-only mode: direct download — allow all formats including WebM
     if mode == "audio" {
         let best_audio = formats
@@ -483,7 +493,11 @@ fn pick_best_streams(
                 .iter()
                 .filter(|f| f.height.unwrap_or(0) <= target)
                 .max_by_key(|f| f.height.unwrap_or(0))
-                .or_else(|| all_videos.iter().min_by_key(|f| f.height.unwrap_or(u32::MAX)))
+                .or_else(|| {
+                    all_videos
+                        .iter()
+                        .min_by_key(|f| f.height.unwrap_or(u32::MAX))
+                })
                 .cloned()
                 .cloned()
         } else {
@@ -508,7 +522,11 @@ fn pick_best_streams(
             .iter()
             .filter(|f| f.height.unwrap_or(0) <= target)
             .max_by_key(|f| f.height.unwrap_or(0))
-            .or_else(|| mp4_videos.iter().min_by_key(|f| f.height.unwrap_or(u32::MAX)))
+            .or_else(|| {
+                mp4_videos
+                    .iter()
+                    .min_by_key(|f| f.height.unwrap_or(u32::MAX))
+            })
             .cloned()
             .cloned()
     } else {
@@ -571,7 +589,11 @@ fn extract_playlist_id(url: &str) -> Option<String> {
     let rest = &url[start..];
     let end = rest.find('&').unwrap_or(rest.len());
     let id = &rest[..end];
-    if id.is_empty() { None } else { Some(id.to_string()) }
+    if id.is_empty() {
+        None
+    } else {
+        Some(id.to_string())
+    }
 }
 
 fn rand_jitter(max_ms: u64) -> u64 {
@@ -659,7 +681,10 @@ mod tests {
     fn video_only_mode_returns_best_video_no_audio_allows_webm() {
         let formats = sample_formats();
         let (video, audio) = pick_best_streams(&formats, "best", "video-only");
-        assert!(audio.is_none(), "video-only mode must not return an audio stream");
+        assert!(
+            audio.is_none(),
+            "video-only mode must not return an audio stream"
+        );
         let v = video.expect("video-only mode must return a video stream");
         // Both mp4 and webm 1080p exist — pick highest resolution (webm allowed)
         assert_eq!(v.height, Some(1080));

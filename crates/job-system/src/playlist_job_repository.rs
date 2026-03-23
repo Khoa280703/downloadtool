@@ -110,11 +110,7 @@ impl PlaylistJobRepository {
     }
 
     /// Update playlist job status.
-    pub async fn update_job_status(
-        &self,
-        job_id: &str,
-        status: PlaylistJobStatus,
-    ) -> Result<()> {
+    pub async fn update_job_status(&self, job_id: &str, status: PlaylistJobStatus) -> Result<()> {
         sqlx::query(
             "UPDATE playlist_jobs SET status = $2, updated_at_ms = $3, updated_at = NOW() WHERE id = $1",
         )
@@ -201,7 +197,11 @@ impl PlaylistJobRepository {
     ) -> Result<Vec<PlaylistJobItemRecord>> {
         let now = now_ms();
         let mut records = Vec::with_capacity(items.len());
-        let mut tx = self.pool.begin().await.context("failed to begin transaction")?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("failed to begin transaction")?;
 
         for (video_id, title, thumbnail, ordinal) in items {
             let id = self.next_id("pli");
@@ -266,7 +266,10 @@ impl PlaylistJobRepository {
         .await
         .context("failed to fetch playlist job items")?;
 
-        Ok(rows.into_iter().map(PlaylistJobItemRow::into_record).collect())
+        Ok(rows
+            .into_iter()
+            .map(PlaylistJobItemRow::into_record)
+            .collect())
     }
 
     /// Claim next pending item for processing (SELECT FOR UPDATE SKIP LOCKED).

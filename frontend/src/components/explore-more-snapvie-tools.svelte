@@ -24,7 +24,7 @@
 			{#if showHomeLink}
 				<a
 					href="/"
-					class="explore-tools-link inline-flex items-center gap-2 rounded-full border border-pink-100 bg-white px-5 py-2 text-sm font-bold text-plum hover:text-primary hover:border-primary transition-colors"
+					class="explore-tools-link inline-flex items-center gap-2 rounded-full border border-pink-100 bg-white px-5 py-2 text-sm font-semibold text-plum hover:text-primary hover:border-primary transition-colors"
 				>
 					<AppIcon name="home" class="text-base" />
 					Back to Snapvie
@@ -33,7 +33,7 @@
 			{#each links as link}
 				<a
 					href={link.href}
-					class="explore-tools-link inline-flex items-center gap-2 rounded-full border border-pink-100 bg-white px-5 py-2 text-sm font-bold text-plum hover:text-primary hover:border-primary transition-colors"
+					class="explore-tools-link inline-flex items-center gap-2 rounded-full border border-pink-100 bg-white px-5 py-2 text-sm font-semibold text-plum hover:text-primary hover:border-primary transition-colors"
 				>
 					{link.label}
 				</a>
@@ -43,6 +43,16 @@
 </section>
 
 <style>
+	.explore-tools-title {
+		font-family: 'Fredoka', sans-serif;
+		font-weight: 700;
+	}
+
+	.explore-tools-link {
+		font-family: 'Fredoka', sans-serif;
+		font-weight: 600;
+	}
+
 	:global(.page-root.theme-dark) .explore-tools-section {
 		background-color: rgba(18, 18, 26, 0.88);
 		border-color: rgba(255, 77, 140, 0.16);

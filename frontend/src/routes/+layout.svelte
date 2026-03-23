@@ -301,7 +301,7 @@ async function handleAuthSuccess(target: string): Promise<void> {
 
 	{#if !isLocalizedHomePath($page.url.pathname) && !isAdminPath($page.url.pathname)}
 		<footer class="bg-white border-t border-pink-100 py-6 px-6">
-			<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+			<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 md:pr-40">
 				<div class="flex items-center gap-2 transition-all">
 					<img
 						src="/logo.svg"
@@ -331,12 +331,12 @@ async function handleAuthSuccess(target: string): Promise<void> {
 
 		<button
 			type="button"
-			class="theme-toggle fixed bottom-5 right-5 z-[70] flex h-12 min-w-[120px] items-center justify-center gap-2 rounded-full px-4 text-sm font-bold shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 backdrop-blur-md"
+			class="theme-toggle fixed bottom-4 right-4 z-[70] flex h-11 w-11 min-w-0 items-center justify-center rounded-full px-0 text-sm font-bold shadow-xl transition-all duration-300 backdrop-blur-md hover:scale-105 active:scale-95 sm:bottom-5 sm:right-5 sm:h-12 sm:w-auto sm:min-w-[120px] sm:gap-2 sm:px-4"
 			onclick={toggleTheme}
 			aria-label={isDarkMode ? m.common_theme_switch_to_light() : m.common_theme_switch_to_dark()}
 		>
 			<AppIcon name={isDarkMode ? 'light_mode' : 'dark_mode'} class="text-[18px]" />
-			<span>{isDarkMode ? m.common_theme_light_mode() : m.common_theme_dark_mode()}</span>
+			<span class="hidden sm:inline">{isDarkMode ? m.common_theme_light_mode() : m.common_theme_dark_mode()}</span>
 		</button>
 	{/if}
 </div>
@@ -377,14 +377,45 @@ async function handleAuthSuccess(target: string): Promise<void> {
 	}
 
 	.page-root {
+		position: relative;
+		isolation: isolate;
 		background-color: #fff5f9;
 		color: #2d1b36;
 		transition: background-color 220ms ease, color 220ms ease;
 	}
 
+	.page-root::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		pointer-events: none;
+		opacity: 0.88;
+		filter: blur(18px);
+		background-image:
+			radial-gradient(circle at center, rgba(255, 185, 56, 0.14) 0, rgba(255, 185, 56, 0.14) 38%, transparent 70%),
+			radial-gradient(circle at center, rgba(255, 77, 140, 0.12) 0, rgba(255, 77, 140, 0.12) 40%, transparent 72%),
+			radial-gradient(circle at center, rgba(255, 185, 56, 0.1) 0, rgba(255, 185, 56, 0.1) 34%, transparent 66%);
+		background-size: 18rem 18rem, 24rem 24rem, 14rem 14rem;
+		background-position:
+			6% 5rem,
+			88% 18rem,
+			78% 6rem;
+		background-repeat: repeat-y;
+	}
+
 	.page-root.theme-dark {
 		background-color: #12121a;
 		color: #e0d0f5;
+	}
+
+	.page-root.theme-dark::before {
+		opacity: 0.34;
+		filter: blur(26px);
+		background-image:
+			radial-gradient(circle at center, rgba(255, 185, 56, 0.16) 0, rgba(255, 185, 56, 0.16) 38%, transparent 70%),
+			radial-gradient(circle at center, rgba(255, 77, 140, 0.16) 0, rgba(255, 77, 140, 0.16) 40%, transparent 72%),
+			radial-gradient(circle at center, rgba(129, 140, 248, 0.12) 0, rgba(129, 140, 248, 0.12) 34%, transparent 66%);
 	}
 
 	.page-root.admin-route,

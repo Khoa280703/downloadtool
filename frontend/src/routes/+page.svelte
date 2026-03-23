@@ -6,7 +6,9 @@
 	import AppIcon from '$components/AppIcon.svelte';
 	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
 	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
+	import HowItWorksThreeSteps from '$components/how-it-works-three-steps.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
+	import WhySnapvieSection from '$components/why-snapvie-section.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
@@ -21,7 +23,6 @@
 		type PlaylistJobSnapshot,
 		type PlaylistJobEventSubscription
 	} from '$lib/playlist-job-api';
-	import mikeAvatar from '$lib/assets/testimonials/mike.webp';
 	import * as m from '$lib/paraglide/messages';
 	import {
 		PLAYLIST_DOWNLOAD_MODE_OPTIONS,
@@ -35,8 +36,6 @@
 		pickSaveDirectory,
 		saveDownload
 	} from '$lib/playlist-download-file-saver';
-
-	import sarahAvatar from '$lib/assets/testimonials/sarah.webp';
 	import {
 		addBatchItem,
 		batchProgress,
@@ -50,9 +49,6 @@
 		updateBatchItemProgressByVideoId
 	} from '$stores/batch';
 	import type { ExtractResult, Stream } from '$lib/types';
-	import user1Avatar from '$lib/assets/testimonials/user-1.webp';
-	import user2Avatar from '$lib/assets/testimonials/user-2.webp';
-	import user3Avatar from '$lib/assets/testimonials/user-3.webp';
 	import { currentDownload } from '$stores/download';
 
 	type AuthUser = { name?: string | null; email: string; image?: string | null };
@@ -804,23 +800,6 @@
 			description: m.home_why_usp4_desc()
 		}
 	];
-	const qualityCards = [
-		{
-			icon: 'high_quality',
-			label: m.home_quality_label_resolutions(),
-			value: m.home_quality_res_list()
-		},
-		{
-			icon: 'hdr_strong',
-			label: m.home_quality_label_hdr(),
-			value: m.home_quality_hdr_list()
-		},
-		{
-			icon: 'movie_edit',
-			label: m.home_quality_label_modes(),
-			value: m.home_quality_modes_list()
-		}
-	];
 	const relatedToolLinks = [
 		{ href: '/download-youtube-8k-hdr', label: '8K HDR Videos' },
 		{ href: '/download-youtube-playlist', label: 'Playlist Download' },
@@ -916,7 +895,7 @@
 		}
 
 		.page-root {
-			background-color: #fff5f9;
+			background-color: transparent;
 			color: #2d1b36;
 			transition: background-color 220ms ease, color 220ms ease;
 		}
@@ -928,7 +907,7 @@
 		}
 
 		.page-root.theme-dark {
-			background-color: #12121a;
+			background-color: transparent;
 			color: #e0d0f5;
 		}
 
@@ -1005,12 +984,6 @@
 			border-color: rgba(255, 255, 255, 0.08) !important;
 		}
 
-		.page-root.theme-dark .step-paste-card {
-			background: linear-gradient(135deg, rgba(38, 34, 56, 0.95), rgba(29, 26, 43, 0.95)) !important;
-			border-color: rgba(255, 77, 140, 0.22) !important;
-			box-shadow: 0 0 20px rgba(255, 77, 140, 0.28) !important;
-		}
-
 		.page-root.theme-dark .download-result-card {
 			background: rgba(22, 22, 32, 0.92) !important;
 			border-color: rgba(255, 77, 140, 0.2) !important;
@@ -1078,11 +1051,6 @@
 
 		.page-root.theme-dark footer a:hover {
 			color: #ff4d8c !important;
-		}
-
-		.defer-render-how-it-works {
-			content-visibility: auto;
-			contain-intrinsic-size: 580px;
 		}
 
 		.defer-render-tools {
@@ -1314,340 +1282,6 @@
 			color: rgba(224, 208, 245, 0.84) !important;
 		}
 
-		.closing-stage {
-			position: relative;
-			overflow: hidden;
-			padding: 4rem 1.5rem 4.5rem;
-		}
-
-		.closing-stage::before,
-		.closing-stage::after {
-			content: '';
-			position: absolute;
-			border-radius: 999px;
-			filter: blur(64px);
-			pointer-events: none;
-			opacity: 0.55;
-		}
-
-		.closing-stage::before {
-			top: 4rem;
-			left: -6rem;
-			width: 16rem;
-			height: 16rem;
-			background: rgba(255, 77, 140, 0.14);
-		}
-
-		.closing-stage::after {
-			right: -5rem;
-			bottom: 5rem;
-			width: 18rem;
-			height: 18rem;
-			background: rgba(255, 185, 56, 0.16);
-		}
-
-		.closing-shell {
-			position: relative;
-			z-index: 1;
-			max-width: 80rem;
-			margin: 0 auto;
-			display: grid;
-			gap: 1.25rem;
-		}
-
-		.closing-panel {
-			position: relative;
-			overflow: hidden;
-			border: 1px solid rgba(255, 77, 140, 0.12);
-			border-radius: 2rem;
-			background:
-				linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 250, 252, 0.98)),
-				linear-gradient(135deg, rgba(255, 77, 140, 0.04), rgba(255, 185, 56, 0.06));
-			box-shadow: 0 30px 60px -44px rgba(84, 24, 64, 0.28);
-		}
-
-		.closing-panel::before {
-			content: '';
-			position: absolute;
-			inset: 0;
-			background:
-				linear-gradient(125deg, rgba(255, 255, 255, 0.62), transparent 48%),
-				radial-gradient(circle at top right, rgba(255, 77, 140, 0.08), transparent 34%);
-			pointer-events: none;
-		}
-
-		.closing-panel-content {
-			position: relative;
-			z-index: 1;
-			padding: 1.5rem;
-		}
-
-		.closing-eyebrow {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.5rem;
-			border-radius: 999px;
-			padding: 0.45rem 0.85rem;
-			background: rgba(255, 77, 140, 0.08);
-			color: #be185d;
-			font-size: 0.7rem;
-			font-weight: 800;
-			letter-spacing: 0.16em;
-			text-transform: uppercase;
-		}
-
-		.closing-title {
-			font-size: clamp(1.7rem, 3vw, 2.6rem);
-			line-height: 1.02;
-			font-weight: 700;
-			color: #2d1b36;
-			letter-spacing: -0.03em;
-		}
-
-		.closing-subtitle {
-			max-width: 42rem;
-			color: rgba(45, 27, 54, 0.72);
-			font-size: 0.98rem;
-			font-weight: 700;
-			line-height: 1.7;
-		}
-
-		.closing-feature-grid,
-		.closing-quality-grid {
-			display: grid;
-			gap: 1rem;
-		}
-
-		.closing-feature-card {
-			position: relative;
-			overflow: hidden;
-			border-radius: 1.65rem;
-			padding: 1.15rem;
-			background: rgba(255, 255, 255, 0.76);
-			border: 1px solid rgba(255, 77, 140, 0.08);
-			box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-			transition:
-				transform 220ms ease,
-				box-shadow 220ms ease,
-				border-color 220ms ease;
-		}
-
-		.closing-feature-card:hover {
-			transform: translateY(-3px);
-			box-shadow: 0 24px 40px -32px rgba(84, 24, 64, 0.32);
-			border-color: rgba(255, 77, 140, 0.16);
-		}
-
-		.closing-feature-top {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			margin-bottom: 0.95rem;
-		}
-
-		.closing-feature-icon,
-		.closing-quality-icon {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			border-radius: 1rem;
-			flex-shrink: 0;
-		}
-
-		.closing-feature-icon {
-			width: 3rem;
-			height: 3rem;
-			font-size: 1.4rem;
-		}
-
-		.closing-feature-kicker {
-			font-size: 0.72rem;
-			font-weight: 800;
-			letter-spacing: 0.18em;
-			text-transform: uppercase;
-			color: rgba(45, 27, 54, 0.34);
-		}
-
-		.closing-feature-card h3,
-		.closing-quality-card h3 {
-			font-family: 'Fredoka', sans-serif;
-		}
-
-		.closing-feature-card h3 {
-			font-size: 1.08rem;
-			font-weight: 700;
-			color: #2d1b36;
-			margin-bottom: 0.45rem;
-		}
-
-		.closing-feature-card p {
-			font-size: 0.88rem;
-			line-height: 1.65;
-			font-weight: 700;
-			color: rgba(45, 27, 54, 0.68);
-		}
-
-		.closing-proof {
-			margin-top: 1.15rem;
-			border-top: 1px solid rgba(255, 77, 140, 0.12);
-			padding-top: 1.15rem;
-		}
-
-		.closing-feature-primary .closing-feature-icon {
-			background: rgba(255, 77, 140, 0.12);
-			color: #ff4d8c;
-		}
-
-		.closing-feature-secondary .closing-feature-icon {
-			background: rgba(99, 102, 241, 0.12);
-			color: #5b5cf0;
-		}
-
-		.closing-feature-accent .closing-feature-icon {
-			background: rgba(255, 185, 56, 0.16);
-			color: #dd8a00;
-		}
-
-		.closing-feature-neutral .closing-feature-icon {
-			background: rgba(45, 27, 54, 0.08);
-			color: #2d1b36;
-		}
-
-		.closing-quality-card {
-			position: relative;
-			overflow: hidden;
-			border-radius: 1.65rem;
-			padding: 1.2rem;
-			background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(255, 248, 251, 0.92));
-			border: 1px solid rgba(255, 77, 140, 0.08);
-		}
-
-		.closing-quality-card::before {
-			content: '';
-			position: absolute;
-			inset: auto -18% -42% auto;
-			width: 8rem;
-			height: 8rem;
-			border-radius: 999px;
-			background: rgba(255, 77, 140, 0.08);
-		}
-
-		.closing-quality-top {
-			position: relative;
-			z-index: 1;
-			display: flex;
-			align-items: center;
-			gap: 0.75rem;
-			margin-bottom: 0.95rem;
-		}
-
-		.closing-quality-icon {
-			width: 2.7rem;
-			height: 2.7rem;
-			background: rgba(255, 77, 140, 0.1);
-			color: #ff4d8c;
-			font-size: 1.2rem;
-		}
-
-		.closing-quality-card h3 {
-			font-size: 0.78rem;
-			font-weight: 800;
-			letter-spacing: 0.14em;
-			text-transform: uppercase;
-			color: rgba(45, 27, 54, 0.48);
-		}
-
-		.closing-quality-card p {
-			position: relative;
-			z-index: 1;
-			font-size: 1rem;
-			line-height: 1.7;
-			font-weight: 700;
-			color: #2d1b36;
-		}
-
-		.closing-quality-note {
-			position: relative;
-			z-index: 1;
-			display: inline-flex;
-			align-items: center;
-			gap: 0.55rem;
-			border-radius: 999px;
-			padding: 0.7rem 1rem;
-			background: rgba(45, 27, 54, 0.04);
-			color: rgba(45, 27, 54, 0.62);
-			font-size: 0.82rem;
-			font-weight: 700;
-		}
-
-		.page-root.theme-dark .closing-panel {
-			background:
-				linear-gradient(180deg, rgba(26, 23, 39, 0.94), rgba(18, 18, 26, 0.96)),
-				linear-gradient(135deg, rgba(255, 77, 140, 0.07), rgba(255, 185, 56, 0.08));
-			border-color: rgba(255, 77, 140, 0.2);
-			box-shadow: 0 30px 60px -44px rgba(0, 0, 0, 0.58);
-		}
-
-		.page-root.theme-dark .closing-panel::before {
-			background:
-				linear-gradient(125deg, rgba(255, 255, 255, 0.03), transparent 48%),
-				radial-gradient(circle at top right, rgba(255, 77, 140, 0.14), transparent 34%);
-		}
-
-		.page-root.theme-dark .closing-eyebrow,
-		.page-root.theme-dark .closing-quality-icon {
-			background: rgba(255, 77, 140, 0.16);
-			color: #ff8fb7;
-		}
-
-		.page-root.theme-dark .closing-title,
-		.page-root.theme-dark .closing-feature-card h3,
-		.page-root.theme-dark .closing-quality-card p {
-			color: #ffffff;
-		}
-
-		.page-root.theme-dark .closing-subtitle,
-		.page-root.theme-dark .closing-feature-card p,
-		.page-root.theme-dark .closing-quality-note {
-			color: rgba(224, 208, 245, 0.72);
-		}
-
-		.page-root.theme-dark .closing-feature-kicker,
-		.page-root.theme-dark .closing-quality-card h3 {
-			color: rgba(224, 208, 245, 0.42);
-		}
-
-		.page-root.theme-dark .closing-feature-card,
-		.page-root.theme-dark .closing-quality-card,
-		.page-root.theme-dark .closing-quality-note {
-			background: rgba(255, 255, 255, 0.04);
-			border-color: rgba(255, 77, 140, 0.16);
-		}
-
-		.page-root.theme-dark .closing-proof {
-			border-top-color: rgba(255, 77, 140, 0.16);
-		}
-
-		.page-root.theme-dark .closing-feature-primary .closing-feature-icon {
-			background: rgba(255, 77, 140, 0.18);
-			color: #ff8fb7;
-		}
-
-		.page-root.theme-dark .closing-feature-secondary .closing-feature-icon {
-			background: rgba(99, 102, 241, 0.18);
-			color: #c7d2fe;
-		}
-
-		.page-root.theme-dark .closing-feature-accent .closing-feature-icon {
-			background: rgba(255, 185, 56, 0.2);
-			color: #ffd18a;
-		}
-
-		.page-root.theme-dark .closing-feature-neutral .closing-feature-icon {
-			background: rgba(255, 255, 255, 0.08);
-			color: rgba(224, 208, 245, 0.82);
-		}
-
 		@media (max-width: 768px) {
 			.playlist-mode-switch {
 				width: 100%;
@@ -1666,27 +1300,8 @@
 			.playlist-summary-line {
 				align-items: flex-start;
 			}
-
-			.closing-stage {
-				padding-top: 3rem;
-				padding-bottom: 3.5rem;
-			}
 		}
 
-		@media (min-width: 768px) {
-			.closing-panel-content {
-				padding: 1.85rem;
-			}
-
-			.closing-feature-grid {
-				grid-template-columns: repeat(2, minmax(0, 1fr));
-			}
-
-			.closing-quality-grid {
-				grid-template-columns: repeat(3, minmax(0, 1fr));
-			}
-
-		}
 	</style>
 </svelte:head>
 
@@ -2075,162 +1690,9 @@
 			</section>
 		{/if}
 
-		<section class="defer-render-how-it-works py-8 px-6 lg:px-20 relative z-20" id="how-it-works">
-			<div class="max-w-6xl mx-auto">
-				<div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
-					<div class="relative group">
-						<div class="bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 hover:shadow-float transition-all duration-300 h-full flex flex-col items-center text-center relative overflow-hidden">
-							<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-transparent opacity-50"></div>
-							<div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-								<AppIcon name="search" class="text-3xl text-primary" />
-							</div>
-							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step1_title()}</h3>
-							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step1_desc()}</p>
-						</div>
-						<div class="md:hidden flex justify-center py-2 text-plum/20">
-							<AppIcon name="arrow_downward" />
-						</div>
-					</div>
-					<div class="relative group md:-translate-y-4">
-						<div class="step-paste-card bg-gradient-to-br from-white to-pink-50 p-6 rounded-[2rem] shadow-candy border border-pink-100 hover:-translate-y-1 transition-all duration-300 h-full flex flex-col items-center text-center relative overflow-hidden z-10">
-							<div class="absolute -right-10 -top-10 w-24 h-24 bg-secondary/10 rounded-full blur-xl"></div>
-							<div class="w-16 h-16 rounded-full bg-secondary text-white shadow-lg flex items-center justify-center mb-4 animate-bob">
-								<AppIcon name="content_paste_go" class="text-3xl" />
-							</div>
-							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step2_title()}</h3>
-							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step2_desc()}</p>
-						</div>
-						<div class="md:hidden flex justify-center py-2 text-plum/20">
-							<AppIcon name="arrow_downward" />
-						</div>
-					</div>
-					<div class="relative group">
-						<div class="bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 hover:shadow-float transition-all duration-300 h-full flex flex-col items-center text-center relative overflow-hidden">
-							<div class="absolute top-0 right-0 w-full h-1 bg-gradient-to-l from-accent to-transparent opacity-50"></div>
-							<div class="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-								<AppIcon name="download_for_offline" class="text-3xl text-accent" />
-							</div>
-							<h3 class="text-xl font-bold text-plum mb-2">{m.home_step3_title()}</h3>
-							<p class="text-plum/75 text-sm font-medium leading-snug">{m.home_step3_desc()}</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
+		<HowItWorksThreeSteps />
 
-		<section class="closing-stage">
-			<div class="closing-shell">
-				<div class="closing-panel">
-					<div class="closing-panel-content">
-						<div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-							<div class="space-y-3">
-								<span class="closing-eyebrow">
-									<AppIcon name="auto_awesome" class="text-[14px]" />
-									Snapvie Highlights
-								</span>
-								<h2 class="closing-title">{m.home_why_title()}</h2>
-							</div>
-						</div>
-						<div class="closing-feature-grid">
-							{#each whyCards as card}
-								<article class={`closing-feature-card ${card.accentClass}`}>
-									<div class="closing-feature-top">
-										<div class="closing-feature-icon">
-											<AppIcon name={card.icon} />
-										</div>
-										<span class="closing-feature-kicker">{card.kicker}</span>
-									</div>
-									<h3>{card.title}</h3>
-									<p>{card.description}</p>
-								</article>
-							{/each}
-						</div>
-						<div class="closing-proof">
-							<div class="flex flex-col md:flex-row items-center gap-8">
-								<div class="flex-1 text-center md:text-left">
-									<span class="inline-block py-1 px-3 rounded-full bg-green-100 text-green-700 font-bold text-xs uppercase mb-3 tracking-wider">{m.home_testimonials_badge()}</span>
-									<h2 class="text-3xl md:text-4xl font-bold text-plum mb-3">{m.home_testimonials_title()}</h2>
-									<p class="text-base text-plum/75 font-semibold max-w-md mx-auto md:mx-0">{m.home_testimonials_subtitle()}</p>
-									<div class="hidden md:flex mt-6 -space-x-3">
-										<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '1' })}><img alt={m.home_testimonial_user_avatar({ index: '1' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user1Avatar}/></div>
-										<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '2' })}><img alt={m.home_testimonial_user_avatar({ index: '2' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user2Avatar}/></div>
-										<div class="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden" title={m.home_testimonial_user_avatar({ index: '3' })}><img alt={m.home_testimonial_user_avatar({ index: '3' })} class="w-full h-full object-cover" loading="lazy" decoding="async" width="40" height="40" src={user3Avatar}/></div>
-										<div class="w-10 h-10 rounded-full border-2 border-white bg-plum text-white text-xs font-bold flex items-center justify-center">+9k</div>
-									</div>
-								</div>
-								<div class="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-									<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300">
-										<div class="flex items-center gap-3 mb-3">
-											<div class="w-8 h-8 rounded-full bg-purple-100 overflow-hidden"><img alt={m.home_testimonial_sarah_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={sarahAvatar}/></div>
-											<div>
-												<p class="font-bold text-plum text-sm">{m.home_testimonial_sarah_name()}</p>
-												<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
-											</div>
-										</div>
-										<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_sarah_quote()}</p>
-									</div>
-									<div class="bg-white p-5 rounded-2xl shadow-sm border border-pink-50 hover:shadow-float hover:-translate-y-1 transition-all duration-300 sm:translate-y-4">
-										<div class="flex items-center gap-3 mb-3">
-											<div class="w-8 h-8 rounded-full bg-blue-100 overflow-hidden"><img alt={m.home_testimonial_mike_name()} class="w-full h-full object-cover" loading="lazy" decoding="async" width="32" height="32" src={mikeAvatar}/></div>
-											<div>
-												<p class="font-bold text-plum text-sm">{m.home_testimonial_mike_name()}</p>
-												<div class="flex text-yellow-400 text-[10px]">★★★★★</div>
-											</div>
-										</div>
-										<p class="text-plum/75 font-medium text-xs leading-relaxed">{m.home_testimonial_mike_quote()}</p>
-									</div>
-									<div class="col-span-1 sm:col-span-2 mt-2 bg-gradient-to-r from-primary/10 to-secondary/10 p-4 rounded-2xl border border-white/50 flex items-center justify-between">
-										<div class="flex-1">
-											<p class="font-bold text-plum text-sm mb-1">{m.home_join_party_title()}</p>
-											<p class="text-plum/75 text-xs">{m.home_join_party_subtitle()}</p>
-										</div>
-										<button class="bg-plum text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg hover:bg-plum/90 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2">
-											<span>{m.home_join_party_cta()}</span>
-											<AppIcon name="arrow_forward" class="text-sm" />
-										</button>
-										<div class="w-12 h-12 ml-4 animate-wiggle"><span class="text-4xl">🎉</span></div>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<div class="grid gap-4">
-					<div class="closing-panel">
-						<div class="closing-panel-content">
-							<div class="mb-6 space-y-3">
-								<span class="closing-eyebrow">
-									<AppIcon name="tune" class="text-[14px]" />
-									Formats
-								</span>
-								<h2 class="closing-title">{m.home_quality_title()}</h2>
-							</div>
-							<div class="closing-quality-grid">
-								{#each qualityCards as card}
-									<article class="closing-quality-card">
-										<div class="closing-quality-top">
-											<div class="closing-quality-icon">
-												<AppIcon name={card.icon} />
-											</div>
-											<h3>{card.label}</h3>
-										</div>
-										<p>{card.value}</p>
-									</article>
-								{/each}
-							</div>
-							<div class="mt-5">
-								<p class="closing-quality-note">
-									<AppIcon name="info" class="text-[15px]" />
-									{m.home_quality_note()}
-								</p>
-							</div>
-						</div>
-					</div>
-				</div>
-
-			</div>
-		</section>
+		<WhySnapvieSection cards={whyCards} />
 		<FrequentlyAskedQuestionsSection title={m.home_faq_title()} items={faqItems} />
 		<ExploreMoreSnapvieTools links={relatedToolLinks} />
 		</main>
@@ -2245,7 +1707,7 @@
 		{/if}
 
 	<footer class="bg-white border-t border-pink-100 py-6 px-6">
-		<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+		<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 md:pr-40">
 			<div class="flex items-center gap-2 transition-all">
 				<img
 					src="/logo.svg"
@@ -2266,11 +1728,11 @@
 
 	<button
 		type="button"
-		class="theme-toggle fixed bottom-5 right-5 z-[70] flex h-12 min-w-[120px] items-center justify-center gap-2 rounded-full px-4 text-sm font-bold shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 backdrop-blur-md"
+		class="theme-toggle fixed bottom-4 right-4 z-[70] flex h-11 w-11 min-w-0 items-center justify-center rounded-full px-0 text-sm font-bold shadow-xl transition-all duration-300 backdrop-blur-md hover:scale-105 active:scale-95 sm:bottom-5 sm:right-5 sm:h-12 sm:w-auto sm:min-w-[120px] sm:gap-2 sm:px-4"
 		onclick={toggleTheme}
 		aria-label={isDarkMode ? m.common_theme_switch_to_light() : m.common_theme_switch_to_dark()}
 	>
 		<AppIcon name={isDarkMode ? 'light_mode' : 'dark_mode'} class="text-[18px]" />
-		<span>{isDarkMode ? m.common_theme_light_mode() : m.common_theme_dark_mode()}</span>
+		<span class="hidden sm:inline">{isDarkMode ? m.common_theme_light_mode() : m.common_theme_dark_mode()}</span>
 	</button>
 </div>

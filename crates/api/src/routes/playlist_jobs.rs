@@ -208,10 +208,7 @@ pub async fn playlist_job_events_handler(
     Extension(user): Extension<AuthenticatedUser>,
     headers: HeaderMap,
     Path(job_id): Path<String>,
-) -> Result<
-    Sse<impl futures::Stream<Item = Result<Event, Infallible>>>,
-    JobsApiError,
-> {
+) -> Result<Sse<impl futures::Stream<Item = Result<Event, Infallible>>>, JobsApiError> {
     let (user_id, session_id) = resolve_playlist_owner(&user, &headers)?;
 
     // Verify the job exists and belongs to the caller
@@ -285,9 +282,7 @@ pub async fn start_playlist_job_handler(
             retry_after_secs: None,
         })?;
 
-    if job.status == PlaylistJobStatus::Processing
-        || job.status == PlaylistJobStatus::Completed
-    {
+    if job.status == PlaylistJobStatus::Processing || job.status == PlaylistJobStatus::Completed {
         return Ok(Json(StartPlaylistJobResponse {
             started: false,
             selected_items: job.total_items,
@@ -420,11 +415,7 @@ fn resolve_playlist_owner(
     user: &AuthenticatedUser,
     headers: &HeaderMap,
 ) -> Result<(Option<String>, Option<String>), JobsApiError> {
-    if let Some(uid) = user
-        .user_id
-        .as_deref()
-        .filter(|v| !v.trim().is_empty())
-    {
+    if let Some(uid) = user.user_id.as_deref().filter(|v| !v.trim().is_empty()) {
         return Ok((Some(uid.to_string()), None));
     }
 
@@ -451,11 +442,7 @@ async fn build_playlist_response(
     job: PlaylistJobRecord,
     items: Vec<PlaylistJobItemRecord>,
 ) -> PlaylistJobResponse {
-    let items = join_all(
-        items.into_iter()
-            .map(|item| map_item_response(state, item)),
-    )
-    .await;
+    let items = join_all(items.into_iter().map(|item| map_item_response(state, item))).await;
 
     PlaylistJobResponse {
         job_id: job.id,
@@ -548,8 +535,8 @@ fn item_selected(item: &PlaylistJobItemRecord) -> bool {
 }
 
 fn sse_event(event_type: &str, payload: &PlaylistJobResponse) -> Event {
-    let data = serde_json::to_string(payload)
-        .unwrap_or_else(|_| r#"{"status":"failed"}"#.to_string());
+    let data =
+        serde_json::to_string(payload).unwrap_or_else(|_| r#"{"status":"failed"}"#.to_string());
     Event::default().event(event_type).data(data)
 }
 

@@ -50,9 +50,15 @@
 		gap: 0.5rem;
 		cursor: pointer;
 		list-style: none;
+		font-family: 'Fredoka', sans-serif;
 		font-size: 0.875rem;
-		font-weight: 600;
+		font-weight: 500;
 		color: #2d1b36;
+	}
+
+	.faq-title {
+		font-family: 'Fredoka', sans-serif;
+		font-weight: 700;
 	}
 
 	.faq-summary::-webkit-details-marker {

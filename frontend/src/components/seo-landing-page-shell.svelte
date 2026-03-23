@@ -9,6 +9,8 @@
 	import DownloadBtn from '$components/DownloadBtn.svelte';
 	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
 	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
+	import HowItWorksThreeSteps from '$components/how-it-works-three-steps.svelte';
+	import WhySnapvieSection from '$components/why-snapvie-section.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
 	import { currentDownload } from '$stores/download';
 	import type { ExtractResult, Stream } from '$lib/types';
@@ -144,6 +146,8 @@
 	</div>
 </section>
 
+<HowItWorksThreeSteps sectionId="lp-how-it-works" />
+
 <!-- Download Result -->
 {#if extractResult}
 	<section class="py-5 px-6 lg:px-20" id="lp-result">
@@ -189,23 +193,15 @@
 	</div>
 </section>
 
-		<!-- USP Cards -->
-		<section class="py-8 px-6 lg:px-20 bg-slate-50 border-t border-pink-50">
-			<div class="max-w-6xl mx-auto">
-				<h2 class="text-2xl font-bold text-plum mb-8 text-center">Why Use Snapvie?</h2>
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-					{#each config.uspBullets as usp}
-						<div class="bento-card bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 flex flex-col gap-3">
-							<div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-								<AppIcon name={usp.icon} class="text-2xl text-primary" />
-							</div>
-							<h3 class="font-bold text-plum text-base">{usp.title}</h3>
-							<p class="text-sm text-plum/70 leading-relaxed">{usp.desc}</p>
-						</div>
-					{/each}
-				</div>
-			</div>
-		</section>
+		<WhySnapvieSection
+			cards={config.uspBullets.map((usp, index) => ({
+				icon: usp.icon,
+				title: usp.title,
+				description: usp.desc,
+				kicker: String(index + 1).padStart(2, '0'),
+				accentClass: ['closing-feature-primary', 'closing-feature-secondary', 'closing-feature-accent', 'closing-feature-neutral'][index % 4]
+			}))}
+		/>
 
 		<!-- FAQ -->
 		<FrequentlyAskedQuestionsSection items={config.faqItems} />
@@ -217,7 +213,7 @@
 		/>
 
 <style>
-	h1, h2, h3, button {
+	h1, h3, button {
 		font-family: 'Fredoka', sans-serif;
 	}
 
@@ -236,15 +232,6 @@
 
 	:global(.bg-gradient-primary) {
 		background: linear-gradient(135deg, #ff4d8c 0%, #ffb938 100%);
-	}
-
-	.bento-card {
-		transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
-	}
-
-	.bento-card:hover {
-		transform: translateY(-8px);
-		box-shadow: 0 25px 50px -12px rgba(255, 77, 140, 0.25);
 	}
 
 	:global(.page-root.theme-dark .text-plum),

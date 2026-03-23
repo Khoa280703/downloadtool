@@ -3,12 +3,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use tokio::task::JoinSet;
 use job_system::JobRepository;
 use proxy::init_global_proxy_pool;
 use queue::redis_streams::RedisStreamsQueue;
 use queue::{JobQueueConsumer, JobQueuePublisher};
 use sqlx::postgres::PgPoolOptions;
+use tokio::task::JoinSet;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 

@@ -23,7 +23,10 @@ impl StorageTicketService {
         })
     }
 
-    pub async fn build_ticket(&self, job: &JobStatusRecord) -> anyhow::Result<StorageDownloadTicket> {
+    pub async fn build_ticket(
+        &self,
+        job: &JobStatusRecord,
+    ) -> anyhow::Result<StorageDownloadTicket> {
         let backend = job.backend.as_deref().unwrap_or("unknown");
         anyhow::ensure!(
             backend == "s3",
