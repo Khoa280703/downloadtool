@@ -183,6 +183,10 @@ async fn process_playlist_worker_loop(
             return Ok(());
         };
 
+        // Small pre-extract jitter softens the initial burst when many playlist
+        // workers wake up at the same time and start hitting YouTube together.
+        tokio::time::sleep(Duration::from_millis(250 + rand_jitter(750))).await;
+
         let result = process_single_item(
             &item.id,
             &item.video_id,

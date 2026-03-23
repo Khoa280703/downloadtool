@@ -154,9 +154,9 @@ impl ProxyInventoryStore {
     pub async fn release_expired_quarantined(
         &self,
         quarantine_ttl_secs: u64,
-    ) -> anyhow::Result<u64> {
+    ) -> anyhow::Result<Vec<String>> {
         if quarantine_ttl_secs == 0 {
-            return Ok(0);
+            return Ok(Vec::new());
         }
 
         let rows = sqlx::query(
@@ -195,7 +195,10 @@ impl ProxyInventoryStore {
             .context("failed to record expired quarantine release event")?;
         }
 
-        Ok(rows.len() as u64)
+        Ok(rows
+            .into_iter()
+            .map(|row| row.get::<String, _>("proxy_url"))
+            .collect())
     }
 
     pub async fn record_extract_result(

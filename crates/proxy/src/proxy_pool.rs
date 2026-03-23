@@ -25,11 +25,13 @@ pub const BOT_CHECK_QUARANTINE_THRESHOLD: usize = 5;
 /// Default cooldown period for failed proxies.
 pub const FAILURE_COOLDOWN: Duration = Duration::from_secs(1800);
 
+#[derive(Debug)]
 struct ProxyEntry {
     url: String,
     quarantined: AtomicBool,
     failed_count: AtomicUsize,
     bot_check_streak: AtomicUsize,
+    extract_in_flight: AtomicUsize,
     health_score: AtomicUsize,
     last_failed: RwLock<Option<Instant>>,
 }
@@ -41,6 +43,7 @@ impl ProxyEntry {
             quarantined: AtomicBool::new(quarantined),
             failed_count: AtomicUsize::new(0),
             bot_check_streak: AtomicUsize::new(0),
+            extract_in_flight: AtomicUsize::new(0),
             health_score: AtomicUsize::new(health_score.clamp(0, 100) as usize),
             last_failed: RwLock::new(None),
         }
@@ -126,6 +129,16 @@ impl ProxyEntry {
         }
     }
 
+    fn try_acquire_extract_slot(&self) -> bool {
+        self.extract_in_flight
+            .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    fn release_extract_slot(&self) {
+        self.extract_in_flight.store(0, Ordering::Release);
+    }
+
     fn note_bot_check(&self) -> usize {
         self.bot_check_streak.fetch_add(1, Ordering::Relaxed) + 1
     }
@@ -137,14 +150,6 @@ impl ProxyEntry {
     fn set_health_score(&self, health_score: i32) {
         self.health_score
             .store(health_score.clamp(0, 100) as usize, Ordering::Relaxed);
-    }
-
-    fn health_score(&self) -> usize {
-        self.health_score.load(Ordering::Relaxed)
-    }
-
-    fn selection_weight(&self) -> usize {
-        self.health_score().max(1)
     }
 
     fn apply_runtime_health(&self, health: &ProxyRuntimeHealth) {
@@ -162,6 +167,23 @@ impl ProxyEntry {
                 None
             };
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct ProxyLease {
+    entry: Arc<ProxyEntry>,
+}
+
+impl ProxyLease {
+    pub fn proxy_url(&self) -> &str {
+        &self.entry.url
+    }
+}
+
+impl Drop for ProxyLease {
+    fn drop(&mut self) {
+        self.entry.release_extract_slot();
     }
 }
 
@@ -217,11 +239,11 @@ impl ProxyPool {
             return None;
         }
 
-        if let Some(proxy) = weighted_pick(&guard, start_idx, |entry| entry.is_healthy()) {
+        if let Some(proxy) = rotated_pick(&guard, start_idx, |entry| entry.is_healthy()) {
             return Some(proxy);
         }
 
-        if let Some(proxy) = weighted_pick(&guard, start_idx, |entry| !entry.is_quarantined()) {
+        if let Some(proxy) = rotated_pick(&guard, start_idx, |entry| !entry.is_quarantined()) {
             warn!("No healthy proxies available, falling back to non-quarantined proxy");
             return Some(proxy);
         }
@@ -233,6 +255,41 @@ impl ProxyPool {
     /// Owned version of [`Self::next`], useful for async call sites.
     pub fn next_owned(&self) -> Option<String> {
         self.next()
+    }
+
+    pub fn try_acquire_next_owned(&self) -> Option<ProxyLease> {
+        let start_idx = self.current.fetch_add(1, Ordering::Relaxed);
+        let guard = self.proxies.read().ok()?;
+        if guard.is_empty() {
+            return None;
+        }
+
+        if let Some(entry) = rotated_pick_entry(&guard, start_idx, |entry| {
+            entry.is_healthy() && entry.try_acquire_extract_slot()
+        }) {
+            return Some(ProxyLease { entry });
+        }
+
+        if guard.iter().any(|entry| entry.is_healthy()) {
+            return None;
+        }
+
+        if let Some(entry) = rotated_pick_entry(&guard, start_idx, |entry| {
+            !entry.is_quarantined() && entry.try_acquire_extract_slot()
+        }) {
+            warn!("No free healthy proxies available, falling back to free non-quarantined proxy");
+            return Some(ProxyLease { entry });
+        }
+
+        None
+    }
+
+    pub fn try_acquire_preferred_owned(&self, proxy_url: &str) -> Option<ProxyLease> {
+        let entry = self.find_entry(proxy_url)?;
+        if !entry.is_healthy() || !entry.try_acquire_extract_slot() {
+            return None;
+        }
+        Some(ProxyLease { entry })
     }
 
     /// Mark a specific proxy as failed.
@@ -388,6 +445,10 @@ impl ProxyPool {
         self.inventory_pool.clone()
     }
 
+    pub fn health_store(&self) -> Option<ProxyHealthStore> {
+        self.health_store.clone()
+    }
+
     pub fn len(&self) -> usize {
         self.proxies
             .read()
@@ -476,11 +537,7 @@ fn build_entries(
             {
                 match record.status.as_str() {
                     "quarantined" => existing.set_quarantined(true),
-                    "active" => {
-                        if !existing.is_quarantined() {
-                            existing.set_quarantined(false);
-                        }
-                    }
+                    "active" => existing.set_quarantined(false),
                     _ => {}
                 }
                 existing.set_health_score(record.health_score);
@@ -496,41 +553,26 @@ fn build_entries(
         .collect()
 }
 
-fn weighted_pick(
+fn rotated_pick(
     entries: &[Arc<ProxyEntry>],
     start_idx: usize,
     predicate: impl Fn(&ProxyEntry) -> bool,
 ) -> Option<String> {
-    let rotated_entries = entries
+    rotated_pick_entry(entries, start_idx, predicate).map(|entry| entry.url.clone())
+}
+
+fn rotated_pick_entry(
+    entries: &[Arc<ProxyEntry>],
+    start_idx: usize,
+    predicate: impl Fn(&ProxyEntry) -> bool,
+) -> Option<Arc<ProxyEntry>> {
+    entries
         .iter()
         .cycle()
         .skip(start_idx % entries.len())
-        .take(entries.len());
-
-    let mut weighted_entries = Vec::with_capacity(entries.len());
-    let mut total_weight = 0usize;
-
-    for entry in rotated_entries {
-        if predicate(entry) {
-            let weight = entry.selection_weight();
-            total_weight += weight;
-            weighted_entries.push((entry, weight));
-        }
-    }
-
-    if total_weight == 0 {
-        return None;
-    }
-
-    let mut ticket = start_idx % total_weight;
-    for (entry, weight) in weighted_entries {
-        if ticket < weight {
-            return Some(entry.url.clone());
-        }
-        ticket -= weight;
-    }
-
-    None
+        .take(entries.len())
+        .find(|entry| predicate(entry))
+        .cloned()
 }
 
 fn persist_quarantine_blocking(inventory_pool: PgPool, proxy_url: String, reason: String) {
@@ -639,14 +681,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_bot_check_requires_two_consecutive_hits_without_health_store() {
+    async fn test_bot_check_requires_threshold_without_health_store() {
         let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
 
-        assert!(
-            !pool
-                .note_bot_check("http://proxy1:8080", "yt-dlp-bot-check")
-                .await
-        );
+        for _ in 0..(BOT_CHECK_QUARANTINE_THRESHOLD - 1) {
+            assert!(
+                !pool
+                    .note_bot_check("http://proxy1:8080", "yt-dlp-bot-check")
+                    .await
+            );
+        }
         assert!(
             pool.note_bot_check("http://proxy1:8080", "yt-dlp-bot-check")
                 .await
@@ -702,7 +746,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reused_entry_keeps_local_quarantine_until_explicit_reenable() {
+    fn test_reused_entry_reenables_when_inventory_marks_active() {
         let initial = build_entries(
             vec![ProxyInventoryRecord {
                 proxy_url: "http://proxy1:8080".to_string(),
@@ -722,7 +766,7 @@ mod tests {
             }],
             Some(&previous),
         );
-        assert!(refreshed[0].is_quarantined());
+        assert!(!refreshed[0].is_quarantined());
     }
 
     #[test]
@@ -739,7 +783,7 @@ mod tests {
     }
 
     #[test]
-    fn test_weighted_selection_prefers_higher_score() {
+    fn test_round_robin_selection_ignores_health_score_weighting() {
         let pool = ProxyPool::new_with_runtime(
             vec![
                 ProxyInventoryRecord {
@@ -758,18 +802,46 @@ mod tests {
             None,
         );
 
-        let mut high_hits = 0usize;
-        let mut low_hits = 0usize;
-        for _ in 0..100 {
-            match pool.next().as_deref() {
-                Some("http://proxy-high:8080") => high_hits += 1,
-                Some("http://proxy-low:8080") => low_hits += 1,
-                other => panic!("unexpected proxy selection: {:?}", other),
-            }
-        }
+        assert_eq!(pool.next().unwrap(), "http://proxy-high:8080");
+        assert_eq!(pool.next().unwrap(), "http://proxy-low:8080");
+        assert_eq!(pool.next().unwrap(), "http://proxy-high:8080");
+    }
 
-        assert!(high_hits > low_hits);
-        assert!(high_hits >= 90);
+    #[test]
+    fn test_extract_slot_prevents_parallel_reuse_of_same_proxy() {
+        let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
+
+        let lease = pool
+            .try_acquire_next_owned()
+            .expect("first extract lease should succeed");
+        assert_eq!(lease.proxy_url(), "http://proxy1:8080");
+        assert!(pool.try_acquire_next_owned().is_none());
+
+        drop(lease);
+        assert!(pool.try_acquire_next_owned().is_some());
+    }
+
+    #[test]
+    fn test_extract_slot_waits_for_busy_healthy_proxy_before_using_unhealthy_proxy() {
+        let pool = ProxyPool::new(vec![
+            "http://proxy1:8080".to_string(),
+            "http://proxy2:8080".to_string(),
+        ]);
+
+        let lease = pool
+            .try_acquire_next_owned()
+            .expect("healthy proxy should be leased first");
+        pool.mark_failed("http://proxy2:8080");
+        pool.mark_failed("http://proxy2:8080");
+        pool.mark_failed("http://proxy2:8080");
+
+        assert!(pool.try_acquire_next_owned().is_none());
+
+        drop(lease);
+        let next = pool
+            .try_acquire_next_owned()
+            .expect("healthy proxy should become available after release");
+        assert_eq!(next.proxy_url(), "http://proxy1:8080");
     }
 
     #[test]

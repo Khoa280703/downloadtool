@@ -7,6 +7,7 @@ use crate::proxy_pool::{FAILURE_COOLDOWN, MAX_FAILURES};
 
 const FAIL_COUNT_TTL_SECS: u64 = FAILURE_COOLDOWN.as_secs();
 const LAST_ERROR_TTL_SECS: u64 = FAILURE_COOLDOWN.as_secs() * 2;
+const BOT_CHECK_STREAK_TTL_SECS: u64 = 3600;
 
 #[derive(Clone, Debug, Default)]
 pub struct ProxyRuntimeHealth {
@@ -152,6 +153,10 @@ impl ProxyHealthStore {
             .set_ex(&last_error_key, reason, LAST_ERROR_TTL_SECS)
             .await
             .with_context(|| format!("failed to write redis key {last_error_key}"))?;
+        let _: bool = conn
+            .expire(&bot_check_streak_key, BOT_CHECK_STREAK_TTL_SECS as i64)
+            .await
+            .with_context(|| format!("failed to expire redis key {bot_check_streak_key}"))?;
 
         Ok(streak.max(0) as usize)
     }
@@ -164,6 +169,25 @@ impl ProxyHealthStore {
             .del(&bot_check_streak_key)
             .await
             .with_context(|| format!("failed to clear redis key {bot_check_streak_key}"))?;
+
+        Ok(())
+    }
+
+    pub async fn clear_runtime_health(&self, proxy_url: &str) -> anyhow::Result<()> {
+        let mut conn = self.connection().await?;
+        let keys = [
+            fail_count_key(proxy_url),
+            cooldown_key(proxy_url),
+            last_error_key(proxy_url),
+            bot_check_streak_key(proxy_url),
+        ];
+
+        for key in keys {
+            let _: usize = conn
+                .del(&key)
+                .await
+                .with_context(|| format!("failed to clear redis key {key}"))?;
+        }
 
         Ok(())
     }
@@ -212,5 +236,10 @@ mod tests {
     #[test]
     fn cooldown_matches_failure_window() {
         assert_eq!(FAIL_COUNT_TTL_SECS, FAILURE_COOLDOWN.as_secs());
+    }
+
+    #[test]
+    fn bot_check_streak_uses_positive_ttl() {
+        assert!(BOT_CHECK_STREAK_TTL_SECS > 0);
     }
 }

@@ -24,6 +24,8 @@ pub async fn init_global_proxy_pool(
     }
 
     let inventory_store = ProxyInventoryStore::new(db_pool.clone());
+    let redis_store = ProxyHealthStore::new(redis_url)
+        .context("failed to initialize shared redis proxy health store")?;
     let proxy_count_before_seed = inventory_store.count_all().await.unwrap_or_default();
     info!("Initializing proxy runtime from database inventory");
 
@@ -49,18 +51,17 @@ pub async fn init_global_proxy_pool(
         }
     }
 
-    inventory_store
+    let released_proxies = inventory_store
         .release_expired_quarantined(quarantine_ttl_secs)
         .await?;
+    clear_released_runtime_health(&redis_store, &released_proxies).await;
 
     let records = inventory_store.list_runtime_records().await?;
-    let redis_store = ProxyHealthStore::new(redis_url)
-        .context("failed to initialize shared redis proxy health store")?;
     let pool = Arc::new(ProxyPool::new_with_runtime(
         records,
         quarantine_file,
         Some(db_pool),
-        Some(redis_store),
+        Some(redis_store.clone()),
     ));
 
     pool.refresh_from_runtime().await?;
@@ -81,12 +82,20 @@ fn spawn_background_sync(pool: Arc<ProxyPool>, quarantine_ttl_secs: u64) {
         let mut interval = tokio::time::interval(Duration::from_secs(PROXY_SYNC_INTERVAL_SECS));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let inventory_store = pool.inventory_pool().map(ProxyInventoryStore::new);
+        let health_store = pool.health_store();
 
         loop {
             interval.tick().await;
             if let Some(store) = inventory_store.as_ref() {
-                if let Err(error) = store.release_expired_quarantined(quarantine_ttl_secs).await {
-                    warn!(err = %error, "Failed to release expired quarantined proxies");
+                match store.release_expired_quarantined(quarantine_ttl_secs).await {
+                    Ok(released_proxies) => {
+                        if let Some(health_store) = health_store.as_ref() {
+                            clear_released_runtime_health(health_store, &released_proxies).await;
+                        }
+                    }
+                    Err(error) => {
+                        warn!(err = %error, "Failed to release expired quarantined proxies");
+                    }
                 }
             }
             if let Err(error) = pool.refresh_from_runtime().await {
@@ -94,4 +103,16 @@ fn spawn_background_sync(pool: Arc<ProxyPool>, quarantine_ttl_secs: u64) {
             }
         }
     });
+}
+
+async fn clear_released_runtime_health(health_store: &ProxyHealthStore, proxy_urls: &[String]) {
+    for proxy_url in proxy_urls {
+        if let Err(error) = health_store.clear_runtime_health(proxy_url).await {
+            warn!(
+                err = %error,
+                proxy = %proxy_url,
+                "Failed to clear runtime health for released proxy"
+            );
+        }
+    }
 }

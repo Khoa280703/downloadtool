@@ -6,7 +6,7 @@
 use crate::runtime_limit_profiles::extractor_limit_profile;
 use crate::types::{ExtractionError, VideoFormat, VideoInfo};
 use moka::future::Cache;
-use proxy::{ProxyExtractEvent, ProxyPool, BOT_CHECK_QUARANTINE_THRESHOLD};
+use proxy::{ProxyExtractEvent, ProxyLease, ProxyPool, BOT_CHECK_QUARANTINE_THRESHOLD};
 use serde_json::Value;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -74,10 +74,11 @@ fn get_proxy_pool() -> Option<&'static Arc<ProxyPool>> {
         .as_ref()
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct SelectedProxy {
     url: String,
     from_pool: bool,
+    _lease: Option<ProxyLease>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -92,26 +93,29 @@ struct ExtractCatalogStats {
 
 fn select_proxy() -> Option<SelectedProxy> {
     get_proxy_pool()
-        .and_then(|pool| pool.next_owned())
-        .map(|url| SelectedProxy {
-            url,
+        .and_then(|pool| pool.try_acquire_next_owned())
+        .map(|lease| SelectedProxy {
+            url: lease.proxy_url().to_string(),
             from_pool: true,
+            _lease: Some(lease),
         })
 }
 
 fn select_proxy_with_preference(preferred_proxy: Option<&str>) -> Option<SelectedProxy> {
     if let Some(preferred_proxy) = preferred_proxy {
         if let Some(pool) = get_proxy_pool() {
-            if pool.is_proxy_usable(preferred_proxy) {
+            if let Some(lease) = pool.try_acquire_preferred_owned(preferred_proxy) {
                 return Some(SelectedProxy {
-                    url: preferred_proxy.to_string(),
+                    url: lease.proxy_url().to_string(),
                     from_pool: true,
+                    _lease: Some(lease),
                 });
             }
         } else {
             return Some(SelectedProxy {
                 url: preferred_proxy.to_string(),
                 from_pool: false,
+                _lease: None,
             });
         }
     }
@@ -119,12 +123,21 @@ fn select_proxy_with_preference(preferred_proxy: Option<&str>) -> Option<Selecte
     select_proxy()
 }
 
-fn require_proxy(preferred_proxy: Option<&str>) -> Result<SelectedProxy, ExtractionError> {
-    select_proxy_with_preference(preferred_proxy).ok_or_else(|| {
-        ExtractionError::ScriptExecutionFailed(
-            "proxy-only mode requires at least one healthy proxy".to_string(),
-        )
-    })
+async fn require_proxy(preferred_proxy: Option<&str>) -> Result<SelectedProxy, ExtractionError> {
+    const PROXY_ACQUIRE_RETRY_DELAY_MS: u64 = 50;
+    const PROXY_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
+
+    let deadline = Instant::now() + PROXY_ACQUIRE_TIMEOUT;
+    while Instant::now() < deadline {
+        if let Some(proxy) = select_proxy_with_preference(preferred_proxy) {
+            return Ok(proxy);
+        }
+        tokio::time::sleep(Duration::from_millis(PROXY_ACQUIRE_RETRY_DELAY_MS)).await;
+    }
+
+    Err(ExtractionError::ScriptExecutionFailed(
+        "proxy-only mode requires at least one free healthy proxy".to_string(),
+    ))
 }
 
 /// How a proxy failure should be handled.
@@ -434,7 +447,7 @@ async fn extract_subprocess(
     let mut last_error: Option<String> = None;
 
     for attempt in 0..max_attempts {
-        let selected_proxy = require_proxy(preferred_proxy.as_deref())?;
+        let selected_proxy = require_proxy(preferred_proxy.as_deref()).await?;
         let attempt_started_at = Instant::now();
         debug!(
             url = %url,
@@ -595,10 +608,7 @@ async fn extract_subprocess(
                             .note_bot_check(&selected_proxy.url, "yt-dlp-bot-check")
                             .await
                         {
-                            pool.quarantine(
-                                &selected_proxy.url,
-                                "yt-dlp-bot-check-streak-5",
-                            );
+                            pool.quarantine(&selected_proxy.url, "yt-dlp-bot-check-streak-5");
                         } else {
                             warn!(
                                 proxy = %selected_proxy.url,
