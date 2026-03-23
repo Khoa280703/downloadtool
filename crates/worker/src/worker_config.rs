@@ -1,5 +1,7 @@
 use std::env;
+use std::fmt::Display;
 use std::process::Command;
+use std::str::FromStr;
 
 #[derive(Clone, Debug)]
 pub struct WorkerConfig {
@@ -49,6 +51,20 @@ impl WorkerConfig {
 
     fn first_env_or_default(names: &[&str], default: impl FnOnce() -> String) -> String {
         Self::first_present_env(names).unwrap_or_else(default)
+    }
+
+    fn required_env(name: &str) -> anyhow::Result<String> {
+        Self::optional_env(name).ok_or_else(|| anyhow::anyhow!("{name} env var is required"))
+    }
+
+    fn parse_required_env<T>(name: &str) -> anyhow::Result<T>
+    where
+        T: FromStr,
+        T::Err: Display,
+    {
+        let raw = Self::required_env(name)?;
+        raw.parse()
+            .map_err(|err| anyhow::anyhow!("{name} env var is invalid: {err}"))
     }
 
     fn command_stdout_trimmed(command: &mut Command) -> Option<String> {
@@ -225,60 +241,26 @@ impl WorkerConfig {
             Self::first_present_env(&["INTERNAL_PROXY_REDIS_URL", "PROXY_REDIS_URL"])
                 .map(|value| Self::resolve_local_redis_url(&value))
                 .unwrap_or_else(|| redis_url.clone());
-        let proxy_quarantine_ttl_secs = env::var("PROXY_QUARANTINE_TTL_SECS")
-            .ok()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(172_800);
+        let proxy_quarantine_ttl_secs = Self::parse_required_env("PROXY_QUARANTINE_TTL_SECS")?;
+        let concurrency = Self::parse_required_env::<usize>("MUX_WORKER_CONCURRENCY")?;
+        anyhow::ensure!(concurrency > 0, "MUX_WORKER_CONCURRENCY env var must be > 0");
+
         Ok(Self {
             database_url,
             proxy_database_url,
             redis_url,
             proxy_redis_url,
             proxy_quarantine_ttl_secs,
-            queue_stream: Self::first_env_or_default(
-                &["INTERNAL_MUX_QUEUE_STREAM", "MUX_QUEUE_STREAM"],
-                || "mux_jobs".to_string(),
-            ),
-            queue_group: Self::first_env_or_default(
-                &["INTERNAL_MUX_QUEUE_GROUP", "MUX_QUEUE_GROUP"],
-                || "mux-workers".to_string(),
-            ),
+            queue_stream: Self::required_env("MUX_QUEUE_STREAM")?,
+            queue_group: Self::required_env("MUX_QUEUE_GROUP")?,
             worker_id: Self::env_or_default("MUX_WORKER_ID", || format!("{host}-{pid}")),
-            concurrency: env::var("MUX_WORKER_CONCURRENCY")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .filter(|value: &usize| *value > 0)
-                .unwrap_or(16),
-            lease_secs: Self::first_present_env(&[
-                "INTERNAL_MUX_WORKER_LEASE_SECS",
-                "MUX_WORKER_LEASE_SECS",
-            ])
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(90),
-            reclaim_limit: Self::first_present_env(&[
-                "INTERNAL_MUX_WORKER_RECLAIM_LIMIT",
-                "MUX_WORKER_RECLAIM_LIMIT",
-            ])
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(100),
-            max_attempts: Self::first_present_env(&[
-                "INTERNAL_MUX_JOB_MAX_ATTEMPTS",
-                "MUX_JOB_MAX_ATTEMPTS",
-            ])
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(3),
-            artifact_ttl_secs: env::var("MUX_ARTIFACT_TTL_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(24 * 3600),
-            cleanup_interval_secs: env::var("MUX_CLEANUP_INTERVAL_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(3600),
-            cleanup_batch_limit: env::var("MUX_CLEANUP_BATCH_LIMIT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(50),
+            concurrency,
+            lease_secs: Self::parse_required_env("MUX_WORKER_LEASE_SECS")?,
+            reclaim_limit: Self::parse_required_env("MUX_WORKER_RECLAIM_LIMIT")?,
+            max_attempts: Self::parse_required_env("MUX_JOB_MAX_ATTEMPTS")?,
+            artifact_ttl_secs: Self::parse_required_env("MUX_ARTIFACT_TTL_SECS")?,
+            cleanup_interval_secs: Self::parse_required_env("MUX_CLEANUP_INTERVAL_SECS")?,
+            cleanup_batch_limit: Self::parse_required_env("MUX_CLEANUP_BATCH_LIMIT")?,
             s3_bucket: Self::optional_env("S3_BUCKET_NAME"),
             s3_region: Self::optional_env("S3_REGION"),
             s3_endpoint: Self::optional_env("S3_ENDPOINT"),

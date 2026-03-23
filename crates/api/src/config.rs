@@ -3,7 +3,9 @@
 //! Loads configuration from environment variables.
 
 use std::env;
+use std::fmt::Display;
 use std::process::Command;
+use std::str::FromStr;
 
 use crate::limit_profiles::backend_limit_profile;
 
@@ -56,6 +58,20 @@ impl Config {
 
     fn first_env_or_default(names: &[&str], default: &str) -> String {
         Self::first_present_env(names).unwrap_or_else(|| default.to_string())
+    }
+
+    fn required_env(name: &str) -> anyhow::Result<String> {
+        Self::optional_env(name).ok_or_else(|| anyhow::anyhow!("{name} env var is required"))
+    }
+
+    fn parse_required_env<T>(name: &str) -> anyhow::Result<T>
+    where
+        T: FromStr,
+        T::Err: Display,
+    {
+        let raw = Self::required_env(name)?;
+        raw.parse()
+            .map_err(|err| anyhow::anyhow!("{name} env var is invalid: {err}"))
     }
 
     fn command_stdout_trimmed(command: &mut Command) -> Option<String> {
@@ -254,22 +270,10 @@ impl Config {
             Self::first_present_env(&["INTERNAL_PROXY_REDIS_URL", "PROXY_REDIS_URL"])
                 .map(|value| Self::resolve_local_redis_url(&value))
                 .unwrap_or_else(|| redis_url.clone());
-        let proxy_quarantine_ttl_secs = env::var("PROXY_QUARANTINE_TTL_SECS")
-            .ok()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(172_800);
-        let mux_queue_stream = Self::first_env_or_default(
-            &["INTERNAL_MUX_QUEUE_STREAM", "MUX_QUEUE_STREAM"],
-            "mux_jobs",
-        );
-        let mux_job_max_attempts =
-            Self::first_present_env(&["INTERNAL_MUX_JOB_MAX_ATTEMPTS", "MUX_JOB_MAX_ATTEMPTS"])
-                .and_then(|value| value.parse().ok())
-                .unwrap_or(3);
-        let mux_file_ticket_ttl_secs = env::var("MUX_FILE_TICKET_TTL_SECS")
-            .ok()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(900);
+        let proxy_quarantine_ttl_secs = Self::parse_required_env("PROXY_QUARANTINE_TTL_SECS")?;
+        let mux_queue_stream = Self::required_env("MUX_QUEUE_STREAM")?;
+        let mux_job_max_attempts = Self::parse_required_env("MUX_JOB_MAX_ATTEMPTS")?;
+        let mux_file_ticket_ttl_secs = Self::parse_required_env("MUX_FILE_TICKET_TTL_SECS")?;
         let s3_bucket = Self::optional_env("S3_BUCKET_NAME");
         let s3_region = Self::optional_env("S3_REGION");
         let s3_endpoint = Self::optional_env("S3_ENDPOINT");
