@@ -22,6 +22,8 @@ use crate::proxy_quarantine::append_quarantine_record;
 /// Maximum consecutive failures before marking proxy as unhealthy.
 pub const MAX_FAILURES: usize = 3;
 pub const BOT_CHECK_QUARANTINE_THRESHOLD: usize = 5;
+/// Maximum concurrent downloads allowed per proxy to avoid cluster detection.
+pub const MAX_DOWNLOAD_PER_PROXY: usize = 2;
 /// Default cooldown period for failed proxies.
 pub const FAILURE_COOLDOWN: Duration = Duration::from_secs(1800);
 
@@ -134,8 +136,22 @@ impl ProxyEntry {
         self.extract_in_flight.store(0, Ordering::Release);
     }
 
-    fn acquire_download_slot(&self) {
-        self.download_in_flight.fetch_add(1, Ordering::AcqRel);
+    /// Try to acquire a download slot, respecting the per-proxy cap.
+    /// Returns `true` if the slot was acquired, `false` if at capacity.
+    fn try_acquire_download_slot(&self) -> bool {
+        loop {
+            let current = self.download_in_flight.load(Ordering::Acquire);
+            if current >= MAX_DOWNLOAD_PER_PROXY {
+                return false;
+            }
+            if self
+                .download_in_flight
+                .compare_exchange(current, current + 1, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                return true;
+            }
+        }
     }
 
     fn release_download_slot(&self) {
@@ -337,10 +353,12 @@ impl ProxyPool {
         Some(ProxyLease { entry })
     }
 
-    pub fn acquire_download_leases<'a>(
+    /// Acquire download leases for the given proxy URLs.
+    /// Returns `None` if any proxy has reached its download capacity.
+    pub fn try_acquire_download_leases<'a>(
         &self,
         proxy_urls: impl IntoIterator<Item = Option<&'a str>>,
-    ) -> ProxyDownloadLease {
+    ) -> Option<ProxyDownloadLease> {
         let mut grouped = HashMap::<String, Arc<ProxyEntry>>::new();
         for proxy_url in proxy_urls.into_iter().flatten() {
             if grouped.contains_key(proxy_url) {
@@ -348,14 +366,20 @@ impl ProxyPool {
             }
 
             if let Some(entry) = self.find_entry(proxy_url) {
-                entry.acquire_download_slot();
+                if !entry.try_acquire_download_slot() {
+                    // Proxy at capacity — roll back already-acquired slots.
+                    for acquired in grouped.values() {
+                        acquired.release_download_slot();
+                    }
+                    return None;
+                }
                 grouped.insert(proxy_url.to_string(), entry);
             }
         }
 
-        ProxyDownloadLease {
+        Some(ProxyDownloadLease {
             entries: grouped.into_values().collect(),
-        }
+        })
     }
 
     /// Mark a specific proxy as failed.
@@ -917,7 +941,7 @@ mod tests {
             "http://proxy2:8080".to_string(),
         ]);
 
-        let _download = pool.acquire_download_leases([Some("http://proxy1:8080"), None]);
+        let _download = pool.try_acquire_download_leases([Some("http://proxy1:8080"), None]);
         let extract = pool
             .try_acquire_next_owned()
             .expect("extract should use proxy that is not busy downloading");
@@ -928,10 +952,38 @@ mod tests {
     fn test_preferred_extract_proxy_rejected_while_download_busy() {
         let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
 
-        let _download = pool.acquire_download_leases([Some("http://proxy1:8080")]);
+        let _download = pool.try_acquire_download_leases([Some("http://proxy1:8080")]);
         assert!(pool
             .try_acquire_preferred_owned("http://proxy1:8080")
             .is_none());
+    }
+
+    #[test]
+    fn test_download_slot_cap_rejects_when_at_capacity() {
+        let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
+
+        // Acquire MAX_DOWNLOAD_PER_PROXY slots — should all succeed.
+        let _lease1 = pool
+            .try_acquire_download_leases([Some("http://proxy1:8080")])
+            .expect("first download lease should succeed");
+        let _lease2 = pool
+            .try_acquire_download_leases([Some("http://proxy1:8080")])
+            .expect("second download lease should succeed");
+
+        // Third should fail — proxy at capacity (MAX_DOWNLOAD_PER_PROXY = 2).
+        assert!(
+            pool.try_acquire_download_leases([Some("http://proxy1:8080")])
+                .is_none(),
+            "third download lease should be rejected (proxy at capacity)"
+        );
+
+        // Releasing one slot should allow a new lease.
+        drop(_lease1);
+        assert!(
+            pool.try_acquire_download_leases([Some("http://proxy1:8080")])
+                .is_some(),
+            "download lease should succeed after releasing one slot"
+        );
     }
 
     #[test]

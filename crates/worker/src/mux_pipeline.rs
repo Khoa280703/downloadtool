@@ -119,9 +119,26 @@ pub async fn upload_muxed_artifact(
         .map(|value| value.max_refresh_attempts)
         .unwrap_or(0)
     {
-        let download_leases = global_proxy_pool().map(|pool| {
-            pool.acquire_download_leases([video_proxy.as_deref(), audio_proxy.as_deref()])
-        });
+        // Wait for download slots on the required proxies (capped per-proxy).
+        let download_leases = if let Some(pool) = global_proxy_pool() {
+            let mut lease = None;
+            for wait in 0..30 {
+                if let Some(l) = pool.try_acquire_download_leases([video_proxy.as_deref(), audio_proxy.as_deref()]) {
+                    lease = Some(l);
+                    break;
+                }
+                if wait == 0 {
+                    tracing::debug!(job_id, "Proxy download slots full, waiting for capacity");
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+            if lease.is_none() {
+                tracing::warn!(job_id, "Proxy download slots still full after 60s, proceeding without lease");
+            }
+            lease
+        } else {
+            None
+        };
 
         if let Err(error) = progress
             .publish_phase(JobProgressPhase::FetchingStreams, None)
@@ -523,7 +540,7 @@ mod tests {
     #[tokio::test]
     async fn download_lease_releases_when_wrapped_upload_stream_drops() {
         let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
-        let download_leases = pool.acquire_download_leases([Some("http://proxy1:8080")]);
+        let download_leases = pool.try_acquire_download_leases([Some("http://proxy1:8080")]).unwrap();
         assert!(pool
             .try_acquire_preferred_owned("http://proxy1:8080")
             .is_none());
