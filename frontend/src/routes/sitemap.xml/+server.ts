@@ -1,5 +1,6 @@
 import type { RequestHandler } from './$types';
 import { PUBLIC_PAGES, SITE_URL } from '$lib/seo/public-pages';
+import { getContentByType } from '$lib/seo/content/content-registry';
 
 const LANGUAGES = [
 	'ar',
@@ -68,6 +69,16 @@ export const GET: RequestHandler = () => {
 	const entries = PUBLIC_PAGES.map((page) =>
 		buildEntry(page.path, page.priority, page.changefreq, page.lastmod)
 	);
+
+	// Content registry: guide entries
+	for (const entry of getContentByType('guide')) {
+		entries.push(buildEntry(`/guides/${entry.slug}`, 0.6, 'monthly', entry.dateModified));
+	}
+
+	// Content registry: compare entries
+	for (const entry of getContentByType('compare')) {
+		entries.push(buildEntry(`/compare/${entry.slug}`, 0.6, 'monthly', entry.dateModified));
+	}
 
 	const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">

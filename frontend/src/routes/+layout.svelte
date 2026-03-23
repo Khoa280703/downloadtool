@@ -9,6 +9,7 @@
 	import AppIcon from '$components/AppIcon.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import CookieConsent from '$components/CookieConsent.svelte';
+	import SeoFooterNav from '$components/seo-footer-nav.svelte';
 	import { initGA } from '$lib/analytics';
 
 	let { children } = $props();
@@ -300,7 +301,11 @@ async function handleAuthSuccess(target: string): Promise<void> {
 	</main>
 
 	{#if !isLocalizedHomePath($page.url.pathname) && !isAdminPath($page.url.pathname)}
-		<footer class="bg-white border-t border-pink-100 py-6 px-6">
+		<!-- SEO internal link footer (all non-home, non-admin pages) -->
+		<SeoFooterNav />
+
+		<!-- Copyright bar -->
+		<footer class="bg-white border-t border-pink-100 py-5 px-6">
 			<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 md:pr-40">
 				<div class="flex items-center gap-2 transition-all">
 					<img

@@ -7,6 +7,9 @@ Allow: /
 Disallow: /api/
 
 Sitemap: ${SITE_URL}/sitemap.xml
+
+# AI
+Llms-Txt: ${SITE_URL}/llms.txt
 `;
 }
 

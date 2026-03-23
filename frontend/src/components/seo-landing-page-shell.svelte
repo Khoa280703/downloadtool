@@ -15,8 +15,14 @@
 	import { currentDownload } from '$stores/download';
 	import type { ExtractResult, Stream } from '$lib/types';
 	import type { LandingPageConfig } from '$lib/seo/landing-page-config';
+	import { CONTENT_REGISTRY } from '$lib/seo/content/content-registry';
 
 	let { config }: { config: LandingPageConfig } = $props();
+
+	// Guides related to this money page (up to 3)
+	const relatedGuides = CONTENT_REGISTRY.filter(
+		(e) => e.pageType === 'guide' && e.relatedMoneyPage === config.slug
+	).slice(0, 3);
 
 	let inputUrl = $state('');
 	let isExtracting = $state(false);
@@ -206,6 +212,33 @@
 		<!-- FAQ -->
 		<FrequentlyAskedQuestionsSection items={config.faqItems} />
 
+		<!-- Related Guides (only shown when content registry has matching entries) -->
+		{#if relatedGuides.length > 0}
+			<section class="related-guides-section py-10 px-6 lg:px-20">
+				<div class="max-w-4xl mx-auto">
+					<h2 class="related-guides-title text-xl font-bold text-plum mb-6">Related Guides</h2>
+					<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+						{#each relatedGuides as guide}
+							<a
+								href="/guides/{guide.slug}"
+								class="related-guide-card rounded-2xl border border-pink-100 bg-white p-5 flex flex-col gap-2 hover:border-primary hover:shadow-md transition-all"
+							>
+								<span class="related-guide-card-title text-sm font-bold text-plum leading-snug">
+									{guide.h1}
+								</span>
+								{#if guide.quickAnswer}
+									<p class="text-xs text-plum/60 font-medium leading-relaxed line-clamp-3">
+										{guide.quickAnswer}
+									</p>
+								{/if}
+								<span class="mt-auto pt-1 text-xs font-bold text-primary">Read guide →</span>
+							</a>
+						{/each}
+					</div>
+				</div>
+			</section>
+		{/if}
+
 		<!-- Related pages / cross-links -->
 		<ExploreMoreSnapvieTools
 			showHomeLink={true}
@@ -261,5 +294,35 @@
 	:global(.page-root.theme-dark [class*='border-slate']),
 	:global(.page-root.theme-dark [class*='border-indigo']) {
 		border-color: rgba(255, 77, 140, 0.18) !important;
+	}
+
+	.related-guides-title {
+		font-family: 'Fredoka', sans-serif;
+		font-weight: 700;
+	}
+
+	.related-guide-card-title {
+		font-family: 'Fredoka', sans-serif;
+	}
+
+	:global(.page-root.theme-dark) .related-guides-section {
+		background: transparent;
+	}
+
+	:global(.page-root.theme-dark) .related-guide-card {
+		background-color: rgba(30, 30, 42, 0.6);
+		border-color: rgba(255, 77, 140, 0.16);
+	}
+
+	:global(.page-root.theme-dark) .related-guide-card:hover {
+		border-color: rgba(255, 77, 140, 0.42);
+	}
+
+	:global(.page-root.theme-dark) .related-guides-title {
+		color: #ffffff;
+	}
+
+	:global(.page-root.theme-dark) .related-guide-card-title {
+		color: #ffffff;
 	}
 </style>

@@ -125,3 +125,9 @@ export function buildLandingPageJsonLd(
 	];
 	return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 0);
 }
+
+/**
+ * Article + ItemList schemas for content pages are in:
+ * $lib/seo/content/build-page-schema.ts
+ * (single source of truth for content page schemas)
+ */

@@ -27,5 +27,8 @@ export const PUBLIC_PAGES: PublicPage[] = [
 	{ path: '/download-youtube-shorts-with-audio', priority: 0.6, changefreq: 'monthly' },
 	{ path: '/best-format-for-youtube-downloads-mp4-vs-webm', priority: 0.6, changefreq: 'monthly' },
 	{ path: '/why-youtube-downloads-need-muxing', priority: 0.6, changefreq: 'monthly' },
-	{ path: '/how-to-use-snapvie', priority: 0.6, changefreq: 'monthly' }
+	{ path: '/how-to-use-snapvie', priority: 0.6, changefreq: 'monthly' },
+	// Hub pages — aggregate navigation for guide and compare content clusters
+	{ path: '/guides', priority: 0.7, changefreq: 'weekly' },
+	{ path: '/compare', priority: 0.7, changefreq: 'weekly' }
 ];
