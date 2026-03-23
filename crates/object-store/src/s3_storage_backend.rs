@@ -52,6 +52,9 @@ impl StorageBackend for S3StorageBackend {
         let upload_result = self
             .upload_stream_parts(artifact_key, upload_id, &mut stream)
             .await;
+        // Drop the upstream stream as soon as multipart ingestion finishes so any
+        // attached proxy/download leases are released before S3 completion.
+        drop(stream);
 
         let (completed_parts, total_bytes) = match upload_result {
             Ok(result) => result,

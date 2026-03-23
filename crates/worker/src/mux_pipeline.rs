@@ -1,13 +1,17 @@
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context as TaskContext, Poll};
 use std::time::Instant;
 
 use anyhow::{anyhow, Context, Result};
-use futures::TryStreamExt;
+use bytes::Bytes;
+use futures::{Stream, TryStreamExt};
 use job_system::{JobProgressPhase, MuxJobRequest};
 use muxer::stream_fetcher::{FetchBothRefreshOptions, StreamFetcher, StreamUrlRefreshContext};
 use muxer::{remux_streams, MuxerError};
 use object_store::{StorageBackend, StoredArtifact, UploadStream};
 use proxy::anti_bot::AntiBotError;
+use proxy::proxy_pool::ProxyDownloadLease;
 use proxy::Platform;
 use proxy::{global_proxy_pool, ProxyDownloadAccessEvent};
 use tracing::{info, warn};
@@ -27,6 +31,28 @@ pub struct ResolvedMuxJobSources {
     pub proxy_binding: MuxProxyBinding,
     pub resolution_strategy: &'static str,
     pub fallback_reason: Option<&'static str>,
+}
+
+struct LeaseBoundUploadStream {
+    inner: UploadStream,
+    _download_leases: ProxyDownloadLease,
+}
+
+impl LeaseBoundUploadStream {
+    fn new(inner: UploadStream, download_leases: ProxyDownloadLease) -> Self {
+        Self {
+            inner,
+            _download_leases: download_leases,
+        }
+    }
+}
+
+impl Stream for LeaseBoundUploadStream {
+    type Item = Result<Bytes>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Option<Self::Item>> {
+        self.inner.as_mut().poll_next(cx)
+    }
 }
 
 pub async fn resolve_mux_job_sources(request: &MuxJobRequest) -> ResolvedMuxJobSources {
@@ -93,7 +119,7 @@ pub async fn upload_muxed_artifact(
         .map(|value| value.max_refresh_attempts)
         .unwrap_or(0)
     {
-        let _download_leases = global_proxy_pool().map(|pool| {
+        let download_leases = global_proxy_pool().map(|pool| {
             pool.acquire_download_leases([video_proxy.as_deref(), audio_proxy.as_deref()])
         });
 
@@ -142,7 +168,15 @@ pub async fn upload_muxed_artifact(
         let muxed = remux_streams(video_stream, audio_stream).inspect_ok(move |bytes| {
             upload_progress.record_uploaded_bytes(bytes.len() as u64);
         });
-        let upload_stream: UploadStream = Box::pin(muxed.map_err(anyhow::Error::new));
+        let upload_stream: UploadStream = {
+            let muxed_stream: UploadStream = Box::pin(muxed.map_err(anyhow::Error::new));
+            match download_leases {
+                Some(download_leases) => {
+                    Box::pin(LeaseBoundUploadStream::new(muxed_stream, download_leases))
+                }
+                None => muxed_stream,
+            }
+        };
         let store_started_at = Instant::now();
         info!(
             job_id,
@@ -475,4 +509,37 @@ fn _is_auth_like_muxer_error(error: &MuxerError) -> bool {
 #[allow(dead_code)]
 fn _is_auth_like_antibot_error(error: &AntiBotError) -> bool {
     is_auth_like_error(&anyhow!(error.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use futures::{stream, StreamExt};
+    use proxy::ProxyPool;
+
+    use super::LeaseBoundUploadStream;
+    use object_store::UploadStream;
+
+    #[tokio::test]
+    async fn download_lease_releases_when_wrapped_upload_stream_drops() {
+        let pool = ProxyPool::new(vec!["http://proxy1:8080".to_string()]);
+        let download_leases = pool.acquire_download_leases([Some("http://proxy1:8080")]);
+        assert!(pool
+            .try_acquire_preferred_owned("http://proxy1:8080")
+            .is_none());
+
+        let inner: UploadStream = Box::pin(stream::iter(vec![Ok(Bytes::from_static(b"part-1"))]));
+        let mut wrapped = LeaseBoundUploadStream::new(inner, download_leases);
+        assert!(wrapped.next().await.is_some());
+        assert!(wrapped.next().await.is_none());
+        assert!(pool
+            .try_acquire_preferred_owned("http://proxy1:8080")
+            .is_none());
+
+        drop(wrapped);
+
+        assert!(pool
+            .try_acquire_preferred_owned("http://proxy1:8080")
+            .is_some());
+    }
 }
