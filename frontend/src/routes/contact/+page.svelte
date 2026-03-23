@@ -1,6 +1,23 @@
 <script lang="ts">
 	import { trackPageView } from '$lib/analytics';
 	import { onMount } from 'svelte';
+	import { buildOrganizationSchema, buildBreadcrumbSchema } from '$lib/seo/structured-data';
+	import { SITE_URL } from '$lib/seo/public-pages';
+
+	const jsonLd = JSON.stringify(
+		{
+			'@context': 'https://schema.org',
+			'@graph': [
+				buildOrganizationSchema(),
+				buildBreadcrumbSchema([
+					{ name: 'Snapvie', url: SITE_URL },
+					{ name: 'Contact', url: `${SITE_URL}/contact` }
+				])
+			]
+		},
+		null,
+		0
+	);
 
 	onMount(() => {
 		trackPageView('/contact', 'Contact Snapvie');
@@ -14,6 +31,15 @@
 		content="Contact Snapvie for support, to report a bug, submit a DMCA takedown, or send general feedback."
 	/>
 	<link rel="canonical" href="https://snapvie.com/contact" />
+	<meta property="og:title" content="Contact Snapvie — Get Help or Report Issues" />
+	<meta
+		property="og:description"
+		content="Contact Snapvie for support, bug reports, DMCA takedown requests, or general feedback."
+	/>
+	<meta property="og:url" content="https://snapvie.com/contact" />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary_large_image" />
+	{@html '<script type="application/ld+json">' + jsonLd + '<\/script>'}
 </svelte:head>
 
 <div class="legal-page">

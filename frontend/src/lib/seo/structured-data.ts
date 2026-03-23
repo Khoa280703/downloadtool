@@ -16,11 +16,19 @@ export function buildOrganizationSchema() {
 		'@id': `${SITE_URL}/#organization`,
 		name: SITE_NAME,
 		url: SITE_URL,
+		description:
+			'Snapvie is a free, ad-free YouTube video downloader supporting 4K, 8K HDR, playlists, Shorts, and audio-only downloads.',
+		foundingDate: '2025',
 		logo: {
 			'@type': 'ImageObject',
 			url: LOGO_URL,
 			width: 512,
 			height: 512
+		},
+		contactPoint: {
+			'@type': 'ContactPoint',
+			email: 'support@snapvie.com',
+			contactType: 'customer support'
 		},
 		sameAs: [] as string[]
 	};

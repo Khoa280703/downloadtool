@@ -1,6 +1,23 @@
 <script lang="ts">
 	import { trackPageView } from '$lib/analytics';
 	import { onMount } from 'svelte';
+	import { buildOrganizationSchema, buildBreadcrumbSchema } from '$lib/seo/structured-data';
+	import { SITE_URL } from '$lib/seo/public-pages';
+
+	const jsonLd = JSON.stringify(
+		{
+			'@context': 'https://schema.org',
+			'@graph': [
+				buildOrganizationSchema(),
+				buildBreadcrumbSchema([
+					{ name: 'Snapvie', url: SITE_URL },
+					{ name: 'About', url: `${SITE_URL}/about` }
+				])
+			]
+		},
+		null,
+		0
+	);
 
 	onMount(() => {
 		trackPageView('/about', 'About Snapvie — Free 4K YouTube Video Downloader');
@@ -14,6 +31,15 @@
 		content="Learn about Snapvie — a free, ad-free YouTube video downloader supporting 4K, 8K HDR, playlists, Shorts, and audio-only downloads."
 	/>
 	<link rel="canonical" href="https://snapvie.com/about" />
+	<meta property="og:title" content="About Snapvie — Free 4K YouTube Video Downloader" />
+	<meta
+		property="og:description"
+		content="Learn about Snapvie — a free, ad-free YouTube video downloader supporting 4K, 8K HDR, playlists, Shorts, and audio-only downloads."
+	/>
+	<meta property="og:url" content="https://snapvie.com/about" />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary_large_image" />
+	{@html '<script type="application/ld+json">' + jsonLd + '<\/script>'}
 </svelte:head>
 
 <div class="legal-page">
@@ -45,6 +71,36 @@
 	</section>
 
 	<section>
+		<h2>How Snapvie Works</h2>
+		<p>
+			The process is straightforward. Paste a YouTube URL — Snapvie fetches the available streams
+			directly from YouTube's delivery infrastructure. You choose the quality (up to 8K HDR) and
+			format (MP4, WebM, or audio-only). The file is delivered to your browser without being stored
+			on our servers: streams are proxied in real time, then discarded.
+		</p>
+		<p>
+			For playlists, Snapvie processes each video in batch and tracks progress item by item. You can
+			start a playlist download and come back when it's done.
+		</p>
+	</section>
+
+	<section>
+		<h2>Built for Quality</h2>
+		<p>
+			YouTube delivers high-resolution video and audio as separate DASH streams. Most tools skip the
+			merge step and cap output at 1080p, because that's where the combined stream ends. Snapvie
+			performs real-time muxing — merging video and audio on the fly — so if YouTube offers 4K or
+			8K, you get 4K or 8K.
+		</p>
+		<ul>
+			<li><strong>No quality caps</strong> — whatever YouTube offers, Snapvie delivers</li>
+			<li><strong>Real-time muxing</strong> — video and audio merged on the fly, no re-encoding</li>
+			<li><strong>No ads, no popups, no dark patterns</strong> — the tool does one thing</li>
+			<li><strong>Any modern browser</strong> — desktop or mobile, no extension required</li>
+		</ul>
+	</section>
+
+	<section>
 		<h2>Our Mission</h2>
 		<p>
 			To provide safe, ad-free, high-quality video downloads for personal and educational use. We
@@ -64,6 +120,17 @@
 			processed to fetch stream info and then discarded. See our <a href="/privacy">Privacy Policy</a
 			> for full details.
 		</p>
+	</section>
+
+	<section class="internal-links">
+		<h2>Learn More</h2>
+		<ul>
+			<li><a href="/guides">Read our guides</a> — step-by-step tutorials for common download tasks</li>
+			<li>
+				<a href="/compare">See how Snapvie compares</a> — side-by-side vs. other tools
+			</li>
+			<li><a href="/contact">Get in touch</a> — questions, feedback, or DMCA requests</li>
+		</ul>
 	</section>
 
 	<div class="back-link">
