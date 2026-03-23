@@ -44,6 +44,10 @@ impl RedisStreamsQueue {
             redis::from_redis_value(json).context("invalid redis payload field")?;
         serde_json::from_str(&payload).context("invalid queue payload json")
     }
+
+    fn is_missing_group_error(error: &redis::RedisError) -> bool {
+        error.to_string().contains("NOGROUP")
+    }
 }
 
 #[async_trait]
@@ -86,7 +90,7 @@ impl JobQueueConsumer for RedisStreamsQueue {
 
     async fn consume(&self, block_ms: usize) -> anyhow::Result<Option<ClaimedQueueMessage>> {
         let mut conn = self.connection().await?;
-        let reply: StreamReadReply = redis::cmd("XREADGROUP")
+        let reply: StreamReadReply = match redis::cmd("XREADGROUP")
             .arg("GROUP")
             .arg(&self.group_name)
             .arg(&self.consumer_name)
@@ -99,7 +103,16 @@ impl JobQueueConsumer for RedisStreamsQueue {
             .arg(">")
             .query_async(&mut conn)
             .await
-            .context("failed to read redis stream job")?;
+        {
+            Ok(reply) => reply,
+            Err(error) if Self::is_missing_group_error(&error) => {
+                self.ensure_group()
+                    .await
+                    .context("failed to recreate redis stream group after NOGROUP")?;
+                return Ok(None);
+            }
+            Err(error) => return Err(error).context("failed to read redis stream job"),
+        };
 
         let Some(stream) = reply.keys.first() else {
             return Ok(None);
