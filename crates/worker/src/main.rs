@@ -118,9 +118,7 @@ async fn main() -> Result<()> {
         if last_cleanup_at.elapsed()
             >= Duration::from_secs(config.cleanup_interval_secs.max(1) as u64)
         {
-            if let Err(error) =
-                cleanup_expired_artifacts(&repo, storage.clone()).await
-            {
+            if let Err(error) = cleanup_expired_artifacts(&repo, storage.clone()).await {
                 error!(err = %error, "Failed to clean expired mux artifacts");
             }
             last_cleanup_at = std::time::Instant::now();

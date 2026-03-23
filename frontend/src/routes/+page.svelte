@@ -5,7 +5,7 @@
 	import BatchProgress from '$components/BatchProgress.svelte';
 	import AppIcon from '$components/AppIcon.svelte';
 	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
-	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
+	import KnowledgeSections from '$components/knowledge-sections.svelte';
 	import HowItWorksThreeSteps from '$components/how-it-works-three-steps.svelte';
 	import SiteHeader from '$components/SiteHeader.svelte';
 	import WhySnapvieSection from '$components/why-snapvie-section.svelte';
@@ -823,7 +823,7 @@
 	<meta property="og:image" content={SEO_OG_IMAGE} />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
-	<meta property="og:image:alt" content="Snapvie - Free YouTube Video Downloader" />
+	<meta property="og:image:alt" content={m.home_og_image_alt()} />
 
 	<!-- Twitter -->
 	<meta name="twitter:card" content="summary_large_image" />
@@ -1697,37 +1697,35 @@
 
 		<HowItWorksThreeSteps />
 
-		<WhySnapvieSection cards={whyCards} />
-		<FrequentlyAskedQuestionsSection title={m.home_faq_title()} items={faqItems} />
-
-		<section class="guides-discovery py-8 px-6 bg-white border-t border-pink-50">
-			<div class="max-w-4xl mx-auto text-center">
-				<h2 class="text-lg font-bold text-plum mb-4" style="font-family:'Fredoka',sans-serif">
-					Guides & Resources
-				</h2>
-				<div class="grid sm:grid-cols-2 gap-6 text-sm max-w-2xl mx-auto">
-					<div class="text-left">
-						<p class="font-bold text-plum/70 text-xs uppercase tracking-wider mb-2">Guides</p>
-						<ul class="space-y-1.5">
-							<li><a href="/guides/how-to-use-snapvie" class="text-plum/80 hover:text-primary transition-colors font-semibold">How to Use Snapvie</a></li>
-							<li><a href="/guides/how-to-download-youtube-playlists" class="text-plum/80 hover:text-primary transition-colors font-semibold">How to Download Playlists</a></li>
-							<li><a href="/guides/why-youtube-downloads-show-360p-only" class="text-plum/80 hover:text-primary transition-colors font-semibold">Why Downloads Show 360p Only</a></li>
-							<li><a href="/guides/best-format-for-youtube-downloads-mp4-vs-webm" class="text-plum/80 hover:text-primary transition-colors font-semibold">MP4 vs WebM: Best Format</a></li>
-						</ul>
-						<a href="/guides" class="inline-block mt-2 text-xs font-bold text-primary hover:underline">View all guides →</a>
-					</div>
-					<div class="text-left">
-						<p class="font-bold text-plum/70 text-xs uppercase tracking-wider mb-2">Compare</p>
-						<ul class="space-y-1.5">
-							<li><a href="/compare/snapvie-vs-y2mate" class="text-plum/80 hover:text-primary transition-colors font-semibold">Snapvie vs y2mate</a></li>
-							<li><a href="/compare/best-youtube-downloader-for-4k" class="text-plum/80 hover:text-primary transition-colors font-semibold">Best Downloader for 4K</a></li>
-							<li><a href="/compare/best-youtube-downloader-for-playlists" class="text-plum/80 hover:text-primary transition-colors font-semibold">Best for Playlists</a></li>
-						</ul>
-						<a href="/compare" class="inline-block mt-2 text-xs font-bold text-primary hover:underline">View all comparisons →</a>
-					</div>
-				</div>
-			</div>
-		</section>
+		<WhySnapvieSection cards={whyCards} ctaHref="#home" />
+		<KnowledgeSections
+			faqTitle={m.home_faq_title()}
+			faqItems={faqItems}
+			resourceTitle={m.home_resource_title()}
+			resourceGroups={[
+				{
+					label: m.home_resource_guides_label(),
+					links: [
+						{ href: '/guides/how-to-use-snapvie', label: m.home_resource_guide_how_to_use() },
+						{ href: '/guides/how-to-download-youtube-playlists', label: m.home_resource_guide_playlists() },
+						{ href: '/guides/why-youtube-downloads-show-360p-only', label: m.home_resource_guide_360p() },
+						{ href: '/guides/best-format-for-youtube-downloads-mp4-vs-webm', label: m.home_resource_guide_format() }
+					],
+					ctaHref: '/guides',
+					ctaLabel: m.home_resource_view_all_guides()
+				},
+				{
+					label: m.home_resource_compare_label(),
+					links: [
+						{ href: '/compare/snapvie-vs-y2mate', label: m.home_resource_compare_y2mate() },
+						{ href: '/compare/best-youtube-downloader-for-4k', label: m.home_resource_compare_4k() },
+						{ href: '/compare/best-youtube-downloader-for-playlists', label: m.home_resource_compare_playlists() }
+					],
+					ctaHref: '/compare',
+					ctaLabel: m.home_resource_view_all_comparisons()
+				}
+			]}
+		/>
 
 		<ExploreMoreSnapvieTools links={relatedToolLinks} />
 		</main>

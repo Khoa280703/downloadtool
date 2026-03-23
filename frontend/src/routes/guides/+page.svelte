@@ -8,6 +8,7 @@
 	import { CATEGORY_CONFIG } from '$lib/seo/content/content-taxonomy';
 	import { buildHubPageMeta } from '$lib/seo/content/build-page-seo';
 	import { buildHubPageJsonLd } from '$lib/seo/content/build-page-schema';
+	import * as m from '$lib/paraglide/messages';
 
 	let { data }: { data: PageData } = $props();
 
@@ -43,9 +44,9 @@
 <!-- Hero -->
 <section class="pt-12 pb-8 px-6 text-center">
 	<nav aria-label="Breadcrumb" class="mb-4 flex justify-center gap-2 text-xs font-semibold text-plum/50">
-		<a href="/" class="hover:text-primary transition-colors">Snapvie</a>
+		<a href="/" class="hover:text-primary transition-colors">{m.common_breadcrumb_snapvie()}</a>
 		<span>›</span>
-		<span class="text-plum/70">Guides</span>
+		<span class="text-plum/70">{m.guides_breadcrumb()}</span>
 	</nav>
 	<h1 class="text-3xl md:text-5xl font-bold text-plum mb-4 leading-tight" style="font-family:'Fredoka',sans-serif">
 		{data.config.h1}
@@ -60,7 +61,7 @@
 			class="rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors {selectedCategory === null ? 'bg-primary text-white border-primary' : 'bg-white border-pink-100 text-plum hover:border-primary hover:text-primary'}"
 			onclick={() => (selectedCategory = null)}
 		>
-			All
+			{m.guides_filter_all()}
 		</button>
 		{#each activeCategories as cat}
 			<button

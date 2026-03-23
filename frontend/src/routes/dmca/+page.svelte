@@ -1,117 +1,75 @@
 <script lang="ts">
 	import { trackPageView } from '$lib/analytics';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	onMount(() => {
-		trackPageView('/dmca', 'DMCA & Copyright — Snapvie');
+		trackPageView('/dmca', m.dmca_meta_title());
 	});
 </script>
 
 <svelte:head>
-	<title>DMCA &amp; Copyright Policy — Snapvie</title>
+	<title>{m.dmca_meta_title()}</title>
 	<meta
 		name="description"
-		content="Snapvie DMCA takedown procedure, counter-notification process, and copyright contact information."
+		content={m.dmca_meta_description()}
 	/>
 	<link rel="canonical" href="https://snapvie.com/dmca" />
 </svelte:head>
 
 <div class="legal-page">
-	<h1>DMCA &amp; Copyright</h1>
-	<p class="tagline">Last updated: March 19, 2026</p>
+	<h1>{m.dmca_title()}</h1>
+	<p class="tagline">{m.dmca_last_updated()}</p>
 
 	<section>
-		<h2>Overview</h2>
-		<p>
-			Snapvie respects intellectual property rights and complies with the Digital Millennium
-			Copyright Act (DMCA). We do not host or store video content — we provide a tool that accesses
-			publicly available streams from third-party platforms.
-		</p>
-		<p>
-			If you believe content accessible via Snapvie infringes your copyright, you may submit a
-			takedown notice using the procedure below.
-		</p>
+		<h2>{m.dmca_overview_title()}</h2>
+		<p>{m.dmca_overview_p1()}</p>
+		<p>{m.dmca_overview_p2()}</p>
 	</section>
 
 	<section>
-		<h2>DMCA Takedown Notice</h2>
-		<p>
-			To submit a valid DMCA notice, email <a href="mailto:dmca@snapvie.com">dmca@snapvie.com</a> with
-			the following information:
-		</p>
+		<h2>{m.dmca_notice_title()}</h2>
+		<p>{m.dmca_notice_p1()}</p>
 		<ul>
-			<li>
-				<strong>Identification of the copyrighted work</strong> — describe the work you claim has been
-				infringed
-			</li>
-			<li>
-				<strong>Identification of the infringing material</strong> — the specific URL(s) being used with
-				Snapvie
-			</li>
-			<li>
-				<strong>Your contact information</strong> — name, address, phone number, and email address
-			</li>
-			<li>
-				<strong>Good faith statement</strong> — a statement that you believe in good faith the use is
-				not authorized by the copyright owner
-			</li>
-			<li>
-				<strong>Accuracy statement</strong> — a statement that the information in the notice is
-				accurate, and under penalty of perjury, that you are authorized to act on behalf of the
-				copyright owner
-			</li>
-			<li>
-				<strong>Signature</strong> — your physical or electronic signature
-			</li>
+			<li>{m.dmca_notice_item1()}</li>
+			<li>{m.dmca_notice_item2()}</li>
+			<li>{m.dmca_notice_item3()}</li>
+			<li>{m.dmca_notice_item4()}</li>
+			<li>{m.dmca_notice_item5()}</li>
+			<li>{m.dmca_notice_item6()}</li>
 		</ul>
-		<p>
-			We will review valid notices and take appropriate action, which may include restricting access
-			to the identified content.
-		</p>
+		<p>{m.dmca_notice_p2()}</p>
 	</section>
 
 	<section>
-		<h2>Counter-Notification Procedure</h2>
-		<p>
-			If you believe your content was wrongly restricted, you may submit a counter-notification to
-			<a href="mailto:dmca@snapvie.com">dmca@snapvie.com</a> including:
-		</p>
+		<h2>{m.dmca_counter_title()}</h2>
+		<p>{m.dmca_counter_p1()}</p>
 		<ul>
-			<li>Identification of the material that was restricted and its prior location</li>
-			<li>
-				A statement under penalty of perjury that you have a good faith belief the content was
-				removed by mistake or misidentification
-			</li>
-			<li>Your name, address, phone number, and consent to jurisdiction</li>
-			<li>Your physical or electronic signature</li>
+			<li>{m.dmca_counter_item1()}</li>
+			<li>{m.dmca_counter_item2()}</li>
+			<li>{m.dmca_counter_item3()}</li>
+			<li>{m.dmca_counter_item4()}</li>
 		</ul>
-		<p>
-			Upon receiving a valid counter-notification, we will forward it to the original complainant.
-			If no legal action is filed within 10 business days, the restriction may be lifted at our
-			discretion.
-		</p>
+		<p>{m.dmca_counter_p2()}</p>
 	</section>
 
 	<section>
-		<h2>Repeat Infringers</h2>
-		<p>
-			Snapvie reserves the right to terminate access to users who are repeat infringers of
-			third-party intellectual property rights, in appropriate circumstances.
-		</p>
+		<h2>{m.dmca_repeat_title()}</h2>
+		<p>{m.dmca_repeat_p1()}</p>
 	</section>
 
 	<section>
-		<h2>Contact</h2>
+		<h2>{m.dmca_contact_title()}</h2>
 		<p>
-			DMCA agent: <a href="mailto:dmca@snapvie.com">dmca@snapvie.com</a>
+			{m.dmca_contact_agent_text()}<a href="mailto:dmca@snapvie.com">dmca@snapvie.com</a>
 		</p>
 		<p>
-			For general inquiries, see our <a href="/contact">contact page</a>.
+			{m.dmca_contact_general_text()}<a href="/contact">{m.dmca_contact_page_link()}</a>.
 		</p>
 	</section>
 
 	<div class="back-link">
-		<a href="/">← Back to Snapvie</a>
+		<a href="/">{m.common_back_to_snapvie()}</a>
 	</div>
 </div>
 

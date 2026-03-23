@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AppIcon from '$components/AppIcon.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	type ExploreLink = {
 		href: string;
@@ -9,7 +10,7 @@
 	let {
 		links,
 		showHomeLink = false,
-		title = 'Explore More Snapvie Tools'
+		title = m.explore_more_default_title()
 	}: {
 		links: ExploreLink[];
 		showHomeLink?: boolean;
@@ -27,7 +28,7 @@
 					class="explore-tools-link inline-flex items-center gap-2 rounded-full border border-pink-100 bg-white px-5 py-2 text-sm font-semibold text-plum hover:text-primary hover:border-primary transition-colors"
 				>
 					<AppIcon name="home" class="text-base" />
-					Back to Snapvie
+					{m.common_back_to_snapvie()}
 				</a>
 			{/if}
 			{#each links as link}

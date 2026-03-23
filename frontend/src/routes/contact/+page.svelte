@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { buildOrganizationSchema, buildBreadcrumbSchema } from '$lib/seo/structured-data';
 	import { SITE_URL } from '$lib/seo/public-pages';
+	import * as m from '$lib/paraglide/messages';
 
 	const jsonLd = JSON.stringify(
 		{
@@ -11,7 +12,7 @@
 				buildOrganizationSchema(),
 				buildBreadcrumbSchema([
 					{ name: 'Snapvie', url: SITE_URL },
-					{ name: 'Contact', url: `${SITE_URL}/contact` }
+					{ name: m.contact_breadcrumb(), url: `${SITE_URL}/contact` }
 				])
 			]
 		},
@@ -20,21 +21,21 @@
 	);
 
 	onMount(() => {
-		trackPageView('/contact', 'Contact Snapvie');
+		trackPageView('/contact', m.contact_og_title());
 	});
 </script>
 
 <svelte:head>
-	<title>Contact Snapvie — Get Help or Report Issues</title>
+	<title>{m.contact_og_title()}</title>
 	<meta
 		name="description"
-		content="Contact Snapvie for support, to report a bug, submit a DMCA takedown, or send general feedback."
+		content={m.contact_meta_description()}
 	/>
 	<link rel="canonical" href="https://snapvie.com/contact" />
-	<meta property="og:title" content="Contact Snapvie — Get Help or Report Issues" />
+	<meta property="og:title" content={m.contact_og_title()} />
 	<meta
 		property="og:description"
-		content="Contact Snapvie for support, bug reports, DMCA takedown requests, or general feedback."
+		content={m.contact_meta_description()}
 	/>
 	<meta property="og:url" content="https://snapvie.com/contact" />
 	<meta property="og:type" content="website" />
@@ -43,64 +44,42 @@
 </svelte:head>
 
 <div class="legal-page">
-	<h1>Contact Us</h1>
-	<p class="tagline">We read every message.</p>
+	<h1>{m.contact_title()}</h1>
+	<p class="tagline">{m.contact_tagline()}</p>
 
 	<section>
-		<h2>General Support</h2>
+		<h2>{m.contact_support_title()}</h2>
+		<p>{m.contact_support_p1()}</p>
 		<p>
-			Having trouble downloading a video? Something not working as expected? Reach out and we'll do
-			our best to help.
+			{m.contact_support_email()}
 		</p>
-		<p>
-			Email us at: <a href="mailto:support@snapvie.com">support@snapvie.com</a>
-		</p>
-		<p>
-			Please include the video URL and a brief description of what happened. We typically respond
-			within 1–2 business days.
-		</p>
+		<p>{m.contact_support_include()}</p>
 	</section>
 
 	<section>
-		<h2>Bug Reports</h2>
-		<p>
-			Found a bug or broken feature? We want to know. When reporting, please include:
-		</p>
+		<h2>{m.contact_bugs_title()}</h2>
+		<p>{m.contact_bugs_p1()}</p>
 		<ul>
-			<li>The video URL you were trying to download</li>
-			<li>What happened (error message, blank result, etc.)</li>
-			<li>Your browser and operating system</li>
+			<li>{m.contact_bugs_item1()}</li>
+			<li>{m.contact_bugs_item2()}</li>
+			<li>{m.contact_bugs_item3()}</li>
 		</ul>
-		<p>
-			Send bug reports to: <a href="mailto:support@snapvie.com">support@snapvie.com</a> with subject
-			line <strong>"Bug Report"</strong>.
-		</p>
+		<p>{m.contact_bugs_email()}</p>
 	</section>
 
 	<section>
-		<h2>DMCA &amp; Copyright</h2>
-		<p>
-			If you are a copyright holder and believe content facilitated by Snapvie infringes your rights,
-			please see our <a href="/dmca">DMCA &amp; Copyright Policy</a> for the proper takedown procedure.
-		</p>
-		<p>
-			DMCA notices must be submitted via email to: <a href="mailto:dmca@snapvie.com"
-				>dmca@snapvie.com</a
-			>
-		</p>
+		<h2>{m.contact_dmca_title()}</h2>
+		<p>{m.contact_dmca_p1()}</p>
+		<p>{m.contact_dmca_email()}</p>
 	</section>
 
 	<section>
-		<h2>Other Inquiries</h2>
-		<p>
-			For anything else — partnerships, press, or general feedback — email us at <a
-				href="mailto:hello@snapvie.com">hello@snapvie.com</a
-			>.
-		</p>
+		<h2>{m.contact_other_title()}</h2>
+		<p>{m.contact_other_p1()}</p>
 	</section>
 
 	<div class="back-link">
-		<a href="/">← Back to Snapvie</a>
+		<a href="/">{m.common_back_to_snapvie()}</a>
 	</div>
 </div>
 

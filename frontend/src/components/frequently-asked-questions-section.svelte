@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	type FrequentlyAskedQuestion = {
 		q: string;
 		a: string;
@@ -6,7 +8,7 @@
 
 	let {
 		items,
-		title = 'Frequently Asked Questions'
+		title = m.knowledge_faq_default_title()
 	}: {
 		items: FrequentlyAskedQuestion[];
 		title?: string;

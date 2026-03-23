@@ -4,41 +4,42 @@
 	 * Provides link equity flow to all money pages, hubs, and trust pages.
 	 * Visible on all non-home, non-admin pages via +layout.svelte.
 	 */
+	import * as m from '$lib/paraglide/messages';
 </script>
 
 <footer class="seo-footer border-t border-pink-100 bg-slate-50 py-10 px-6">
-	<nav aria-label="Site navigation" class="max-w-7xl mx-auto">
+	<nav aria-label={m.footer_nav_aria()} class="max-w-7xl mx-auto">
 		<div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
 
 			<!-- Product links: money pages -->
 			<div>
 				<h3 class="seo-footer-heading text-xs font-bold uppercase tracking-widest text-plum/50 mb-3">
-					Download Tools
+					{m.footer_nav_download_tools()}
 				</h3>
 				<ul class="flex flex-col gap-2">
 					<li>
 						<a class="seo-footer-link" href="/download-youtube-4k">
-							Download YouTube 4K
+							{m.footer_nav_download_4k()}
 						</a>
 					</li>
 					<li>
 						<a class="seo-footer-link" href="/download-youtube-8k-hdr">
-							Download YouTube 8K HDR
+							{m.footer_nav_download_8k_hdr()}
 						</a>
 					</li>
 					<li>
 						<a class="seo-footer-link" href="/download-youtube-playlist">
-							Download YouTube Playlists
+							{m.footer_nav_download_playlists()}
 						</a>
 					</li>
 					<li>
 						<a class="seo-footer-link" href="/download-youtube-shorts">
-							Download YouTube Shorts
+							{m.footer_nav_download_shorts()}
 						</a>
 					</li>
 					<li>
 						<a class="seo-footer-link" href="/download-youtube-mp3">
-							YouTube to MP3
+							{m.footer_nav_download_mp3()}
 						</a>
 					</li>
 				</ul>
@@ -47,17 +48,17 @@
 			<!-- Resources: content hubs -->
 			<div>
 				<h3 class="seo-footer-heading text-xs font-bold uppercase tracking-widest text-plum/50 mb-3">
-					Resources
+					{m.footer_nav_resources()}
 				</h3>
 				<ul class="flex flex-col gap-2">
 					<li>
 						<a class="seo-footer-link" href="/guides">
-							How-to Guides
+							{m.footer_nav_guides()}
 						</a>
 					</li>
 					<li>
 						<a class="seo-footer-link" href="/compare">
-							Comparisons
+							{m.footer_nav_comparisons()}
 						</a>
 					</li>
 				</ul>
@@ -66,23 +67,23 @@
 			<!-- Company / trust pages -->
 			<div>
 				<h3 class="seo-footer-heading text-xs font-bold uppercase tracking-widest text-plum/50 mb-3">
-					Company
+					{m.footer_nav_company()}
 				</h3>
 				<ul class="flex flex-col gap-2">
 					<li>
-						<a class="seo-footer-link" href="/about">About Snapvie</a>
+						<a class="seo-footer-link" href="/about">{m.footer_nav_about()}</a>
 					</li>
 					<li>
-						<a class="seo-footer-link" href="/contact">Contact</a>
+						<a class="seo-footer-link" href="/contact">{m.footer_nav_contact()}</a>
 					</li>
 					<li>
-						<a class="seo-footer-link" href="/privacy">Privacy Policy</a>
+						<a class="seo-footer-link" href="/privacy">{m.footer_nav_privacy()}</a>
 					</li>
 					<li>
-						<a class="seo-footer-link" href="/terms">Terms of Service</a>
+						<a class="seo-footer-link" href="/terms">{m.footer_nav_terms()}</a>
 					</li>
 					<li>
-						<a class="seo-footer-link" href="/dmca">DMCA</a>
+						<a class="seo-footer-link" href="/dmca">{m.footer_nav_dmca()}</a>
 					</li>
 				</ul>
 			</div>

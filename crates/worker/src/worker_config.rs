@@ -242,7 +242,10 @@ impl WorkerConfig {
                 .unwrap_or_else(|| redis_url.clone());
         let proxy_quarantine_ttl_secs = Self::parse_required_env("PROXY_QUARANTINE_TTL_SECS")?;
         let concurrency = Self::parse_required_env::<usize>("MUX_WORKER_CONCURRENCY")?;
-        anyhow::ensure!(concurrency > 0, "MUX_WORKER_CONCURRENCY env var must be > 0");
+        anyhow::ensure!(
+            concurrency > 0,
+            "MUX_WORKER_CONCURRENCY env var must be > 0"
+        );
 
         Ok(Self {
             database_url,

@@ -389,38 +389,9 @@ async function handleAuthSuccess(target: string): Promise<void> {
 		transition: background-color 220ms ease, color 220ms ease;
 	}
 
-	.page-root::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		z-index: 0;
-		pointer-events: none;
-		opacity: 0.88;
-		filter: blur(18px);
-		background-image:
-			radial-gradient(circle at center, rgba(255, 185, 56, 0.14) 0, rgba(255, 185, 56, 0.14) 38%, transparent 70%),
-			radial-gradient(circle at center, rgba(255, 77, 140, 0.12) 0, rgba(255, 77, 140, 0.12) 40%, transparent 72%),
-			radial-gradient(circle at center, rgba(255, 185, 56, 0.1) 0, rgba(255, 185, 56, 0.1) 34%, transparent 66%);
-		background-size: 18rem 18rem, 24rem 24rem, 14rem 14rem;
-		background-position:
-			6% 5rem,
-			88% 18rem,
-			78% 6rem;
-		background-repeat: repeat-y;
-	}
-
 	.page-root.theme-dark {
 		background-color: #12121a;
 		color: #e0d0f5;
-	}
-
-	.page-root.theme-dark::before {
-		opacity: 0.34;
-		filter: blur(26px);
-		background-image:
-			radial-gradient(circle at center, rgba(255, 185, 56, 0.16) 0, rgba(255, 185, 56, 0.16) 38%, transparent 70%),
-			radial-gradient(circle at center, rgba(255, 77, 140, 0.16) 0, rgba(255, 77, 140, 0.16) 40%, transparent 72%),
-			radial-gradient(circle at center, rgba(129, 140, 248, 0.12) 0, rgba(129, 140, 248, 0.12) 34%, transparent 66%);
 	}
 
 	.page-root.admin-route,

@@ -18,12 +18,14 @@
 	const featureRotations = ['-5deg', '-2deg', '3deg', '5deg'] as const;
 	let {
 		title = m.home_why_title(),
-		eyebrow = 'Snapvie Highlights',
-		cards
+		eyebrow = m.why_snapvie_eyebrow(),
+		cards,
+		ctaHref = '#home'
 	}: {
 		title?: string;
 		eyebrow?: string;
 		cards: WhySnapvieCard[];
+		ctaHref?: string;
 	} = $props();
 </script>
 
@@ -112,10 +114,10 @@
 						<p class="why-snapvie-cta-title">{m.home_join_party_title()}</p>
 						<p class="why-snapvie-cta-copy">{m.home_join_party_subtitle()}</p>
 					</div>
-					<button type="button" class="why-snapvie-cta-button">
+					<a href={ctaHref} class="why-snapvie-cta-button">
 						<span>{m.home_join_party_cta()}</span>
 						<AppIcon name="arrow_forward" class="text-[16px]" />
-					</button>
+					</a>
 					<div class="why-snapvie-cta-badge" aria-hidden="true">🎉</div>
 				</div>
 			</div>

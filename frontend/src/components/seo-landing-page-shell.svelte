@@ -7,8 +7,7 @@
 	import AppIcon from '$components/AppIcon.svelte';
 	import FormatPicker from '$components/FormatPicker.svelte';
 	import DownloadBtn from '$components/DownloadBtn.svelte';
-	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
-	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
+	import KnowledgeSections from '$components/knowledge-sections.svelte';
 	import HowItWorksThreeSteps from '$components/how-it-works-three-steps.svelte';
 	import WhySnapvieSection from '$components/why-snapvie-section.svelte';
 	import { extract, extractYouTubeVideoId, isValidVideoUrl } from '$lib/api';
@@ -23,6 +22,7 @@
 		trackSeoExtractSuccess
 	} from '$lib/analytics/seo-page-events';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let { config }: { config: LandingPageConfig } = $props();
 
@@ -56,11 +56,11 @@
 		const url = inputUrl.trim();
 
 		if (!url) {
-			extractError = 'Please paste a YouTube URL first.';
+			extractError = m.lp_error_paste_url();
 			return;
 		}
 		if (!isValidVideoUrl(url)) {
-			extractError = 'That does not look like a valid YouTube URL. Please check and try again.';
+			extractError = m.lp_error_invalid_url();
 			return;
 		}
 
@@ -74,7 +74,7 @@
 		try {
 			const result = await extract(url);
 			if (!result.streams.length) {
-				extractError = 'No downloadable streams found for this video.';
+				extractError = m.lp_error_no_streams();
 				return;
 			}
 			extractResult = result;
@@ -83,7 +83,7 @@
 				document.getElementById('lp-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 			});
 		} catch (err) {
-			extractError = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+			extractError = err instanceof Error ? err.message : m.lp_error_generic();
 		} finally {
 			isExtracting = false;
 		}
@@ -96,8 +96,8 @@
 	<div class="hero-orb absolute bottom-[20%] right-[10%] w-32 h-32 rounded-3xl rotate-12 bg-primary/10 blur-xl animate-bob-delayed"></div>
 	<div class="relative z-10 w-full max-w-4xl mx-auto text-center">
 		<!-- Breadcrumb -->
-		<nav aria-label="Breadcrumb" class="mb-4 flex justify-center gap-2 text-xs font-semibold text-plum/50">
-			<a href="/" class="hover:text-primary transition-colors">Snapvie</a>
+		<nav aria-label={m.lp_breadcrumb_aria()} class="mb-4 flex justify-center gap-2 text-xs font-semibold text-plum/50">
+			<a href="/" class="hover:text-primary transition-colors">{m.lp_breadcrumb_home()}</a>
 			<span>›</span>
 			<span class="text-plum/70">{config.h1}</span>
 		</nav>
@@ -122,11 +122,11 @@
 				</div>
 				<input
 					class="h-full w-full border-none bg-transparent px-4 text-lg font-semibold text-plum placeholder:text-muted/50 focus:ring-0 md:text-xl"
-					placeholder="Paste YouTube URL here..."
+					placeholder={m.lp_input_placeholder()}
 					type="text"
 					bind:value={inputUrl}
 					disabled={isExtracting}
-					aria-label="YouTube video URL"
+					aria-label={m.lp_input_aria()}
 					onfocus={() => trackSeoInputFocus(seoParams)}
 				/>
 				<button
@@ -134,7 +134,7 @@
 					type="submit"
 					disabled={isExtracting}
 				>
-					<span class="hidden md:inline">{isExtracting ? 'Fetching...' : 'Get Download'}</span>
+					<span class="hidden md:inline">{isExtracting ? m.lp_button_fetching() : m.lp_button_get_download()}</span>
 					<AppIcon
 						name={isExtracting ? 'progress_activity' : 'bolt'}
 						class={`text-base font-bold md:text-lg ${isExtracting ? 'animate-spin' : ''}`}
@@ -148,7 +148,7 @@
 			{#if isExtracting}
 				<p class="mt-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-bold text-primary shadow-sm">
 					<AppIcon name="progress_activity" class="animate-spin text-base" />
-					Analyzing link...
+					{m.lp_analyzing()}
 				</p>
 			{/if}
 		</form>
@@ -157,15 +157,15 @@
 		<div class="flex flex-wrap justify-center gap-3 opacity-80">
 			<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
 				<AppIcon name="check_circle" class="text-lg text-green-500" />
-				<span class="text-xs font-bold text-plum/70">No Ads</span>
+				<span class="text-xs font-bold text-plum/70">{m.lp_chip_no_ads()}</span>
 			</div>
 			<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
 				<AppIcon name="verified_user" class="text-lg text-blue-500" />
-				<span class="text-xs font-bold text-plum/70">Safe &amp; Secure</span>
+				<span class="text-xs font-bold text-plum/70">{m.lp_chip_safe()}</span>
 			</div>
 			<div class="flex items-center gap-2 rounded-xl border border-white/50 bg-white/60 px-3 py-1.5">
 				<AppIcon name="rocket_launch" class="text-lg text-purple-500" />
-				<span class="text-xs font-bold text-plum/70">Super Fast</span>
+				<span class="text-xs font-bold text-plum/70">{m.lp_chip_fast()}</span>
 			</div>
 		</div>
 	</div>
@@ -188,10 +188,10 @@
 							</div>
 						{/if}
 						<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-						<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/20">Ready</div>
+						<div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/20">{m.lp_badge_ready()}</div>
 					</div>
 					<h3 class="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{extractResult.title}</h3>
-					<p class="text-slate-500 font-semibold">Select a format below, then download.</p>
+					<p class="text-slate-500 font-semibold">{m.lp_select_format()}</p>
 				</div>
 				<div class="flex-1 flex flex-col bg-white">
 					<div class="p-5 md:p-6 pb-4">
@@ -219,6 +219,7 @@
 </section>
 
 		<WhySnapvieSection
+			ctaHref="#lp-hero"
 			cards={config.uspBullets.map((usp, index) => ({
 				icon: usp.icon,
 				title: usp.title,
@@ -228,40 +229,27 @@
 			}))}
 		/>
 
-		<!-- FAQ -->
-		<FrequentlyAskedQuestionsSection items={config.faqItems} />
-
-		<!-- Related Guides (only shown when content registry has matching entries) -->
-		{#if relatedGuides.length > 0}
-			<section class="related-guides-section py-10 px-6 lg:px-20">
-				<div class="max-w-4xl mx-auto">
-					<h2 class="related-guides-title text-xl font-bold text-plum mb-6">Related Guides</h2>
-					<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-						{#each relatedGuides as guide}
-							<a
-								href="/guides/{guide.slug}"
-								class="related-guide-card rounded-2xl border border-pink-100 bg-white p-5 flex flex-col gap-2 hover:border-primary hover:shadow-md transition-all"
-							>
-								<span class="related-guide-card-title text-sm font-bold text-plum leading-snug">
-									{guide.h1}
-								</span>
-								{#if guide.quickAnswer}
-									<p class="text-xs text-plum/60 font-medium leading-relaxed line-clamp-3">
-										{guide.quickAnswer}
-									</p>
-								{/if}
-								<span class="mt-auto pt-1 text-xs font-bold text-primary">Read guide →</span>
-							</a>
-						{/each}
-					</div>
-				</div>
-			</section>
-		{/if}
-
-		<!-- Related pages / cross-links -->
-		<ExploreMoreSnapvieTools
-			showHomeLink={true}
-			links={config.relatedPages.map((rel) => ({ href: `/${rel.slug}`, label: rel.label }))}
+		<KnowledgeSections
+			faqItems={config.faqItems}
+			resourceTitle={relatedGuides.length > 0 ? m.lp_resource_guides() : m.lp_resource_more()}
+			resourceGroups={relatedGuides.length > 0
+				? [
+					{
+						label: m.lp_related_guides(),
+						links: relatedGuides.map((guide) => ({ href: `/guides/${guide.slug}`, label: guide.h1 })),
+						ctaHref: '/guides',
+						ctaLabel: m.lp_view_all_guides()
+					},
+					{
+						label: m.lp_snapvie_tools(),
+						links: config.relatedPages.map((rel) => ({ href: `/${rel.slug}`, label: rel.label })),
+						ctaHref: '/',
+						ctaLabel: m.lp_back_to_snapvie()
+					}
+				]
+				: []}
+			resourceLinks={relatedGuides.length > 0 ? [] : config.relatedPages.map((rel) => ({ href: `/${rel.slug}`, label: rel.label }))}
+			showHomeLink={relatedGuides.length === 0}
 		/>
 
 <style>
@@ -313,35 +301,5 @@
 	:global(.page-root.theme-dark [class*='border-slate']),
 	:global(.page-root.theme-dark [class*='border-indigo']) {
 		border-color: rgba(255, 77, 140, 0.18) !important;
-	}
-
-	.related-guides-title {
-		font-family: 'Fredoka', sans-serif;
-		font-weight: 700;
-	}
-
-	.related-guide-card-title {
-		font-family: 'Fredoka', sans-serif;
-	}
-
-	:global(.page-root.theme-dark) .related-guides-section {
-		background: transparent;
-	}
-
-	:global(.page-root.theme-dark) .related-guide-card {
-		background-color: rgba(30, 30, 42, 0.6);
-		border-color: rgba(255, 77, 140, 0.16);
-	}
-
-	:global(.page-root.theme-dark) .related-guide-card:hover {
-		border-color: rgba(255, 77, 140, 0.42);
-	}
-
-	:global(.page-root.theme-dark) .related-guides-title {
-		color: #ffffff;
-	}
-
-	:global(.page-root.theme-dark) .related-guide-card-title {
-		color: #ffffff;
 	}
 </style>

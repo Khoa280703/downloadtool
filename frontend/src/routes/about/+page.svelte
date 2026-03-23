@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { buildOrganizationSchema, buildBreadcrumbSchema } from '$lib/seo/structured-data';
 	import { SITE_URL } from '$lib/seo/public-pages';
+	import * as m from '$lib/paraglide/messages';
 
 	const jsonLd = JSON.stringify(
 		{
@@ -11,7 +12,7 @@
 				buildOrganizationSchema(),
 				buildBreadcrumbSchema([
 					{ name: 'Snapvie', url: SITE_URL },
-					{ name: 'About', url: `${SITE_URL}/about` }
+					{ name: m.about_breadcrumb(), url: `${SITE_URL}/about` }
 				])
 			]
 		},
@@ -20,21 +21,21 @@
 	);
 
 	onMount(() => {
-		trackPageView('/about', 'About Snapvie — Free 4K YouTube Video Downloader');
+		trackPageView('/about', m.about_og_title());
 	});
 </script>
 
 <svelte:head>
-	<title>About Snapvie — Free 4K YouTube Video Downloader</title>
+	<title>{m.about_og_title()}</title>
 	<meta
 		name="description"
-		content="Learn about Snapvie — a free, ad-free YouTube video downloader supporting 4K, 8K HDR, playlists, Shorts, and audio-only downloads."
+		content={m.about_meta_description()}
 	/>
 	<link rel="canonical" href="https://snapvie.com/about" />
-	<meta property="og:title" content="About Snapvie — Free 4K YouTube Video Downloader" />
+	<meta property="og:title" content={m.about_og_title()} />
 	<meta
 		property="og:description"
-		content="Learn about Snapvie — a free, ad-free YouTube video downloader supporting 4K, 8K HDR, playlists, Shorts, and audio-only downloads."
+		content={m.about_meta_description()}
 	/>
 	<meta property="og:url" content="https://snapvie.com/about" />
 	<meta property="og:type" content="website" />
@@ -43,98 +44,67 @@
 </svelte:head>
 
 <div class="legal-page">
-	<h1>About Snapvie</h1>
-	<p class="tagline">Free, fast, and genuinely ad-free.</p>
+	<h1>{m.about_title()}</h1>
+	<p class="tagline">{m.about_tagline()}</p>
 
 	<section>
-		<h2>What is Snapvie?</h2>
-		<p>
-			Snapvie is a free YouTube video downloader that lets you save videos in the highest available
-			quality — including 4K, 8K HDR, and HDR10+. No account required, no ads, no watermarks.
-		</p>
-		<p>
-			We built Snapvie because most downloader tools are cluttered with ads, require sign-ups, or cap
-			quality at 1080p. Snapvie strips all of that away and focuses on one thing: getting you the
-			best possible file from the video you want.
-		</p>
+		<h2>{m.about_what_is_title()}</h2>
+		<p>{m.about_what_is_p1()}</p>
+		<p>{m.about_what_is_p2()}</p>
 	</section>
 
 	<section>
-		<h2>What Snapvie Supports</h2>
+		<h2>{m.about_supports_title()}</h2>
 		<ul>
-			<li><strong>4K &amp; 8K HDR</strong> — download in full original quality, no compression</li>
-			<li><strong>Playlists</strong> — batch download entire YouTube playlists at once</li>
-			<li><strong>YouTube Shorts</strong> — works just like regular videos</li>
-			<li><strong>Audio-only</strong> — extract audio as a clean file without video</li>
-			<li><strong>No account required</strong> — paste a URL and download, that's it</li>
+			<li><strong>{m.about_supports_4k()}</strong> — {m.about_supports_4k_desc()}</li>
+			<li><strong>{m.about_supports_playlists()}</strong> — {m.about_supports_playlists_desc()}</li>
+			<li><strong>{m.about_supports_shorts()}</strong> — {m.about_supports_shorts_desc()}</li>
+			<li><strong>{m.about_supports_audio()}</strong> — {m.about_supports_audio_desc()}</li>
+			<li><strong>{m.about_supports_no_account()}</strong> — {m.about_supports_no_account_desc()}</li>
 		</ul>
 	</section>
 
 	<section>
-		<h2>How Snapvie Works</h2>
-		<p>
-			The process is straightforward. Paste a YouTube URL — Snapvie fetches the available streams
-			directly from YouTube's delivery infrastructure. You choose the quality (up to 8K HDR) and
-			format (MP4, WebM, or audio-only). The file is delivered to your browser without being stored
-			on our servers: streams are proxied in real time, then discarded.
-		</p>
-		<p>
-			For playlists, Snapvie processes each video in batch and tracks progress item by item. You can
-			start a playlist download and come back when it's done.
-		</p>
+		<h2>{m.about_how_works_title()}</h2>
+		<p>{m.about_how_works_p1()}</p>
+		<p>{m.about_how_works_p2()}</p>
 	</section>
 
 	<section>
-		<h2>Built for Quality</h2>
-		<p>
-			YouTube delivers high-resolution video and audio as separate DASH streams. Most tools skip the
-			merge step and cap output at 1080p, because that's where the combined stream ends. Snapvie
-			performs real-time muxing — merging video and audio on the fly — so if YouTube offers 4K or
-			8K, you get 4K or 8K.
-		</p>
+		<h2>{m.about_built_quality_title()}</h2>
+		<p>{m.about_built_quality_p1()}</p>
 		<ul>
-			<li><strong>No quality caps</strong> — whatever YouTube offers, Snapvie delivers</li>
-			<li><strong>Real-time muxing</strong> — video and audio merged on the fly, no re-encoding</li>
-			<li><strong>No ads, no popups, no dark patterns</strong> — the tool does one thing</li>
-			<li><strong>Any modern browser</strong> — desktop or mobile, no extension required</li>
+			<li><strong>{m.about_built_quality_no_caps()}</strong> — {m.about_built_quality_no_caps_desc()}</li>
+			<li><strong>{m.about_built_quality_realtime()}</strong> — {m.about_built_quality_realtime_desc()}</li>
+			<li><strong>{m.about_built_quality_no_ads()}</strong> — {m.about_built_quality_no_ads_desc()}</li>
+			<li><strong>{m.about_built_quality_any_browser()}</strong> — {m.about_built_quality_any_browser_desc()}</li>
 		</ul>
 	</section>
 
 	<section>
-		<h2>Our Mission</h2>
-		<p>
-			To provide safe, ad-free, high-quality video downloads for personal and educational use. We
-			believe accessing content you're entitled to download shouldn't require installing sketchy
-			software or sitting through five ad popups.
-		</p>
-		<p>
-			Snapvie is provided as a tool for lawful personal use only. We ask all users to respect
-			copyright and YouTube's Terms of Service.
-		</p>
+		<h2>{m.about_mission_title()}</h2>
+		<p>{m.about_mission_p1()}</p>
+		<p>{m.about_mission_disclaimer()}</p>
 	</section>
 
 	<section>
-		<h2>Privacy &amp; No Tracking</h2>
-		<p>
-			We don't sell your data. We don't track what videos you download. Video URLs you submit are
-			processed to fetch stream info and then discarded. See our <a href="/privacy">Privacy Policy</a
-			> for full details.
-		</p>
+		<h2>{m.about_privacy_title()}</h2>
+		<p>{m.about_privacy_p1()}</p>
 	</section>
 
 	<section class="internal-links">
-		<h2>Learn More</h2>
+		<h2>{m.about_learn_more_title()}</h2>
 		<ul>
-			<li><a href="/guides">Read our guides</a> — step-by-step tutorials for common download tasks</li>
+			<li><a href="/guides">{m.about_learn_more_guides()}</a> — {m.about_learn_more_guides_desc()}</li>
 			<li>
-				<a href="/compare">See how Snapvie compares</a> — side-by-side vs. other tools
+				<a href="/compare">{m.about_learn_more_compare()}</a> — {m.about_learn_more_compare_desc()}
 			</li>
-			<li><a href="/contact">Get in touch</a> — questions, feedback, or DMCA requests</li>
+			<li><a href="/contact">{m.about_learn_more_contact()}</a> — {m.about_learn_more_contact_desc()}</li>
 		</ul>
 	</section>
 
 	<div class="back-link">
-		<a href="/">← Back to Snapvie</a>
+		<a href="/">{m.common_back_to_snapvie()}</a>
 	</div>
 </div>
 

@@ -1,107 +1,77 @@
 <script lang="ts">
 	import { trackPageView } from '$lib/analytics';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	onMount(() => {
-		trackPageView('/terms', 'Terms of Service — Snapvie');
+		trackPageView('/terms', m.terms_meta_title());
 	});
 </script>
 
 <svelte:head>
-	<title>Terms of Service — Snapvie</title>
+	<title>{m.terms_meta_title()}</title>
 	<meta
 		name="description"
-		content="Snapvie Terms of Service: acceptable use, copyright compliance, and user responsibilities for our free YouTube video downloader."
+		content={m.terms_meta_description()}
 	/>
 	<link rel="canonical" href="https://snapvie.com/terms" />
 </svelte:head>
 
 <div class="legal-page">
-	<h1>Terms of Service</h1>
-	<p class="tagline">Last updated: March 19, 2026</p>
+	<h1>{m.terms_title()}</h1>
+	<p class="tagline">{m.terms_last_updated()}</p>
 
 	<section>
-		<h2>1. Acceptance of Terms</h2>
-		<p>
-			By using Snapvie ("the Service"), you agree to these Terms of Service. If you do not agree,
-			please do not use the Service. These terms apply to all users of snapvie.com.
-		</p>
+		<h2>{m.terms_s1_title()}</h2>
+		<p>{m.terms_s1_p1()}</p>
 	</section>
 
 	<section>
-		<h2>2. Acceptable Use</h2>
-		<p>Snapvie is provided for personal and educational use only. You may use the Service to:</p>
+		<h2>{m.terms_s2_title()}</h2>
+		<p>{m.terms_s2_p1()}</p>
 		<ul>
-			<li>Download videos for offline personal viewing</li>
-			<li>Save content for educational or research purposes</li>
-			<li>Extract audio for personal listening</li>
+			<li>{m.terms_s2_allowed1()}</li>
+			<li>{m.terms_s2_allowed2()}</li>
+			<li>{m.terms_s2_allowed3()}</li>
 		</ul>
-		<p>You may <strong>not</strong> use Snapvie to:</p>
+		<p>{m.terms_s2_p2()}</p>
 		<ul>
-			<li>Commercially redistribute, sell, or monetize downloaded content</li>
-			<li>Upload downloaded content to other platforms without rights to do so</li>
-			<li>Scrape or automate requests to our service in ways that harm availability</li>
-			<li>Circumvent technical measures in a way that violates applicable law</li>
+			<li>{m.terms_s2_denied1()}</li>
+			<li>{m.terms_s2_denied2()}</li>
+			<li>{m.terms_s2_denied3()}</li>
+			<li>{m.terms_s2_denied4()}</li>
 		</ul>
 	</section>
 
 	<section>
-		<h2>3. Copyright Compliance</h2>
-		<p>
-			You are solely responsible for ensuring that your use of downloaded content complies with
-			applicable copyright law and the Terms of Service of the source platform. Snapvie does not
-			host, store, or control any video content — it facilitates access to publicly available
-			streams.
-		</p>
-		<p>
-			Downloading copyrighted material without authorization from the rights holder may violate
-			applicable law. Use the Service only for content you have rights to download.
-		</p>
+		<h2>{m.terms_s3_title()}</h2>
+		<p>{m.terms_s3_p1()}</p>
+		<p>{m.terms_s3_p2()}</p>
 	</section>
 
 	<section>
-		<h2>4. Service Provided As-Is</h2>
-		<p>
-			Snapvie is provided "as-is" without warranties of any kind, express or implied. We do not
-			guarantee that the Service will be uninterrupted, error-free, or that any specific video will
-			be downloadable at any given time.
-		</p>
-		<p>
-			We reserve the right to modify, suspend, or discontinue any part of the Service at any time
-			without notice.
-		</p>
+		<h2>{m.terms_s4_title()}</h2>
+		<p>{m.terms_s4_p1()}</p>
+		<p>{m.terms_s4_p2()}</p>
 	</section>
 
 	<section>
-		<h2>5. User Responsibility</h2>
-		<p>
-			You use the Service at your own risk. Snapvie and its operators are not liable for any damages
-			arising from your use or inability to use the Service, or from any content you download using
-			it.
-		</p>
+		<h2>{m.terms_s5_title()}</h2>
+		<p>{m.terms_s5_p1()}</p>
 	</section>
 
 	<section>
-		<h2>6. Changes to These Terms</h2>
-		<p>
-			We may update these Terms from time to time. Changes will be posted on this page with an
-			updated date. Continued use of the Service after changes constitutes acceptance of the revised
-			Terms.
-		</p>
+		<h2>{m.terms_s6_title()}</h2>
+		<p>{m.terms_s6_p1()}</p>
 	</section>
 
 	<section>
-		<h2>7. Contact</h2>
-		<p>
-			Questions about these Terms? Email us at <a href="mailto:hello@snapvie.com"
-				>hello@snapvie.com</a
-			>
-			or see our <a href="/contact">contact page</a>.
-		</p>
+		<h2>{m.terms_s7_title()}</h2>
+		<p>{m.terms_s7_p1()}</p>
 	</section>
 
 	<div class="back-link">
-		<a href="/">← Back to Snapvie</a>
+		<a href="/">{m.common_back_to_snapvie()}</a>
 	</div>
 </div>
 

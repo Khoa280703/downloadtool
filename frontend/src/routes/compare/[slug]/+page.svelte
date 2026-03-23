@@ -8,8 +8,8 @@
 	import { buildContentPageJsonLd } from '$lib/seo/content/build-page-schema';
 	import { getRelatedContent } from '$lib/seo/content/related-content';
 	import { trackSeoPageView } from '$lib/analytics/seo-page-events';
-	import FrequentlyAskedQuestionsSection from '$components/frequently-asked-questions-section.svelte';
-	import ExploreMoreSnapvieTools from '$components/explore-more-snapvie-tools.svelte';
+	import KnowledgeSections from '$components/knowledge-sections.svelte';
+	import * as m from '$lib/paraglide/messages';
 	import { onMount } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -47,9 +47,9 @@
 <article class="max-w-3xl mx-auto px-6 pt-10 pb-16">
 	<!-- Breadcrumb -->
 	<nav aria-label="Breadcrumb" class="mb-6 flex gap-2 text-xs font-semibold text-plum/50">
-		<a href="/" class="hover:text-primary transition-colors">Snapvie</a>
+		<a href="/" class="hover:text-primary transition-colors">{m.common_breadcrumb_snapvie()}</a>
 		<span>›</span>
-		<a href="/compare" class="hover:text-primary transition-colors">Compare</a>
+		<a href="/compare" class="hover:text-primary transition-colors">{m.compare_breadcrumb()}</a>
 		<span>›</span>
 		<span class="text-plum/70 line-clamp-1">{data.entry.h1}</span>
 	</nav>
@@ -73,7 +73,7 @@
 
 	<!-- Quick answer box -->
 	<div class="quick-answer rounded-2xl border border-primary/20 bg-pink-50 p-5 mb-10">
-		<p class="text-xs font-bold text-primary uppercase tracking-wider mb-2">Quick Summary</p>
+		<p class="text-xs font-bold text-primary uppercase tracking-wider mb-2">{m.content_quick_summary()}</p>
 		<p class="text-sm font-semibold text-plum leading-relaxed">{data.entry.quickAnswer}</p>
 	</div>
 
@@ -93,7 +93,7 @@
 	<!-- Related comparisons -->
 	{#if related.length > 0}
 		<section class="mt-10 pt-8 border-t border-pink-100">
-			<h2 class="text-lg font-bold text-plum mb-4" style="font-family:'Fredoka',sans-serif">Related Comparisons</h2>
+			<h2 class="text-lg font-bold text-plum mb-4" style="font-family:'Fredoka',sans-serif">{m.content_related_comparisons()}</h2>
 			<div class="grid gap-3 sm:grid-cols-2">
 				{#each related as rel (rel.slug)}
 					<a
@@ -110,29 +110,26 @@
 	<!-- CTA to money page -->
 	{#if data.entry.relatedMoneyPage}
 		<section class="mt-10 rounded-2xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 p-6 text-center">
-			<p class="text-sm font-bold text-plum mb-3">See for yourself — try Snapvie free.</p>
+			<p class="text-sm font-bold text-plum mb-3">{m.content_cta_see_yourself()}</p>
 			<a
 				href="/{data.entry.relatedMoneyPage}"
 				class="inline-block rounded-full bg-gradient-to-r from-primary to-secondary px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110 transition-all"
 				style="font-family:'Fredoka',sans-serif"
 			>
-				Try Snapvie Free
+				{m.content_cta_button()}
 			</a>
 		</section>
 	{/if}
 </article>
 
-<!-- FAQ accordion -->
 {#if data.entry.faqItems && data.entry.faqItems.length > 0}
-	<FrequentlyAskedQuestionsSection items={data.entry.faqItems} />
+	<KnowledgeSections
+		faqItems={data.entry.faqItems}
+		resourceTitle={m.content_more_from_snapvie()}
+		resourceLinks={related.map((r) => ({ href: `/compare/${r.slug}`, label: r.h1 }))}
+		showHomeLink={true}
+	/>
 {/if}
-
-<!-- Cross-links -->
-<ExploreMoreSnapvieTools
-	showHomeLink={true}
-	title="More from Snapvie"
-	links={related.map((r) => ({ href: `/compare/${r.slug}`, label: r.h1 }))}
-/>
 
 <style>
 	.prose-content :global(ol) {
